@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pet_care/models/pet.dart';
 import 'package:pet_care/providers/pet_providers.dart';
 import 'package:pet_care/providers/auth_providers.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:pet_care/services/avatar_upload_service.dart';
 
 class PetDetailsScreen extends ConsumerStatefulWidget {
   final String species;
@@ -26,6 +26,7 @@ class _PetDetailsScreenState extends ConsumerState<PetDetailsScreen> {
   String? _photoUrl;
   bool _isUploading = false;
   bool _isSaving = false;
+  double _uploadProgress = 0.0;
 
   @override
   void dispose() {
@@ -62,28 +63,57 @@ class _PetDetailsScreenState extends ConsumerState<PetDetailsScreen> {
   }
 
   Future<void> _pickPhoto() async {
-    try {
-      setState(() => _isUploading = true);
+    if (_isUploading) return;
 
-      final ImagePicker picker = ImagePicker();
-      final XFile? image = await picker.pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 1024,
-        maxHeight: 1024,
-        imageQuality: 85,
+    try {
+      setState(() {
+        _isUploading = true;
+        _uploadProgress = 0.0;
+      });
+
+      // Get the avatar upload service
+      final supabase = ref.read(supabaseProvider);
+      final avatarService = AvatarUploadService(supabase);
+
+      // Show picker dialog
+      final imageFile = await avatarService.showImageSourceDialog(context);
+
+      if (imageFile == null) {
+        setState(() {
+          _isUploading = false;
+        });
+        return;
+      }
+
+      // Get user ID for upload path
+      final user = ref.read(currentUserProvider);
+      if (user == null) {
+        throw Exception('User not logged in');
+      }
+
+      // Upload to Supabase storage
+      final photoUrl = await avatarService.uploadAvatar(
+        userId: 'pets/${user.id}', // Store in pets subfolder
+        imageFile: imageFile,
+        onProgress: (progress) {
+          setState(() {
+            _uploadProgress = progress;
+          });
+        },
       );
 
-      if (image != null) {
-        // TODO: Upload to Supabase storage
-        // For now, just use the local path
-        setState(() {
-          _photoUrl = image.path;
-        });
-      }
+      setState(() {
+        _photoUrl = photoUrl;
+      });
+
+      _showSnackBar('Photo uploaded successfully!');
     } catch (e) {
-      _showSnackBar('Failed to pick photo: $e', isError: true);
+      _showSnackBar('Failed to upload photo: $e', isError: true);
     } finally {
-      setState(() => _isUploading = false);
+      setState(() {
+        _isUploading = false;
+        _uploadProgress = 0.0;
+      });
     }
   }
 
@@ -121,8 +151,6 @@ class _PetDetailsScreenState extends ConsumerState<PetDetailsScreen> {
 
       if (mounted) {
         _showSnackBar('${pet.name} added successfully!');
-
-        // Show option to add another pet or go home
         _showAddAnotherDialog();
       }
     } catch (e) {
@@ -138,20 +166,20 @@ class _PetDetailsScreenState extends ConsumerState<PetDetailsScreen> {
       barrierDismissible: false,
       builder:
           (context) => AlertDialog(
-            title: const Text('Pet Added! 🎉'),
+            title: const Text('Pet Added!'),
             content: const Text('Would you like to add another pet?'),
             actions: [
               TextButton(
                 onPressed: () {
-                  Navigator.of(context).pop(); // Close dialog
+                  Navigator.of(context).pop();
                   Navigator.of(context).pushReplacementNamed('/home');
                 },
                 child: const Text('Go to Home'),
               ),
               ElevatedButton(
                 onPressed: () {
-                  Navigator.of(context).pop(); // Close dialog
-                  Navigator.of(context).pop(); // Go back to species selection
+                  Navigator.of(context).pop();
+                  Navigator.of(context).pop();
                 },
                 child: const Text('Add Another'),
               ),
@@ -295,9 +323,23 @@ class _PetDetailsScreenState extends ConsumerState<PetDetailsScreen> {
                               color: Colors.black.withOpacity(0.5),
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            child: const Center(
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
+                            child: Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const CircularProgressIndicator(
+                                    color: Colors.white,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    '${(_uploadProgress * 100).toInt()}%',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ),

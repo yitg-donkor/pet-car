@@ -1,4 +1,6 @@
 // providers/pet_providers.dart
+import 'package:image_picker/image_picker.dart';
+import 'package:pet_care/services/avatar_upload_service.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../models/pet.dart';
 import '../models/medical_record.dart';
@@ -68,6 +70,36 @@ class Pets extends _$Pets {
     await supabase.from('pets').delete().eq('id', petId);
     ref.invalidateSelf();
   }
+
+  AvatarUploadService get _avatarService =>
+      AvatarUploadService(ref.read(supabaseProvider));
+
+  //     Future<String> uploadPetAvatar({
+  //   required XFile imageFile,
+  //   Function(double)? onProgress,
+  // }) async {
+  //   final user = ref.read(currentUserProvider);
+  //   if (user == null) throw Exception('No user logged in');
+
+  //   try {
+  //     // Upload image to storage
+  //     final petAvatarUrl = await _avatarService.uploadAvatar(
+  //       userId: user.id,
+  //       imageFile: imageFile,
+  //       onProgress: onProgress,
+  //     );
+
+  //     // Update profile with new avatar URL
+  //     await updatePet(
+
+  //       photo_url: petAvatarUrl
+  //     );
+
+  //     return petAvatarUrl;
+  //   } catch (e) {
+  //     throw Exception('Failed to upload avatar: $e');
+  //   }
+  // }
 }
 
 // Selected pet provider (for pet details screen)
