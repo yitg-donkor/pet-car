@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pet_care/models/pet.dart';
+import 'package:pet_care/providers/pet_providers.dart';
 
 class PetsScreen extends ConsumerWidget {
   const PetsScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final petsAsync = ref.watch(petsProvider);
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
@@ -21,94 +25,110 @@ class PetsScreen extends ConsumerWidget {
         ),
         actions: [
           IconButton(
-            onPressed: () => _showAddPetDialog(context),
+            onPressed: () {
+              Navigator.of(context).pushReplacementNamed('/pet_selection');
+            },
             icon: const Icon(Icons.add, color: Colors.black),
           ),
         ],
       ),
-      body: ListView(
+      body: Padding(
         padding: const EdgeInsets.all(20),
-        children: [
-          // Search Bar
-          Container(
-            margin: const EdgeInsets.only(bottom: 20),
-            padding: const EdgeInsets.symmetric(horizontal: 15),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(25),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
-                  spreadRadius: 1,
-                  blurRadius: 5,
-                  offset: const Offset(0, 2),
+        child: Column(
+          children: [
+            // Search Bar
+            Container(
+              margin: const EdgeInsets.only(bottom: 20),
+              padding: const EdgeInsets.symmetric(horizontal: 15),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(25),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.1),
+                    spreadRadius: 1,
+                    blurRadius: 5,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: const TextField(
+                decoration: InputDecoration(
+                  hintText: 'Search pets...',
+                  prefixIcon: Icon(Icons.search, color: Colors.grey),
+                  border: InputBorder.none,
                 ),
-              ],
-            ),
-            child: const TextField(
-              decoration: InputDecoration(
-                hintText: 'Search pets...',
-                prefixIcon: Icon(Icons.search, color: Colors.grey),
-                border: InputBorder.none,
               ),
             ),
-          ),
 
-          // Pet Cards
-          _buildPetCard(
-            name: 'Buddy',
-            type: 'Golden Retriever',
-            age: '3 years old',
-            imageUrl:
-                'https://images.unsplash.com/photo-1552053831-71594a27632d?w=150&h=150&fit=crop&crop=face',
-            healthStatus: 'Healthy',
-            isHealthy: true,
-            nextVet: 'Oct 26, 2:00 PM',
-          ),
-
-          _buildPetCard(
-            name: 'Whiskers',
-            type: 'Persian Cat',
-            age: '2 years old',
-            imageUrl:
-                'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=150&h=150&fit=crop&crop=face',
-            healthStatus: 'Healthy',
-            isHealthy: true,
-            nextVet: 'Dec 15, 10:00 AM',
-          ),
-
-          _buildPetCard(
-            name: 'Nemo',
-            type: 'Goldfish',
-            age: '1 year old',
-            imageUrl:
-                'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=150&h=150&fit=crop&crop=center',
-            healthStatus: 'Needs Attention',
-            isHealthy: false,
-            nextVet: 'Nov 1, 9:00 AM',
-          ),
-
-          _buildPetCard(
-            name: 'Charlie',
-            type: 'Beagle',
-            age: '5 years old',
-            imageUrl:
-                'https://images.unsplash.com/photo-1551717743-49959800b1f6?w=150&h=150&fit=crop&crop=face',
-            healthStatus: 'Healthy',
-            isHealthy: true,
-            nextVet: 'Jan 10, 3:30 PM',
-          ),
-        ],
+            // Pets List
+            Expanded(
+              child: petsAsync.when(
+                data: (pets) {
+                  if (pets.isEmpty) {
+                    return const Center(
+                      child: Text(
+                        'No pets found',
+                        style: TextStyle(fontSize: 16, color: Colors.grey),
+                      ),
+                    );
+                  }
+                  return ListView.builder(
+                    itemCount: pets.length,
+                    itemBuilder: (context, index) {
+                      final pet = pets[index];
+                      return _buildPetCard(
+                        name: pet.name,
+                        type: pet.species,
+                        isHealthy: true,
+                        age: pet.age ?? 0,
+                        imageUrl: pet.photoUrl ?? '',
+                        breed: pet.breed ?? 'Unknown',
+                        nextVet: '2024-12-01',
+                      );
+                    },
+                  );
+                },
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error:
+                    (error, stack) => Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.error_outline,
+                            color: Colors.red,
+                            size: 48,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Error: $error',
+                            style: const TextStyle(color: Colors.red),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
+  }
+
+  String _calculateAge(DateTime? birthDate) {
+    if (birthDate == null) return 'Unknown';
+    final age = DateTime.now().difference(birthDate).inDays ~/ 365;
+    return '$age ${age == 1 ? 'year' : 'years'}';
   }
 
   Widget _buildPetCard({
     required String name,
     required String type,
-    required String age,
+    required int age,
     required String imageUrl,
-    required String healthStatus,
+    required String breed,
     required bool isHealthy,
     required String nextVet,
   }) {
@@ -135,11 +155,19 @@ class PetsScreen extends ConsumerWidget {
             height: 70,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(15),
-              image: DecorationImage(
-                image: NetworkImage(imageUrl),
-                fit: BoxFit.cover,
-              ),
+              color: Colors.grey.shade200,
+              image:
+                  imageUrl.isNotEmpty
+                      ? DecorationImage(
+                        image: NetworkImage(imageUrl),
+                        fit: BoxFit.cover,
+                      )
+                      : null,
             ),
+            child:
+                imageUrl.isEmpty
+                    ? Icon(Icons.pets, size: 40, color: Colors.grey.shade400)
+                    : null,
           ),
           const SizedBox(width: 15),
 
@@ -172,7 +200,7 @@ class PetsScreen extends ConsumerWidget {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        healthStatus,
+                        breed,
                         style: TextStyle(
                           color:
                               isHealthy
@@ -196,7 +224,7 @@ class PetsScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  age,
+                  '$age ${age == 1 ? 'year' : 'years'} old',
                   style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
                 ),
                 const SizedBox(height: 8),
@@ -241,70 +269,6 @@ class PetsScreen extends ConsumerWidget {
           ),
         ],
       ),
-    );
-  }
-
-  void _showAddPetDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          title: const Text('Add New Pet'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                decoration: InputDecoration(
-                  labelText: 'Pet Name',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 15),
-              TextField(
-                decoration: InputDecoration(
-                  labelText: 'Pet Type/Breed',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 15),
-              TextField(
-                decoration: InputDecoration(
-                  labelText: 'Age',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                // Add pet logic here
-                Navigator.of(context).pop();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF4CAF50),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              child: const Text('Add Pet'),
-            ),
-          ],
-        );
-      },
     );
   }
 }

@@ -86,7 +86,7 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
 
       if (mounted) {
         // Navigate to home
-        Navigator.of(context).pushReplacementNamed('/home');
+        Navigator.of(context).pushReplacementNamed('/pet_selection');
       }
     } catch (e) {
       if (mounted) {

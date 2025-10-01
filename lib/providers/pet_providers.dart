@@ -26,9 +26,12 @@ class Pets extends _$Pets {
 
   Future<void> addPet(Pet pet) async {
     final supabase = ref.read(supabaseProvider);
+    final user = ref.read(currentUserProvider);
+
+    if (user == null) throw Exception('User not logged in');
 
     await supabase.from('pets').insert({
-      'owner_id': pet.ownerId,
+      'owner_id': user.id,
       'name': pet.name,
       'species': pet.species,
       'breed': pet.breed,
@@ -38,7 +41,6 @@ class Pets extends _$Pets {
       'microchip_id': pet.microchipId,
     });
 
-    // Refresh the pets list
     ref.invalidateSelf();
   }
 
@@ -47,7 +49,7 @@ class Pets extends _$Pets {
 
     await supabase
         .from('pets')
-        .update({
+        .upsert({
           'name': pet.name,
           'species': pet.species,
           'breed': pet.breed,

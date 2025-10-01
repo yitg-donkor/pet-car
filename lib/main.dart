@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pet_care/screens/onboarding_screens/introduction.dart';
 import 'package:pet_care/screens/onboarding_screens/onboarding_flow_screen.dart';
-//import 'package:pet_care/onboarding_screens/profile_location.dart';
+
 import 'package:pet_care/screens/onboarding_screens/profile_onboarding.dart';
+import 'package:pet_care/screens/pet_selection_screens/pet_selection.dart';
 import 'package:pet_care/screens/signupscreen.dart';
 import 'package:pet_care/widgets/onboarding.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -38,11 +39,12 @@ class MyApp extends StatelessWidget {
         '/': (context) => const AuthWrapper(), // Move AuthWrapper to routes
         '/login': (context) => const LoginScreen(),
         '/signup': (context) => const Signupscreen(),
-        '/home': (context) => Homescreen(),
+        '/nada': (context) => Homescreen(),
         '/introduction': (context) => const IntroductionScreen(),
         '/profile': (context) => const ProfileCreationScreen(),
-        //'/location': (context) => const ProfileLocation(),
+        '/pet_selection': (context) => const PetSpeciesSelectionScreen(),
         '/onboarding': (context) => const OnboardingFlowScreen(),
+        '/home': (context) => const MainNavigation(),
       },
       theme: ThemeData(primarySwatch: Colors.blue, useMaterial3: true),
       // Remove the home parameter completely

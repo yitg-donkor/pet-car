@@ -5,6 +5,7 @@ class Pet {
   final String name;
   final String species;
   final String? breed;
+  final int? age;
   final DateTime? birthDate;
   final double? weight;
   final String? photoUrl;
@@ -15,6 +16,7 @@ class Pet {
     required this.ownerId,
     required this.name,
     required this.species,
+    this.age,
     this.breed,
     this.birthDate,
     this.weight,
@@ -29,6 +31,7 @@ class Pet {
       name: json['name'],
       species: json['species'],
       breed: json['breed'],
+      age: json['age'],
       birthDate:
           json['birth_date'] != null
               ? DateTime.parse(json['birth_date'])
@@ -46,6 +49,7 @@ class Pet {
       'name': name,
       'species': species,
       'breed': breed,
+      'age': age,
       'birth_date': birthDate?.toIso8601String(),
       'weight': weight,
       'photo_url': photoUrl,

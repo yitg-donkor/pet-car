@@ -497,7 +497,7 @@ class Homescreen extends ConsumerWidget {
                     ),
                     ElevatedButton(
                       onPressed: () {
-                        Navigator.pushNamed(context, '/onboarding');
+                        Navigator.pushNamed(context, '/pet_selection');
                       },
                       child: Text("Go to Profile"),
                     ),
