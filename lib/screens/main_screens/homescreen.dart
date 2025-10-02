@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pet_care/providers/auth_providers.dart';
+import 'package:pet_care/screens/ai_features/ai_navigation_screen.dart';
 import 'package:pet_care/screens/main_screens/log.dart';
 import 'package:pet_care/screens/main_screens/petscreen.dart';
 import 'package:pet_care/screens/main_screens/reminders.dart';
@@ -26,6 +27,7 @@ class _MainNavigationState extends ConsumerState<MainNavigation> {
   final List<Widget> _screens = [
     const Homescreen(), // Your home screen
     const PetsScreen(), // Your pets screen
+    const AIDashboardScreen(userId: ''),
     const RemindersScreen(), // Your reminders screen
     const LogScreen(), // Your log screen
     const ResourcesScreen(), // Your resources screen
@@ -59,9 +61,10 @@ class _MainNavigationState extends ConsumerState<MainNavigation> {
           children: [
             _buildNavItem(Icons.home, 'Home', 0),
             _buildNavItem(Icons.pets, 'Pets', 1),
-            _buildNavItem(Icons.notifications, 'Reminders', 2),
-            _buildNavItem(Icons.edit_note, 'Log', 3),
-            _buildNavItem(Icons.library_books, 'Resources', 4),
+            _buildNavItem(Icons.auto_awesome, "AI", 2),
+            _buildNavItem(Icons.notifications, 'Reminders', 3),
+            _buildNavItem(Icons.edit_note, 'Log', 4),
+            _buildNavItem(Icons.library_books, 'Resources', 5),
           ],
         ),
       ),

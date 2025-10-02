@@ -191,4 +191,16 @@ class PetAIHelper {
       yield response.text ?? '';
     });
   }
+
+  Future<String> generateMonthlyReport(String prompt) async {
+    return await _aiService.generateText(prompt);
+  }
+
+  Future<String> generateSmartReminders(String prompt) async {
+    return await _aiService.generateText(prompt);
+  }
+
+  Future<String> generateHealthInsights(String prompt) async {
+    return await _aiService.generateText(prompt);
+  }
 }
