@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pet_care/providers/auth_providers.dart';
-import 'package:pet_care/screens/log.dart';
-import 'package:pet_care/screens/petscreen.dart';
-import 'package:pet_care/screens/reminders.dart';
-import 'package:pet_care/screens/resources.dart';
+import 'package:pet_care/screens/main_screens/log.dart';
+import 'package:pet_care/screens/main_screens/petscreen.dart';
+import 'package:pet_care/screens/main_screens/reminders.dart';
+import 'package:pet_care/screens/main_screens/resources.dart';
 // Import your screen files here
 // import 'homescreen.dart';
 // import 'pets_screen.dart';
@@ -368,6 +368,38 @@ class Homescreen extends ConsumerWidget {
                         ],
                       ),
                     ),
+                    Container(
+                      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Colors.purple, Colors.deepPurple],
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: ListTile(
+                        leading: Icon(Icons.auto_awesome, color: Colors.white),
+                        title: Text(
+                          'AI Vet Assistant',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        subtitle: Text(
+                          'Get instant pet care advice',
+                          style: TextStyle(color: Colors.white70),
+                        ),
+                        trailing: Icon(
+                          Icons.arrow_forward_ios,
+                          color: Colors.white,
+                          size: 16,
+                        ),
+                        onTap: () {
+                          Navigator.pushNamed(context, '/aichat');
+                          // Navigate to AI chat
+                        },
+                      ),
+                    ),
 
                     // View All Button
                     Center(
@@ -497,7 +529,7 @@ class Homescreen extends ConsumerWidget {
                     ),
                     ElevatedButton(
                       onPressed: () {
-                        Navigator.pushNamed(context, '/pet_selection');
+                        Navigator.pushNamed(context, '/aichat');
                       },
                       child: Text("Go to Profile"),
                     ),

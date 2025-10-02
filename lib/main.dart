@@ -1,17 +1,19 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pet_care/firebase_options.dart';
+import 'package:pet_care/screens/ai_features/aichatscreen.dart';
 import 'package:pet_care/screens/onboarding_screens/introduction.dart';
 import 'package:pet_care/screens/onboarding_screens/onboarding_flow_screen.dart';
-
 import 'package:pet_care/screens/onboarding_screens/profile_onboarding.dart';
 import 'package:pet_care/screens/pet_selection_screens/pet_selection.dart';
-import 'package:pet_care/screens/signupscreen.dart';
+import 'package:pet_care/screens/onboarding_screens/signupscreen.dart';
 import 'package:pet_care/widgets/onboarding.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'providers/auth_providers.dart';
 import 'package:rive/rive.dart' as rive;
-import 'screens/homescreen.dart';
-import 'screens/loginscreen.dart';
+import 'screens/main_screens/homescreen.dart';
+import 'screens/onboarding_screens/loginscreen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,6 +24,7 @@ Future<void> main() async {
     anonKey:
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1vYWlpZm1ncmJiY21udWJneHBtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgyMzA0MjMsImV4cCI6MjA3MzgwNjQyM30.WLfpehs4MY8wTzBepr5qhTeV-DiZwIT2Imy_WuQxueU',
   );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   runApp(const ProviderScope(child: MyApp()));
 }
@@ -45,6 +48,11 @@ class MyApp extends StatelessWidget {
         '/pet_selection': (context) => const PetSpeciesSelectionScreen(),
         '/onboarding': (context) => const OnboardingFlowScreen(),
         '/home': (context) => const MainNavigation(),
+        '/aichat':
+            (context) => const AIVetChatScreen(
+              petName: 'Buddy',
+              species: 'dog',
+            ), // Example route for AI chat screen
       },
       theme: ThemeData(primarySwatch: Colors.blue, useMaterial3: true),
       // Remove the home parameter completely
