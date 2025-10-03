@@ -1,67 +1,55 @@
-// providers/reminder_providers.dart
-import 'package:riverpod_annotation/riverpod_annotation.dart';
-import '../models/reminder.dart';
-import 'auth_providers.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pet_care/local_db/sqflite_db.dart';
+import 'package:pet_care/models/reminder.dart';
+import 'package:pet_care/providers/auth_providers.dart';
+import 'package:pet_care/services/supa_sync-service.dart';
 
-part 'reminder_providers.g.dart';
+final reminderDatabaseProvider = Provider<ReminderDatabaseService>((ref) {
+  return ReminderDatabaseService.instance;
+});
 
-@riverpod
-class Reminders extends _$Reminders {
-  @override
-  Future<List<Reminder>> build() async {
-    final user = ref.watch(currentUserProvider);
-    if (user == null) return [];
+final reminderSyncServiceProvider = Provider<ReminderSyncService>((ref) {
+  final supabase = ref.watch(supabaseProvider);
+  final localDb = ref.watch(reminderDatabaseProvider);
+  return ReminderSyncService(supabase: supabase, localDb: localDb);
+});
 
-    final supabase = ref.watch(supabaseProvider);
-    final response = await supabase
-        .from('reminders')
-        .select('''
-          *,
-          pets:pet_id (name, species)
-        ''')
-        .eq('pets.owner_id', user.id)
-        .eq('is_completed', false)
-        .order('reminder_date');
+// Main provider - fetches all reminders from local DB
+// This will only refresh when explicitly invalidated via ref.invalidate()
+final remindersProvider = FutureProvider<List<Reminder>>((ref) async {
+  final db = ref.watch(reminderDatabaseProvider);
+  final syncService = ref.watch(reminderSyncServiceProvider);
+  final user = ref.watch(currentUserProvider);
 
-    return (response as List).map((json) => Reminder.fromJson(json)).toList();
+  if (user != null) {
+    // Initial sync
+    await syncService.fullSync(user.id);
   }
 
-  Future<void> addReminder(Reminder reminder) async {
-    final supabase = ref.read(supabaseProvider);
+  // Get all reminders from local database
+  return db.getAllReminders();
+});
 
-    await supabase.from('reminders').insert({
-      'pet_id': reminder.petId,
-      'title': reminder.title,
-      'description': reminder.description,
-      'reminder_date': reminder.reminderDate.toIso8601String(),
-      'reminder_type': reminder.reminderType,
-    });
+// Keep this alias for backward compatibility with your existing code
+final remindersStreamProvider = remindersProvider;
 
-    ref.invalidateSelf();
-  }
+final todayRemindersProvider = FutureProvider<List<Reminder>>((ref) async {
+  // Watch the main provider to trigger refresh when it updates
+  ref.watch(remindersProvider);
+  final db = ref.watch(reminderDatabaseProvider);
+  return db.getTodayReminders();
+});
 
-  Future<void> completeReminder(String reminderId) async {
-    final supabase = ref.read(supabaseProvider);
+final weeklyRemindersProvider = FutureProvider<List<Reminder>>((ref) async {
+  // Watch the main provider to trigger refresh when it updates
+  ref.watch(remindersProvider);
+  final db = ref.watch(reminderDatabaseProvider);
+  return db.getRemindersByType('weekly');
+});
 
-    await supabase
-        .from('reminders')
-        .update({'is_completed': true})
-        .eq('id', reminderId);
-
-    ref.invalidateSelf();
-  }
-}
-
-// Today's reminders provider
-@riverpod
-Future<List<Reminder>> todaysReminders(TodaysRemindersRef ref) async {
-  final allReminders = await ref.watch(remindersProvider.future);
-  final today = DateTime.now();
-
-  return allReminders.where((reminder) {
-    final reminderDate = reminder.reminderDate;
-    return reminderDate.year == today.year &&
-        reminderDate.month == today.month &&
-        reminderDate.day == today.day;
-  }).toList();
-}
+final monthlyRemindersProvider = FutureProvider<List<Reminder>>((ref) async {
+  // Watch the main provider to trigger refresh when it updates
+  ref.watch(remindersProvider);
+  final db = ref.watch(reminderDatabaseProvider);
+  return db.getRemindersByType('monthly');
+});

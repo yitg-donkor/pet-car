@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pet_care/models/reminder.dart';
+import 'package:pet_care/providers/auth_providers.dart';
+import 'package:pet_care/providers/pet_providers.dart';
+import 'package:pet_care/providers/reminder_providers.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class RemindersScreen extends ConsumerStatefulWidget {
-  const RemindersScreen({super.key});
+  const RemindersScreen({Key? key}) : super(key: key);
 
   @override
   ConsumerState<RemindersScreen> createState() => _RemindersScreenState();
@@ -11,16 +16,57 @@ class RemindersScreen extends ConsumerStatefulWidget {
 class _RemindersScreenState extends ConsumerState<RemindersScreen>
     with TickerProviderStateMixin {
   late TabController _tabController;
+  RealtimeChannel? _realtimeChannel;
+  bool _isRealtimeSetup = false;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
+    // DON'T call _setupRealtimeSync here - it will be called in didChangeDependencies
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    // Only setup once
+    if (!_isRealtimeSetup) {
+      _isRealtimeSetup = true;
+      _setupRealtimeSync();
+      _performInitialSync();
+    }
+  }
+
+  void _setupRealtimeSync() {
+    final user = ref.read(currentUserProvider);
+    if (user != null) {
+      final syncService = ref.read(reminderSyncServiceProvider);
+      _realtimeChannel = syncService.setupRealtimeSync(user.id, () {
+        // Only invalidate if widget is still mounted
+        if (mounted) {
+          ref.invalidate(remindersStreamProvider);
+          // Don't invalidate the filtered providers - they should react to remindersStreamProvider changes
+        }
+      });
+    }
+  }
+
+  Future<void> _performInitialSync() async {
+    final user = ref.read(currentUserProvider);
+    if (user != null) {
+      final syncService = ref.read(reminderSyncServiceProvider);
+      await syncService.fullSync(user.id);
+      if (mounted) {
+        ref.invalidate(remindersStreamProvider);
+      }
+    }
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _realtimeChannel?.unsubscribe();
     super.dispose();
   }
 
@@ -40,6 +86,10 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
           ),
         ),
         actions: [
+          IconButton(
+            onPressed: _manualSync,
+            icon: const Icon(Icons.sync, color: Colors.black),
+          ),
           IconButton(
             onPressed: () => _showAddReminderDialog(context),
             icon: const Icon(Icons.add, color: Colors.black),
@@ -70,377 +120,691 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
     );
   }
 
+  Future<void> _manualSync() async {
+    final user = ref.read(currentUserProvider);
+    if (user == null) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final syncService = ref.read(reminderSyncServiceProvider);
+      await syncService.fullSync(user.id);
+
+      ref.invalidate(remindersStreamProvider);
+
+      Navigator.pop(context);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Sync completed successfully!')));
+    } catch (e) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Sync failed: $e')));
+    }
+  }
+
   Widget _buildTodayTab() {
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        _buildReminderCard(
-          title: 'Morning Walk',
-          subtitle: 'Buddy',
-          time: '8:00 AM',
-          icon: Icons.pets,
-          color: const Color(0xFF4CAF50),
-          isCompleted: true,
-        ),
-        _buildReminderCard(
-          title: 'Feed Fish',
-          subtitle: 'Nemo',
-          time: '9:00 AM',
-          icon: Icons.water,
-          color: const Color(0xFF2196F3),
-          isCompleted: false,
-        ),
-        _buildReminderCard(
-          title: 'Give Medication',
-          subtitle: 'Buddy',
-          time: '10:00 AM',
-          icon: Icons.medication,
-          color: const Color(0xFFE53E3E),
-          isCompleted: false,
-        ),
-        _buildReminderCard(
-          title: 'Evening Walk',
-          subtitle: 'Charlie',
-          time: '6:00 PM',
-          icon: Icons.pets,
-          color: const Color(0xFF4CAF50),
-          isCompleted: false,
-        ),
-        _buildReminderCard(
-          title: 'Dinner Time',
-          subtitle: 'Whiskers',
-          time: '7:00 PM',
-          icon: Icons.restaurant,
-          color: const Color(0xFFFF9800),
-          isCompleted: false,
-        ),
-      ],
+    final remindersAsync = ref.watch(todayRemindersProvider);
+
+    return remindersAsync.when(
+      data: (reminders) {
+        if (reminders.isEmpty) {
+          return _buildEmptyState('No reminders for today');
+        }
+        return RefreshIndicator(
+          onRefresh: _manualSync,
+          child: ListView.builder(
+            padding: const EdgeInsets.all(20),
+            itemCount: reminders.length,
+            itemBuilder: (context, index) {
+              final reminder = reminders[index];
+              return _buildReminderCard(
+                reminder: reminder,
+                onToggle: () => _toggleCompletion(reminder),
+                onDelete: () => _deleteReminder(reminder.id!),
+              );
+            },
+          ),
+        );
+      },
+      loading: () => Center(child: CircularProgressIndicator()),
+      error: (error, stack) => Center(child: Text('Error: $error')),
     );
   }
 
   Widget _buildWeeklyTab() {
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        _buildReminderCard(
-          title: 'Grooming Session',
-          subtitle: 'Whiskers',
-          time: 'Every Sunday, 10:00 AM',
-          icon: Icons.content_cut,
-          color: const Color(0xFF9C27B0),
-          isCompleted: false,
-        ),
-        _buildReminderCard(
-          title: 'Nail Trimming',
-          subtitle: 'Buddy',
-          time: 'Every 2 weeks, 2:00 PM',
-          icon: Icons.cut,
-          color: const Color(0xFF607D8B),
-          isCompleted: false,
-        ),
-        _buildReminderCard(
-          title: 'Tank Cleaning',
-          subtitle: 'Nemo',
-          time: 'Every Friday, 5:00 PM',
-          icon: Icons.cleaning_services,
-          color: const Color(0xFF00BCD4),
-          isCompleted: false,
-        ),
-      ],
+    final remindersAsync = ref.watch(weeklyRemindersProvider);
+
+    return remindersAsync.when(
+      data: (reminders) {
+        if (reminders.isEmpty) {
+          return _buildEmptyState('No weekly reminders');
+        }
+        return RefreshIndicator(
+          onRefresh: _manualSync,
+          child: ListView.builder(
+            padding: const EdgeInsets.all(20),
+            itemCount: reminders.length,
+            itemBuilder: (context, index) {
+              final reminder = reminders[index];
+              return _buildReminderCard(
+                reminder: reminder,
+                onToggle: () => _toggleCompletion(reminder),
+                onDelete: () => _deleteReminder(reminder.id!),
+              );
+            },
+          ),
+        );
+      },
+      loading: () => Center(child: CircularProgressIndicator()),
+      error: (error, stack) => Center(child: Text('Error: $error')),
     );
   }
 
   Widget _buildMonthlyTab() {
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        _buildReminderCard(
-          title: 'Vet Checkup',
-          subtitle: 'Buddy',
-          time: '26th of every month',
-          icon: Icons.local_hospital,
-          color: const Color(0xFFE53E3E),
-          isCompleted: false,
-        ),
-        _buildReminderCard(
-          title: 'Flea Treatment',
-          subtitle: 'Charlie',
-          time: '1st of every month',
-          icon: Icons.bug_report,
-          color: const Color(0xFF795548),
-          isCompleted: false,
-        ),
-        _buildReminderCard(
-          title: 'Weight Check',
-          subtitle: 'All Pets',
-          time: '15th of every month',
-          icon: Icons.monitor_weight,
-          color: const Color(0xFF3F51B5),
-          isCompleted: false,
-        ),
-      ],
+    final remindersAsync = ref.watch(monthlyRemindersProvider);
+
+    return remindersAsync.when(
+      data: (reminders) {
+        if (reminders.isEmpty) {
+          return _buildEmptyState('No monthly reminders');
+        }
+        return RefreshIndicator(
+          onRefresh: _manualSync,
+          child: ListView.builder(
+            padding: const EdgeInsets.all(20),
+            itemCount: reminders.length,
+            itemBuilder: (context, index) {
+              final reminder = reminders[index];
+              return _buildReminderCard(
+                reminder: reminder,
+                onToggle: () => _toggleCompletion(reminder),
+                onDelete: () => _deleteReminder(reminder.id!),
+              );
+            },
+          ),
+        );
+      },
+      loading: () => Center(child: CircularProgressIndicator()),
+      error: (error, stack) => Center(child: Text('Error: $error')),
     );
   }
 
   Widget _buildAllTab() {
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        // Today's reminders
-        const Text(
-          'Today',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Colors.black,
+    final remindersAsync = ref.watch(remindersStreamProvider);
+
+    return remindersAsync.when(
+      data: (reminders) {
+        if (reminders.isEmpty) {
+          return _buildEmptyState('No reminders yet');
+        }
+
+        final today = <Reminder>[];
+        final thisWeek = <Reminder>[];
+        final thisMonth = <Reminder>[];
+        final later = <Reminder>[];
+
+        final now = DateTime.now();
+        final todayStart = DateTime(now.year, now.month, now.day);
+        final weekEnd = todayStart.add(Duration(days: 7));
+        final monthEnd = DateTime(now.year, now.month + 1, 0);
+
+        for (var reminder in reminders) {
+          if (reminder.reminderDate.isBefore(
+            todayStart.add(Duration(days: 1)),
+          )) {
+            today.add(reminder);
+          } else if (reminder.reminderDate.isBefore(weekEnd)) {
+            thisWeek.add(reminder);
+          } else if (reminder.reminderDate.isBefore(monthEnd)) {
+            thisMonth.add(reminder);
+          } else {
+            later.add(reminder);
+          }
+        }
+
+        return RefreshIndicator(
+          onRefresh: _manualSync,
+          child: ListView(
+            padding: const EdgeInsets.all(20),
+            children: [
+              if (today.isNotEmpty) ...[
+                _buildSectionHeader('Today'),
+                ...today.map(
+                  (r) => _buildReminderCard(
+                    reminder: r,
+                    onToggle: () => _toggleCompletion(r),
+                    onDelete: () => _deleteReminder(r.id!),
+                  ),
+                ),
+                SizedBox(height: 20),
+              ],
+              if (thisWeek.isNotEmpty) ...[
+                _buildSectionHeader('This Week'),
+                ...thisWeek.map(
+                  (r) => _buildReminderCard(
+                    reminder: r,
+                    onToggle: () => _toggleCompletion(r),
+                    onDelete: () => _deleteReminder(r.id!),
+                  ),
+                ),
+                SizedBox(height: 20),
+              ],
+              if (thisMonth.isNotEmpty) ...[
+                _buildSectionHeader('This Month'),
+                ...thisMonth.map(
+                  (r) => _buildReminderCard(
+                    reminder: r,
+                    onToggle: () => _toggleCompletion(r),
+                    onDelete: () => _deleteReminder(r.id!),
+                  ),
+                ),
+                SizedBox(height: 20),
+              ],
+              if (later.isNotEmpty) ...[
+                _buildSectionHeader('Later'),
+                ...later.map(
+                  (r) => _buildReminderCard(
+                    reminder: r,
+                    onToggle: () => _toggleCompletion(r),
+                    onDelete: () => _deleteReminder(r.id!),
+                  ),
+                ),
+              ],
+            ],
           ),
-        ),
-        const SizedBox(height: 10),
-        _buildReminderCard(
-          title: 'Morning Walk',
-          subtitle: 'Buddy',
-          time: '8:00 AM',
-          icon: Icons.pets,
-          color: const Color(0xFF4CAF50),
-          isCompleted: true,
-        ),
-        _buildReminderCard(
-          title: 'Feed Fish',
-          subtitle: 'Nemo',
-          time: '9:00 AM',
-          icon: Icons.water,
-          color: const Color(0xFF2196F3),
-          isCompleted: false,
-        ),
+        );
+      },
+      loading: () => Center(child: CircularProgressIndicator()),
+      error: (error, stack) => Center(child: Text('Error: $error')),
+    );
+  }
 
-        const SizedBox(height: 20),
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Text(
+        title,
+        style: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+          color: Colors.black,
+        ),
+      ),
+    );
+  }
 
-        // This week
-        const Text(
-          'This Week',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Colors.black,
+  Widget _buildEmptyState(String message) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.notifications_none, size: 80, color: Colors.grey[400]),
+          SizedBox(height: 16),
+          Text(
+            message,
+            style: TextStyle(fontSize: 16, color: Colors.grey[600]),
           ),
-        ),
-        const SizedBox(height: 10),
-        _buildReminderCard(
-          title: 'Grooming Session',
-          subtitle: 'Whiskers',
-          time: 'Sunday, 10:00 AM',
-          icon: Icons.content_cut,
-          color: const Color(0xFF9C27B0),
-          isCompleted: false,
-        ),
-
-        const SizedBox(height: 20),
-
-        // This month
-        const Text(
-          'This Month',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Colors.black,
-          ),
-        ),
-        const SizedBox(height: 10),
-        _buildReminderCard(
-          title: 'Vet Checkup',
-          subtitle: 'Buddy',
-          time: 'Oct 26, 2:00 PM',
-          icon: Icons.local_hospital,
-          color: const Color(0xFFE53E3E),
-          isCompleted: false,
-        ),
-      ],
+        ],
+      ),
     );
   }
 
   Widget _buildReminderCard({
-    required String title,
-    required String subtitle,
-    required String time,
-    required IconData icon,
-    required Color color,
-    required bool isCompleted,
+    required Reminder reminder,
+    required VoidCallback onToggle,
+    required VoidCallback onDelete,
   }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 15),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 5,
-            offset: const Offset(0, 2),
-          ),
-        ],
+    final icon = _getIconForReminder(reminder.title);
+    final color = _getColorForImportance(reminder.importanceLevel);
+
+    return Dismissible(
+      key: Key(reminder.id!),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        margin: const EdgeInsets.only(bottom: 15),
+        padding: const EdgeInsets.only(right: 20),
+        alignment: Alignment.centerRight,
+        decoration: BoxDecoration(
+          color: Colors.red,
+          borderRadius: BorderRadius.circular(15),
+        ),
+        child: Icon(Icons.delete, color: Colors.white),
       ),
-      child: Row(
-        children: [
-          Container(
-            width: 50,
-            height: 50,
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
+      onDismissed: (direction) => onDelete(),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 15),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(15),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.1),
+              spreadRadius: 1,
+              blurRadius: 5,
+              offset: const Offset(0, 2),
             ),
-            child: Icon(icon, color: color, size: 24),
-          ),
-          const SizedBox(width: 15),
-
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black,
-                    decoration: isCompleted ? TextDecoration.lineThrough : null,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  subtitle,
-                  style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  time,
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-                ),
-              ],
-            ),
-          ),
-
-          // Complete/Uncomplete button
-          GestureDetector(
-            onTap: () {
-              // Toggle completion logic here
-            },
-            child: Container(
-              width: 24,
-              height: 24,
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 50,
+              height: 50,
               decoration: BoxDecoration(
-                color:
-                    isCompleted ? const Color(0xFF4CAF50) : Colors.transparent,
-                border: Border.all(
-                  color:
-                      isCompleted
-                          ? const Color(0xFF4CAF50)
-                          : Colors.grey.shade400,
-                  width: 2,
-                ),
+                color: color.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child:
-                  isCompleted
-                      ? const Icon(Icons.check, color: Colors.white, size: 16)
-                      : null,
+              child: Icon(icon, color: color, size: 24),
             ),
-          ),
-        ],
+            const SizedBox(width: 15),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          reminder.title,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black,
+                            decoration:
+                                reminder.isCompleted
+                                    ? TextDecoration.lineThrough
+                                    : null,
+                          ),
+                        ),
+                      ),
+                      if (!reminder.isSynced)
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: Colors.orange,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                    ],
+                  ),
+                  if (reminder.description != null) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      reminder.description!,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 3),
+                  Text(
+                    _formatReminderTime(reminder),
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                  ),
+                ],
+              ),
+            ),
+            GestureDetector(
+              onTap: onToggle,
+              child: Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  color:
+                      reminder.isCompleted
+                          ? const Color(0xFF4CAF50)
+                          : Colors.transparent,
+                  border: Border.all(
+                    color:
+                        reminder.isCompleted
+                            ? const Color(0xFF4CAF50)
+                            : Colors.grey.shade400,
+                    width: 2,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child:
+                    reminder.isCompleted
+                        ? const Icon(Icons.check, color: Colors.white, size: 16)
+                        : null,
+              ),
+            ),
+          ],
+        ),
       ),
     );
+  }
+
+  IconData _getIconForReminder(String title) {
+    final titleLower = title.toLowerCase();
+    if (titleLower.contains('walk')) return Icons.pets;
+    if (titleLower.contains('feed') || titleLower.contains('food'))
+      return Icons.restaurant;
+    if (titleLower.contains('medication') || titleLower.contains('medicine'))
+      return Icons.medication;
+    if (titleLower.contains('vet') || titleLower.contains('checkup'))
+      return Icons.local_hospital;
+    if (titleLower.contains('groom')) return Icons.content_cut;
+    if (titleLower.contains('clean')) return Icons.cleaning_services;
+    return Icons.notifications;
+  }
+
+  Color _getColorForImportance(String? importance) {
+    switch (importance) {
+      case 'high':
+        return Colors.red;
+      case 'medium':
+        return Colors.orange;
+      case 'low':
+        return Colors.blue;
+      default:
+        return const Color(0xFF4CAF50);
+    }
+  }
+
+  String _formatReminderTime(Reminder reminder) {
+    final time = reminder.reminderDate;
+    final now = DateTime.now();
+
+    if (time.year == now.year &&
+        time.month == now.month &&
+        time.day == now.day) {
+      return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+    }
+
+    return '${time.day}/${time.month}/${time.year} ${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _toggleCompletion(Reminder reminder) async {
+    final db = ref.read(reminderDatabaseProvider);
+    await db.toggleCompletion(reminder.id!, !reminder.isCompleted);
+
+    final syncService = ref.read(reminderSyncServiceProvider);
+    syncService.syncToSupabase();
+
+    ref.invalidate(remindersStreamProvider);
+  }
+
+  Future<void> _deleteReminder(String id) async {
+    final syncService = ref.read(reminderSyncServiceProvider);
+    await syncService.deleteReminder(id);
+
+    ref.invalidate(remindersStreamProvider);
   }
 
   void _showAddReminderDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          title: const Text('Add New Reminder'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                decoration: InputDecoration(
-                  labelText: 'Reminder Title',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 15),
-              DropdownButtonFormField<String>(
-                decoration: InputDecoration(
-                  labelText: 'Pet',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                items: const [
-                  DropdownMenuItem(value: 'Buddy', child: Text('Buddy')),
-                  DropdownMenuItem(value: 'Whiskers', child: Text('Whiskers')),
-                  DropdownMenuItem(value: 'Nemo', child: Text('Nemo')),
-                  DropdownMenuItem(value: 'Charlie', child: Text('Charlie')),
-                ],
-                onChanged: (value) {},
-              ),
-              const SizedBox(height: 15),
-              TextField(
-                decoration: InputDecoration(
-                  labelText: 'Time',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  suffixIcon: const Icon(Icons.access_time),
-                ),
-                readOnly: true,
-                onTap: () {
-                  // Show time picker
-                },
-              ),
-              const SizedBox(height: 15),
-              DropdownButtonFormField<String>(
-                decoration: InputDecoration(
-                  labelText: 'Frequency',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                items: const [
-                  DropdownMenuItem(value: 'daily', child: Text('Daily')),
-                  DropdownMenuItem(value: 'weekly', child: Text('Weekly')),
-                  DropdownMenuItem(value: 'monthly', child: Text('Monthly')),
-                  DropdownMenuItem(value: 'once', child: Text('One-time')),
-                ],
-                onChanged: (value) {},
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                // Add reminder logic here
-                Navigator.of(context).pop();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF4CAF50),
-                shape: RoundedRectangleBorder(
+      builder: (BuildContext dialogContext) {
+        return _AddReminderDialog(parentRef: ref);
+      },
+    );
+  }
+}
+
+// Separate widget for the dialog to properly handle Consumer
+class _AddReminderDialog extends ConsumerStatefulWidget {
+  final WidgetRef parentRef;
+
+  const _AddReminderDialog({required this.parentRef});
+
+  @override
+  ConsumerState<_AddReminderDialog> createState() => _AddReminderDialogState();
+}
+
+class _AddReminderDialogState extends ConsumerState<_AddReminderDialog> {
+  final titleController = TextEditingController();
+  final descriptionController = TextEditingController();
+  String selectedPetId = '';
+  String selectedFrequency = 'once';
+  String selectedImportance = 'medium';
+  DateTime selectedDateTime = DateTime.now();
+  TimeOfDay selectedTime = TimeOfDay.now();
+
+  @override
+  void dispose() {
+    titleController.dispose();
+    descriptionController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final petsAsync = ref.watch(petsProvider); // Use watch to listen to updates
+
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: const Text('Add New Reminder'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: titleController,
+              decoration: InputDecoration(
+                labelText: 'Reminder Title',
+                border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
-              child: const Text('Add Reminder'),
+            ),
+            const SizedBox(height: 15),
+            TextField(
+              controller: descriptionController,
+              decoration: InputDecoration(
+                labelText: 'Description (Optional)',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              maxLines: 2,
+            ),
+            const SizedBox(height: 15),
+            // Pet dropdown - now properly watching the provider
+            petsAsync.when(
+              data: (pets) {
+                if (pets.isEmpty) {
+                  return Container(
+                    padding: EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text('No pets available. Please add a pet first.'),
+                  );
+                }
+
+                // Set initial value if not set
+                if (selectedPetId.isEmpty && pets.isNotEmpty) {
+                  selectedPetId = pets.first.id!;
+                }
+
+                return DropdownButtonFormField<String>(
+                  value: selectedPetId.isEmpty ? null : selectedPetId,
+                  decoration: InputDecoration(
+                    labelText: 'Pet',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  items:
+                      pets.map((pet) {
+                        return DropdownMenuItem(
+                          value: pet.id,
+                          child: Text(pet.name),
+                        );
+                      }).toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      selectedPetId = value ?? '';
+                    });
+                  },
+                );
+              },
+              loading:
+                  () => Container(
+                    height: 60,
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+              error:
+                  (e, s) => Container(
+                    padding: EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.red),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      'Error loading pets: $e',
+                      style: TextStyle(color: Colors.red),
+                    ),
+                  ),
+            ),
+            const SizedBox(height: 15),
+            TextField(
+              decoration: InputDecoration(
+                labelText: 'Date & Time',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                suffixIcon: const Icon(Icons.calendar_today),
+              ),
+              readOnly: true,
+              controller: TextEditingController(
+                text:
+                    '${selectedDateTime.day}/${selectedDateTime.month}/${selectedDateTime.year} ${selectedTime.format(context)}',
+              ),
+              onTap: () async {
+                final date = await showDatePicker(
+                  context: context,
+                  initialDate: selectedDateTime,
+                  firstDate: DateTime.now(),
+                  lastDate: DateTime.now().add(Duration(days: 365)),
+                );
+                if (date != null) {
+                  final time = await showTimePicker(
+                    context: context,
+                    initialTime: selectedTime,
+                  );
+                  if (time != null) {
+                    setState(() {
+                      selectedDateTime = date;
+                      selectedTime = time;
+                    });
+                  }
+                }
+              },
+            ),
+            const SizedBox(height: 15),
+            DropdownButtonFormField<String>(
+              value: selectedFrequency,
+              decoration: InputDecoration(
+                labelText: 'Frequency',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              items: const [
+                DropdownMenuItem(value: 'daily', child: Text('Daily')),
+                DropdownMenuItem(value: 'weekly', child: Text('Weekly')),
+                DropdownMenuItem(value: 'monthly', child: Text('Monthly')),
+                DropdownMenuItem(value: 'once', child: Text('One-time')),
+              ],
+              onChanged:
+                  (value) =>
+                      setState(() => selectedFrequency = value ?? 'once'),
+            ),
+            const SizedBox(height: 15),
+            DropdownButtonFormField<String>(
+              value: selectedImportance,
+              decoration: InputDecoration(
+                labelText: 'Importance',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              items: const [
+                DropdownMenuItem(value: 'high', child: Text('High')),
+                DropdownMenuItem(value: 'medium', child: Text('Medium')),
+                DropdownMenuItem(value: 'low', child: Text('Low')),
+              ],
+              onChanged:
+                  (value) =>
+                      setState(() => selectedImportance = value ?? 'medium'),
             ),
           ],
-        );
-      },
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () => _saveReminder(context),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF4CAF50),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+          child: const Text('Add Reminder'),
+        ),
+      ],
     );
+  }
+
+  Future<void> _saveReminder(BuildContext context) async {
+    if (titleController.text.isEmpty || selectedPetId.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Please fill required fields')));
+      return;
+    }
+
+    final reminderDateTime = DateTime(
+      selectedDateTime.year,
+      selectedDateTime.month,
+      selectedDateTime.day,
+      selectedTime.hour,
+      selectedTime.minute,
+    );
+
+    final reminder = Reminder(
+      petId: selectedPetId,
+      title: titleController.text,
+      description:
+          descriptionController.text.isEmpty
+              ? null
+              : descriptionController.text,
+      reminderDate: reminderDateTime,
+      reminderType: selectedFrequency,
+      importanceLevel: selectedImportance,
+    );
+
+    final db = widget.parentRef.read(reminderDatabaseProvider);
+    await db.createReminder(reminder);
+
+    final syncService = widget.parentRef.read(reminderSyncServiceProvider);
+    syncService.syncToSupabase();
+
+    widget.parentRef.invalidate(remindersStreamProvider);
+
+    Navigator.of(context).pop();
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('Reminder added!')));
   }
 }

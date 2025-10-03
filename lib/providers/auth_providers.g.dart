@@ -91,7 +91,7 @@ final currentUserAsyncProvider = AutoDisposeFutureProvider<User?>.internal(
 // ignore: unused_element
 typedef CurrentUserAsyncRef = AutoDisposeFutureProviderRef<User?>;
 String _$userProfileProviderHash() =>
-    r'969659d6591b82811844c1e7cb3eaf8372103e99';
+    r'32a70ab40f9e90824bfcc269af0df617c787d951';
 
 /// See also [UserProfileProvider].
 @ProviderFor(UserProfileProvider)

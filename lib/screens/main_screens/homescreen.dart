@@ -6,6 +6,8 @@ import 'package:pet_care/screens/main_screens/log.dart';
 import 'package:pet_care/screens/main_screens/petscreen.dart';
 import 'package:pet_care/screens/main_screens/reminders.dart';
 import 'package:pet_care/screens/main_screens/resources.dart';
+import 'package:pet_care/providers/pet_providers.dart';
+
 // Import your screen files here
 // import 'homescreen.dart';
 // import 'pets_screen.dart';
@@ -113,6 +115,7 @@ class Homescreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final currentPet = ref.watch(petsProvider);
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       body: SafeArea(
@@ -136,21 +139,37 @@ class Homescreen extends ConsumerWidget {
                     height: 50,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(25),
-                      image: const DecorationImage(
-                        image: NetworkImage(
-                          'https://images.unsplash.com/photo-1552053831-71594a27632d?w=100&h=100&fit=crop&crop=face',
+                      image: DecorationImage(
+                        image: currentPet.when(
+                          data:
+                              (pets) =>
+                                  pets.isNotEmpty
+                                      ? NetworkImage(pets[0].photoUrl ?? '')
+                                      : AssetImage('assets/default_pet.png')
+                                          as ImageProvider,
+                          loading:
+                              () => const AssetImage('assets/default_pet.png'),
+                          error:
+                              (e, _) =>
+                                  const AssetImage('assets/default_pet.png'),
                         ),
                         fit: BoxFit.cover,
                       ),
                     ),
                   ),
                   const SizedBox(width: 15),
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Buddy',
+                          currentPet.when(
+                            data:
+                                (pets) =>
+                                    pets.isNotEmpty ? pets[0].name : 'No Pets',
+                            loading: () => 'Loading...',
+                            error: (e, _) => 'Error',
+                          ),
                           style: TextStyle(
                             color: Colors.blue,
                             fontSize: 16,
@@ -369,38 +388,6 @@ class Homescreen extends ConsumerWidget {
                             ),
                           ),
                         ],
-                      ),
-                    ),
-                    Container(
-                      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [Colors.purple, Colors.deepPurple],
-                        ),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: ListTile(
-                        leading: Icon(Icons.auto_awesome, color: Colors.white),
-                        title: Text(
-                          'AI Vet Assistant',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        subtitle: Text(
-                          'Get instant pet care advice',
-                          style: TextStyle(color: Colors.white70),
-                        ),
-                        trailing: Icon(
-                          Icons.arrow_forward_ios,
-                          color: Colors.white,
-                          size: 16,
-                        ),
-                        onTap: () {
-                          Navigator.pushNamed(context, '/aichat');
-                          // Navigate to AI chat
-                        },
                       ),
                     ),
 
