@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pet_care/firebase_options.dart';
 import 'package:pet_care/screens/ai_features/aichatscreen.dart';
+import 'package:pet_care/screens/main_screens/pet_info.dart';
 import 'package:pet_care/screens/onboarding_screens/introduction.dart';
 import 'package:pet_care/screens/onboarding_screens/onboarding_flow_screen.dart';
 import 'package:pet_care/screens/onboarding_screens/profile_onboarding.dart';
+import 'package:pet_care/screens/pet_selection_screens/add_pet.dart';
 import 'package:pet_care/screens/pet_selection_screens/pet_selection.dart';
 import 'package:pet_care/screens/onboarding_screens/signupscreen.dart';
 import 'package:pet_care/widgets/onboarding.dart';
@@ -47,7 +49,10 @@ class MyApp extends StatelessWidget {
         '/profile': (context) => const ProfileCreationScreen(),
         '/pet_selection': (context) => const PetSpeciesSelectionScreen(),
         '/onboarding': (context) => const OnboardingFlowScreen(),
-        '/home': (context) => const MainNavigation(),
+        '/home': (context) => const MainNavigation(initialIndex: 0),
+        '/reminders': (context) => const MainNavigation(initialIndex: 1),
+        '/pet-details': (context) => const PetDetailsScreen(),
+        '/add-pet': (context) => const AddPet(species: 'dog'),
         '/aichat':
             (context) => const AIVetChatScreen(
               petName: 'Buddy',
@@ -73,7 +78,7 @@ class AuthWrapper extends ConsumerWidget {
         final hasSession = authState.session != null;
 
         if (hasSession) {
-          return MainNavigation();
+          return MainNavigation(initialIndex: 0);
         } else {
           // Show onboarding if not seen, otherwise go to login
           return hasSeenOnboarding

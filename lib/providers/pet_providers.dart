@@ -106,13 +106,18 @@ class Pets extends _$Pets {
 @riverpod
 class SelectedPet extends _$SelectedPet {
   @override
-  Pet? build() => null;
+  Pet? build() {
+    print('SelectedPet provider initialized with state: null');
+    return null;
+  }
 
   void selectPet(Pet pet) {
+    print('Selecting pet: ${pet.name} (id: ${pet.id})');
     state = pet;
   }
 
   void clearSelection() {
+    print('Clearing selected pet');
     state = null;
   }
 }

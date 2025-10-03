@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:pet_care/screens/pet_selection_screens/pet_details.dart';
+import 'package:pet_care/screens/pet_selection_screens/add_pet.dart';
 
 class PetSpeciesSelectionScreen extends StatelessWidget {
   const PetSpeciesSelectionScreen({super.key});
@@ -75,9 +75,7 @@ class PetSpeciesSelectionScreen extends StatelessWidget {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder:
-                                (context) =>
-                                    PetDetailsScreen(species: petType.name),
+                            builder: (context) => AddPet(species: petType.name),
                           ),
                         );
                       },

@@ -6,16 +6,16 @@ import 'package:pet_care/providers/pet_providers.dart';
 import 'package:pet_care/providers/auth_providers.dart';
 import 'package:pet_care/services/avatar_upload_service.dart';
 
-class PetDetailsScreen extends ConsumerStatefulWidget {
+class AddPet extends ConsumerStatefulWidget {
   final String species;
 
-  const PetDetailsScreen({super.key, required this.species});
+  const AddPet({super.key, required this.species});
 
   @override
-  ConsumerState<PetDetailsScreen> createState() => _PetDetailsScreenState();
+  ConsumerState<AddPet> createState() => _AddPet();
 }
 
-class _PetDetailsScreenState extends ConsumerState<PetDetailsScreen> {
+class _AddPet extends ConsumerState<AddPet> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _breedController = TextEditingController();
