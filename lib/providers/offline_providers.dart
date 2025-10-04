@@ -317,41 +317,25 @@ class PetMedicalRecordsOffline extends _$PetMedicalRecordsOffline {
 // ============================================
 
 @riverpod
-Stream<List<Reminder>> remindersStream(RemindersStreamRef ref) async* {
+Future<List<Reminder>> allRemindersRefresh(AllRemindersRefreshRef ref) async {
   final db = ref.watch(reminderDatabaseProvider);
-  final syncService = ref.watch(unifiedSyncServiceProvider);
-  final user = ref.watch(currentUserProvider);
-
-  if (user != null) {
-    // Initial sync
-    await syncService.fullSync(user.id);
-  }
-
-  // Poll local database
-  while (true) {
-    final reminders = await db.getAllReminders();
-    yield reminders;
-    await Future.delayed(Duration(seconds: 1));
-  }
+  return db.getAllReminders();
 }
 
 @riverpod
 Future<List<Reminder>> todayReminders(TodayRemindersRef ref) async {
-  ref.watch(remindersStreamProvider); // Trigger refresh
   final db = ref.watch(reminderDatabaseProvider);
   return db.getTodayReminders();
 }
 
 @riverpod
 Future<List<Reminder>> weeklyReminders(WeeklyRemindersRef ref) async {
-  ref.watch(remindersStreamProvider); // Trigger refresh
   final db = ref.watch(reminderDatabaseProvider);
   return db.getRemindersByType('weekly');
 }
 
 @riverpod
 Future<List<Reminder>> monthlyReminders(MonthlyRemindersRef ref) async {
-  ref.watch(remindersStreamProvider); // Trigger refresh
   final db = ref.watch(reminderDatabaseProvider);
   return db.getRemindersByType('monthly');
 }
@@ -435,7 +419,7 @@ class ManualSync extends _$ManualSync {
       await syncService.fullSync(user.id);
 
       // Refresh all providers
-      ref.invalidate(remindersStreamProvider);
+      ref.invalidate(allRemindersRefreshProvider);
       ref.invalidate(syncStatusProvider);
 
       print('Manual sync completed');

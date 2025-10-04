@@ -40,9 +40,16 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
       final syncService = ref.read(unifiedSyncServiceProvider);
       await syncService.fullSync(user.id);
       if (mounted) {
-        ref.invalidate(remindersStreamProvider);
+        _invalidateAllProviders();
       }
     }
+  }
+
+  void _invalidateAllProviders() {
+    ref.invalidate(todayRemindersProvider);
+    ref.invalidate(weeklyRemindersProvider);
+    ref.invalidate(monthlyRemindersProvider);
+    ref.invalidate(allRemindersProvider);
   }
 
   @override
@@ -108,24 +115,28 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => Center(child: CircularProgressIndicator()),
+      builder: (context) => const Center(child: CircularProgressIndicator()),
     );
 
     try {
       final syncService = ref.read(unifiedSyncServiceProvider);
       await syncService.fullSync(user.id);
 
-      ref.invalidate(remindersStreamProvider);
+      _invalidateAllProviders();
 
-      Navigator.pop(context);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Sync completed successfully!')));
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Sync completed successfully!')),
+        );
+      }
     } catch (e) {
-      Navigator.pop(context);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Sync failed: $e')));
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Sync failed: $e')));
+      }
     }
   }
 
@@ -153,7 +164,7 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
           ),
         );
       },
-      loading: () => Center(child: CircularProgressIndicator()),
+      loading: () => const Center(child: CircularProgressIndicator()),
       error: (error, stack) => Center(child: Text('Error: $error')),
     );
   }
@@ -182,7 +193,7 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
           ),
         );
       },
-      loading: () => Center(child: CircularProgressIndicator()),
+      loading: () => const Center(child: CircularProgressIndicator()),
       error: (error, stack) => Center(child: Text('Error: $error')),
     );
   }
@@ -211,13 +222,13 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
           ),
         );
       },
-      loading: () => Center(child: CircularProgressIndicator()),
+      loading: () => const Center(child: CircularProgressIndicator()),
       error: (error, stack) => Center(child: Text('Error: $error')),
     );
   }
 
   Widget _buildAllTab() {
-    final remindersAsync = ref.watch(remindersStreamProvider);
+    final remindersAsync = ref.watch(allRemindersProvider);
 
     return remindersAsync.when(
       data: (reminders) {
@@ -232,12 +243,12 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
 
         final now = DateTime.now();
         final todayStart = DateTime(now.year, now.month, now.day);
-        final weekEnd = todayStart.add(Duration(days: 7));
+        final weekEnd = todayStart.add(const Duration(days: 7));
         final monthEnd = DateTime(now.year, now.month + 1, 0);
 
         for (var reminder in reminders) {
           if (reminder.reminderDate.isBefore(
-            todayStart.add(Duration(days: 1)),
+            todayStart.add(const Duration(days: 1)),
           )) {
             today.add(reminder);
           } else if (reminder.reminderDate.isBefore(weekEnd)) {
@@ -263,7 +274,7 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
                     onDelete: () => _deleteReminder(r.id!),
                   ),
                 ),
-                SizedBox(height: 20),
+                const SizedBox(height: 20),
               ],
               if (thisWeek.isNotEmpty) ...[
                 _buildSectionHeader('This Week'),
@@ -274,7 +285,7 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
                     onDelete: () => _deleteReminder(r.id!),
                   ),
                 ),
-                SizedBox(height: 20),
+                const SizedBox(height: 20),
               ],
               if (thisMonth.isNotEmpty) ...[
                 _buildSectionHeader('This Month'),
@@ -285,7 +296,7 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
                     onDelete: () => _deleteReminder(r.id!),
                   ),
                 ),
-                SizedBox(height: 20),
+                const SizedBox(height: 20),
               ],
               if (later.isNotEmpty) ...[
                 _buildSectionHeader('Later'),
@@ -301,7 +312,7 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
           ),
         );
       },
-      loading: () => Center(child: CircularProgressIndicator()),
+      loading: () => const Center(child: CircularProgressIndicator()),
       error: (error, stack) => Center(child: Text('Error: $error')),
     );
   }
@@ -311,7 +322,7 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
       padding: const EdgeInsets.only(bottom: 10),
       child: Text(
         title,
-        style: TextStyle(
+        style: const TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.bold,
           color: Colors.black,
@@ -326,7 +337,7 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.notifications_none, size: 80, color: Colors.grey[400]),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           Text(
             message,
             style: TextStyle(fontSize: 16, color: Colors.grey[600]),
@@ -355,7 +366,7 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
           color: Colors.red,
           borderRadius: BorderRadius.circular(15),
         ),
-        child: Icon(Icons.delete, color: Colors.white),
+        child: const Icon(Icons.delete, color: Colors.white),
       ),
       onDismissed: (direction) => onDelete(),
       child: Container(
@@ -409,7 +420,7 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
                         Container(
                           width: 8,
                           height: 8,
-                          decoration: BoxDecoration(
+                          decoration: const BoxDecoration(
                             color: Colors.orange,
                             shape: BoxShape.circle,
                           ),
@@ -468,12 +479,15 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
   IconData _getIconForReminder(String title) {
     final titleLower = title.toLowerCase();
     if (titleLower.contains('walk')) return Icons.pets;
-    if (titleLower.contains('feed') || titleLower.contains('food'))
+    if (titleLower.contains('feed') || titleLower.contains('food')) {
       return Icons.restaurant;
-    if (titleLower.contains('medication') || titleLower.contains('medicine'))
+    }
+    if (titleLower.contains('medication') || titleLower.contains('medicine')) {
       return Icons.medication;
-    if (titleLower.contains('vet') || titleLower.contains('checkup'))
+    }
+    if (titleLower.contains('vet') || titleLower.contains('checkup')) {
       return Icons.local_hospital;
+    }
     if (titleLower.contains('groom')) return Icons.content_cut;
     if (titleLower.contains('clean')) return Icons.cleaning_services;
     return Icons.notifications;
@@ -512,7 +526,7 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
     final syncService = ref.read(unifiedSyncServiceProvider);
     await syncService.syncRemindersToSupabase();
 
-    ref.invalidate(remindersStreamProvider);
+    _invalidateAllProviders();
   }
 
   Future<void> _deleteReminder(String id) async {
@@ -529,7 +543,7 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
       }
     }
 
-    ref.invalidate(remindersStreamProvider);
+    _invalidateAllProviders();
   }
 
   void _showAddReminderDialog(BuildContext context) {
@@ -600,23 +614,30 @@ class _AddReminderDialogState extends ConsumerState<_AddReminderDialog> {
               maxLines: 2,
             ),
             const SizedBox(height: 15),
-            // Pet dropdown - now properly watching the provider
             petsAsync.when(
               data: (pets) {
                 if (pets.isEmpty) {
                   return Container(
-                    padding: EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       border: Border.all(color: Colors.grey),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Text('No pets available. Please add a pet first.'),
+                    child: const Text(
+                      'No pets available. Please add a pet first.',
+                    ),
                   );
                 }
 
                 // Set initial value if not set
                 if (selectedPetId.isEmpty && pets.isNotEmpty) {
-                  selectedPetId = pets.first.id!;
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) {
+                      setState(() {
+                        selectedPetId = pets.first.id!;
+                      });
+                    }
+                  });
                 }
 
                 return DropdownButtonFormField<String>(
@@ -648,18 +669,18 @@ class _AddReminderDialogState extends ConsumerState<_AddReminderDialog> {
                       border: Border.all(color: Colors.grey),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Center(child: CircularProgressIndicator()),
+                    child: const Center(child: CircularProgressIndicator()),
                   ),
               error:
                   (e, s) => Container(
-                    padding: EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       border: Border.all(color: Colors.red),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
                       'Error loading pets: $e',
-                      style: TextStyle(color: Colors.red),
+                      style: const TextStyle(color: Colors.red),
                     ),
                   ),
             ),
@@ -682,7 +703,7 @@ class _AddReminderDialogState extends ConsumerState<_AddReminderDialog> {
                   context: context,
                   initialDate: selectedDateTime,
                   firstDate: DateTime.now(),
-                  lastDate: DateTime.now().add(Duration(days: 365)),
+                  lastDate: DateTime.now().add(const Duration(days: 365)),
                 );
                 if (date != null) {
                   final time = await showTimePicker(
@@ -759,9 +780,9 @@ class _AddReminderDialogState extends ConsumerState<_AddReminderDialog> {
 
   Future<void> _saveReminder(BuildContext context) async {
     if (titleController.text.isEmpty || selectedPetId.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Please fill required fields')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill required fields')),
+      );
       return;
     }
 
@@ -791,11 +812,17 @@ class _AddReminderDialogState extends ConsumerState<_AddReminderDialog> {
     final syncService = widget.parentRef.read(unifiedSyncServiceProvider);
     await syncService.syncRemindersToSupabase();
 
-    widget.parentRef.invalidate(remindersStreamProvider);
+    // Invalidate all reminder providers
+    widget.parentRef.invalidate(todayRemindersProvider);
+    widget.parentRef.invalidate(weeklyRemindersProvider);
+    widget.parentRef.invalidate(monthlyRemindersProvider);
+    widget.parentRef.invalidate(allRemindersProvider);
 
-    Navigator.of(context).pop();
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('Reminder added!')));
+    if (context.mounted) {
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Reminder added!')));
+    }
   }
 }

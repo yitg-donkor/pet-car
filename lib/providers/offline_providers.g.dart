@@ -100,25 +100,26 @@ final unifiedSyncServiceProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef UnifiedSyncServiceRef = AutoDisposeProviderRef<UnifiedSyncService>;
-String _$remindersStreamHash() => r'8622788be624fb56897920d5a94d3e5477bd7783';
+String _$allRemindersRefreshHash() =>
+    r'3f0ecee30216c4428e5385d43e496f2587827d52';
 
-/// See also [remindersStream].
-@ProviderFor(remindersStream)
-final remindersStreamProvider =
-    AutoDisposeStreamProvider<List<Reminder>>.internal(
-      remindersStream,
-      name: r'remindersStreamProvider',
+/// See also [allRemindersRefresh].
+@ProviderFor(allRemindersRefresh)
+final allRemindersRefreshProvider =
+    AutoDisposeFutureProvider<List<Reminder>>.internal(
+      allRemindersRefresh,
+      name: r'allRemindersRefreshProvider',
       debugGetCreateSourceHash:
           const bool.fromEnvironment('dart.vm.product')
               ? null
-              : _$remindersStreamHash,
+              : _$allRemindersRefreshHash,
       dependencies: null,
       allTransitiveDependencies: null,
     );
 
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
-typedef RemindersStreamRef = AutoDisposeStreamProviderRef<List<Reminder>>;
+typedef AllRemindersRefreshRef = AutoDisposeFutureProviderRef<List<Reminder>>;
 String _$todayRemindersHash() => r'38c4a4beec5aeca6b96d05c12a9ea73407fcfb18';
 
 /// See also [todayReminders].

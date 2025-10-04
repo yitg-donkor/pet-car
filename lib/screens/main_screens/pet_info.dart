@@ -367,7 +367,7 @@ class PetDetailsScreen extends ConsumerWidget {
     WidgetRef ref,
     Pet displayPet,
   ) {
-    final remindersAsync = ref.watch(remindersStreamProvider);
+    final remindersAsync = ref.watch(allRemindersProvider);
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
