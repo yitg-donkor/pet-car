@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pet_care/models/pet.dart';
 import 'package:pet_care/models/reminder.dart';
 import 'package:pet_care/providers/auth_providers.dart';
+import 'package:pet_care/providers/offline_providers.dart';
 import 'package:pet_care/providers/reminder_providers.dart';
 import 'package:pet_care/screens/ai_features/ai_navigation_screen.dart';
 import 'package:pet_care/screens/main_screens/log.dart';
@@ -124,7 +125,7 @@ class _HomescreenState extends ConsumerState<Homescreen> {
 
   @override
   Widget build(BuildContext context) {
-    final petsAsync = ref.watch(petsProvider);
+    final petsAsync = ref.watch(petsOfflineProvider);
     final todayRemindersAsync = ref.watch(todayRemindersProvider);
     final currentUser = ref.watch(currentUserProvider);
 
@@ -140,13 +141,13 @@ class _HomescreenState extends ConsumerState<Homescreen> {
             Expanded(
               child: RefreshIndicator(
                 onRefresh: () async {
-                  ref.invalidate(petsProvider);
+                  ref.invalidate(petsOfflineProvider);
                   ref.invalidate(todayRemindersProvider);
 
                   // Sync reminders
                   final user = ref.read(currentUserProvider);
                   if (user != null) {
-                    final syncService = ref.read(reminderSyncServiceProvider);
+                    final syncService = ref.read(unifiedSyncServiceProvider);
                     await syncService.fullSync(user.id);
                   }
                 },

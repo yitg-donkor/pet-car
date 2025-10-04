@@ -147,7 +147,7 @@ class _AddPet extends ConsumerState<AddPet> {
                 : null,
       );
 
-      await ref.read(petsProvider.notifier).addPet(pet);
+      await ref.read(petsOfflineProvider.notifier).addPet(pet);
 
       if (mounted) {
         _showSnackBar('${pet.name} added successfully!');

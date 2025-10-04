@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pet_care/models/reminder.dart';
 import 'package:pet_care/providers/auth_providers.dart';
+import 'package:pet_care/providers/offline_providers.dart';
 import 'package:pet_care/providers/pet_providers.dart';
-import 'package:pet_care/providers/reminder_providers.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 class RemindersScreen extends ConsumerStatefulWidget {
   const RemindersScreen({Key? key}) : super(key: key);
@@ -16,46 +15,29 @@ class RemindersScreen extends ConsumerStatefulWidget {
 class _RemindersScreenState extends ConsumerState<RemindersScreen>
     with TickerProviderStateMixin {
   late TabController _tabController;
-  RealtimeChannel? _realtimeChannel;
-  bool _isRealtimeSetup = false;
+  bool _isInitialSyncDone = false;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
-    // DON'T call _setupRealtimeSync here - it will be called in didChangeDependencies
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
 
-    // Only setup once
-    if (!_isRealtimeSetup) {
-      _isRealtimeSetup = true;
-      _setupRealtimeSync();
+    // Only sync once
+    if (!_isInitialSyncDone) {
+      _isInitialSyncDone = true;
       _performInitialSync();
-    }
-  }
-
-  void _setupRealtimeSync() {
-    final user = ref.read(currentUserProvider);
-    if (user != null) {
-      final syncService = ref.read(reminderSyncServiceProvider);
-      _realtimeChannel = syncService.setupRealtimeSync(user.id, () {
-        // Only invalidate if widget is still mounted
-        if (mounted) {
-          ref.invalidate(remindersStreamProvider);
-          // Don't invalidate the filtered providers - they should react to remindersStreamProvider changes
-        }
-      });
     }
   }
 
   Future<void> _performInitialSync() async {
     final user = ref.read(currentUserProvider);
     if (user != null) {
-      final syncService = ref.read(reminderSyncServiceProvider);
+      final syncService = ref.read(unifiedSyncServiceProvider);
       await syncService.fullSync(user.id);
       if (mounted) {
         ref.invalidate(remindersStreamProvider);
@@ -66,7 +48,6 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
   @override
   void dispose() {
     _tabController.dispose();
-    _realtimeChannel?.unsubscribe();
     super.dispose();
   }
 
@@ -131,7 +112,7 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
     );
 
     try {
-      final syncService = ref.read(reminderSyncServiceProvider);
+      final syncService = ref.read(unifiedSyncServiceProvider);
       await syncService.fullSync(user.id);
 
       ref.invalidate(remindersStreamProvider);
@@ -528,15 +509,25 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
     final db = ref.read(reminderDatabaseProvider);
     await db.toggleCompletion(reminder.id!, !reminder.isCompleted);
 
-    final syncService = ref.read(reminderSyncServiceProvider);
-    syncService.syncToSupabase();
+    final syncService = ref.read(unifiedSyncServiceProvider);
+    await syncService.syncRemindersToSupabase();
 
     ref.invalidate(remindersStreamProvider);
   }
 
   Future<void> _deleteReminder(String id) async {
-    final syncService = ref.read(reminderSyncServiceProvider);
-    await syncService.deleteReminder(id);
+    final db = ref.read(reminderDatabaseProvider);
+    await db.deleteReminder(id);
+
+    // Delete from Supabase if online
+    final syncService = ref.read(unifiedSyncServiceProvider);
+    if (await syncService.hasInternetConnection()) {
+      try {
+        await syncService.supabase.from('reminders').delete().eq('id', id);
+      } catch (e) {
+        print('Error deleting from Supabase: $e');
+      }
+    }
 
     ref.invalidate(remindersStreamProvider);
   }
@@ -579,7 +570,7 @@ class _AddReminderDialogState extends ConsumerState<_AddReminderDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final petsAsync = ref.watch(petsProvider); // Use watch to listen to updates
+    final petsAsync = ref.watch(petsOfflineProvider);
 
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -797,8 +788,8 @@ class _AddReminderDialogState extends ConsumerState<_AddReminderDialog> {
     final db = widget.parentRef.read(reminderDatabaseProvider);
     await db.createReminder(reminder);
 
-    final syncService = widget.parentRef.read(reminderSyncServiceProvider);
-    syncService.syncToSupabase();
+    final syncService = widget.parentRef.read(unifiedSyncServiceProvider);
+    await syncService.syncRemindersToSupabase();
 
     widget.parentRef.invalidate(remindersStreamProvider);
 

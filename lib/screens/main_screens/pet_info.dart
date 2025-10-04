@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pet_care/models/pet.dart';
+import 'package:pet_care/providers/offline_providers.dart';
 import 'package:pet_care/providers/pet_providers.dart';
 import 'package:pet_care/providers/reminder_providers.dart';
 import 'package:intl/intl.dart';
@@ -366,7 +367,7 @@ class PetDetailsScreen extends ConsumerWidget {
     WidgetRef ref,
     Pet displayPet,
   ) {
-    final remindersAsync = ref.watch(remindersProvider);
+    final remindersAsync = ref.watch(remindersStreamProvider);
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
@@ -687,7 +688,7 @@ class PetDetailsScreen extends ConsumerWidget {
                 try {
                   // Delete pet using the notifier
                   await ref
-                      .read(petsProvider.notifier)
+                      .read(petsOfflineProvider.notifier)
                       .deletePet(displayPet.id);
 
                   // Clear selection

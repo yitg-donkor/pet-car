@@ -8,7 +8,7 @@ class PetsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final petsAsync = ref.watch(petsProvider);
+    final petsAsync = ref.watch(petsOfflineProvider);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
