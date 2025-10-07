@@ -8,6 +8,7 @@ import 'package:pet_care/screens/onboarding_screens/introduction.dart';
 import 'package:pet_care/screens/onboarding_screens/onboarding_flow_screen.dart';
 import 'package:pet_care/screens/onboarding_screens/profile_onboarding.dart';
 import 'package:pet_care/screens/pet_selection_screens/add_pet.dart';
+import 'package:pet_care/screens/pet_selection_screens/editpetscreen.dart';
 import 'package:pet_care/screens/pet_selection_screens/pet_selection.dart';
 import 'package:pet_care/screens/onboarding_screens/signupscreen.dart';
 import 'package:pet_care/widgets/onboarding.dart';
@@ -53,6 +54,7 @@ class MyApp extends StatelessWidget {
         '/reminders': (context) => const MainNavigation(initialIndex: 1),
         '/pet-details': (context) => const PetDetailsScreen(),
         '/add-pet': (context) => const AddPet(species: 'dog'),
+        '/edit-pet': (context) => const Editpetscreen(),
         '/aichat':
             (context) => const AIVetChatScreen(
               petName: 'Buddy',

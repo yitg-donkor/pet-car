@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pet_care/models/pet.dart';
 import 'package:pet_care/providers/offline_providers.dart';
 import 'package:pet_care/providers/pet_providers.dart';
-import 'package:pet_care/providers/reminder_providers.dart';
+
 import 'package:intl/intl.dart';
 
 class PetDetailsScreen extends ConsumerWidget {
@@ -75,7 +75,9 @@ class PetDetailsScreen extends ConsumerWidget {
       actions: [
         IconButton(
           onPressed: () {
-            // Pass displayPet to edit screen
+            // Pass display
+            print('Selected pet: ${displayPet.name}');
+
             Navigator.pushNamed(context, '/edit-pet', arguments: displayPet);
           },
           icon: Container(

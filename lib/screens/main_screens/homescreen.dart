@@ -4,21 +4,14 @@ import 'package:pet_care/models/pet.dart';
 import 'package:pet_care/models/reminder.dart';
 import 'package:pet_care/providers/auth_providers.dart';
 import 'package:pet_care/providers/offline_providers.dart';
-import 'package:pet_care/providers/reminder_providers.dart';
+
 import 'package:pet_care/screens/ai_features/ai_navigation_screen.dart';
 import 'package:pet_care/screens/main_screens/log.dart';
-import 'package:pet_care/screens/main_screens/petscreen.dart';
 import 'package:pet_care/screens/main_screens/reminders.dart';
 import 'package:pet_care/screens/main_screens/resources.dart';
 import 'package:pet_care/providers/pet_providers.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
-// Import your screen files here
-// import 'homescreen.dart';
-// import 'pets_screen.dart';
-// import 'reminders_screen.dart';
-// import 'log_screen.dart';
-// import 'resources_screen.dart';
 
 class MainNavigation extends ConsumerStatefulWidget {
   const MainNavigation({super.key, required int initialIndex});
@@ -33,7 +26,6 @@ class _MainNavigationState extends ConsumerState<MainNavigation> {
   // Replace these with your actual screen widgets
   final List<Widget> _screens = [
     const Homescreen(), // Your home screen
-    const PetsScreen(), // Your pets screen
     const AIDashboardScreen(userId: ''),
     const RemindersScreen(), // Your reminders screen
     const LogScreen(), // Your log screen
@@ -67,11 +59,11 @@ class _MainNavigationState extends ConsumerState<MainNavigation> {
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
             _buildNavItem(Icons.home, 'Home', 0),
-            _buildNavItem(Icons.pets, 'Pets', 1),
-            _buildNavItem(Icons.auto_awesome, "AI", 2),
-            _buildNavItem(Icons.notifications, 'Reminders', 3),
-            _buildNavItem(Icons.edit_note, 'Log', 4),
-            _buildNavItem(Icons.library_books, 'Resources', 5),
+
+            _buildNavItem(Icons.auto_awesome, "AI", 1),
+            _buildNavItem(Icons.notifications, 'Reminders', 2),
+            _buildNavItem(Icons.edit_note, 'Log', 3),
+            _buildNavItem(Icons.library_books, 'Resources', 4),
           ],
         ),
       ),
