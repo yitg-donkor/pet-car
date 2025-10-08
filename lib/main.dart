@@ -55,11 +55,7 @@ class MyApp extends StatelessWidget {
         '/pet-details': (context) => const PetDetailsScreen(),
         '/add-pet': (context) => const AddPet(species: 'dog'),
         '/edit-pet': (context) => const Editpetscreen(),
-        '/aichat':
-            (context) => const AIVetChatScreen(
-              petName: 'Buddy',
-              species: 'dog',
-            ), // Example route for AI chat screen
+        // Example route for AI chat screen
       },
       theme: ThemeData(primarySwatch: Colors.blue, useMaterial3: true),
       // Remove the home parameter completely

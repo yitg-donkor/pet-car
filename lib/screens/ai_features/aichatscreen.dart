@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:pet_care/models/pet.dart';
 import 'package:pet_care/services/firebase_ai_service.dart';
 
 class AIVetChatScreen extends StatefulWidget {
-  final String petName;
-  final String species;
+  final Pet pet;
 
-  const AIVetChatScreen({required this.petName, required this.species});
+  const AIVetChatScreen({required this.pet});
 
   @override
   State<AIVetChatScreen> createState() => _AIVetChatScreenState();
@@ -23,7 +23,7 @@ class _AIVetChatScreenState extends State<AIVetChatScreen> {
     _messages.add({
       'role': 'assistant',
       'text':
-          'Hello! I\'m your AI vet assistant. I can help with questions about ${widget.petName}. How can I help you today?',
+          'Hello! I\'m your AI vet assistant. I can help with questions about ${widget.pet.name}. How can I help you today?',
     });
   }
 
@@ -48,8 +48,8 @@ class _AIVetChatScreenState extends State<AIVetChatScreen> {
       // ''';
 
       final response = await _aiHelper.chatAboutPet(
-        widget.petName,
-        widget.species,
+        widget.pet.name,
+        widget.pet.species,
         userMessage,
       );
 
@@ -71,7 +71,7 @@ class _AIVetChatScreenState extends State<AIVetChatScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('AI Vet Assistant - ${widget.petName}')),
+      appBar: AppBar(title: Text('AI Vet Assistant - ${widget.pet.name}')),
       body: Column(
         children: [
           Expanded(
@@ -123,7 +123,7 @@ class _AIVetChatScreenState extends State<AIVetChatScreen> {
                   child: TextField(
                     controller: _controller,
                     decoration: InputDecoration(
-                      hintText: 'Ask about ${widget.petName}...',
+                      hintText: 'Ask about ${widget.pet.name}...',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(24),
                       ),

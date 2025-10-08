@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:pet_care/models/pet.dart';
 import 'package:pet_care/services/firebase_ai_service.dart';
 
 class SmartRemindersScreen extends StatefulWidget {
-  final String userId;
+  final Pet pet;
 
-  const SmartRemindersScreen({Key? key, required this.userId})
-    : super(key: key);
+  const SmartRemindersScreen({Key? key, required this.pet}) : super(key: key);
 
   @override
   State<SmartRemindersScreen> createState() => _SmartRemindersScreenState();

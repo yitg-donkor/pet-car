@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:pet_care/models/pet.dart';
 import 'package:pet_care/services/firebase_ai_service.dart';
 
 class SymptomCheckerScreen extends StatefulWidget {
-  final String petName;
-  final String species;
+  final Pet pet;
 
-  const SymptomCheckerScreen({required this.petName, required this.species});
+  const SymptomCheckerScreen({required this.pet});
 
   @override
   State<SymptomCheckerScreen> createState() => _SymptomCheckerScreenState();
@@ -27,8 +27,8 @@ class _SymptomCheckerScreenState extends State<SymptomCheckerScreen> {
 
     try {
       final result = await _aiHelper.analyzeSymptoms(
-        widget.petName,
-        widget.species,
+        widget.pet.name,
+        widget.pet.species,
         _controller.text,
       );
 
@@ -73,7 +73,7 @@ class _SymptomCheckerScreenState extends State<SymptomCheckerScreen> {
             ),
             SizedBox(height: 24),
             Text(
-              'What symptoms is ${widget.petName} experiencing?',
+              'What symptoms is ${widget.pet.name} experiencing?',
               style: Theme.of(context).textTheme.titleLarge,
             ),
             SizedBox(height: 16),

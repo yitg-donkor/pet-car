@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:pet_care/models/pet.dart';
 import 'package:pet_care/services/firebase_ai_service.dart';
 
 class MedicalHistoryAnalysisScreen extends StatefulWidget {
-  final String petId;
+  final Pet pet;
 
-  const MedicalHistoryAnalysisScreen({Key? key, required this.petId})
+  const MedicalHistoryAnalysisScreen({Key? key, required this.pet})
     : super(key: key);
 
   @override

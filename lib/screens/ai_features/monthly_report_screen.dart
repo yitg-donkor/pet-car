@@ -2,12 +2,13 @@
 // ============================================
 
 import 'package:flutter/material.dart';
+import 'package:pet_care/models/pet.dart';
 import 'package:pet_care/services/firebase_ai_service.dart';
 
 class MonthlyReportScreen extends StatefulWidget {
-  final String petId;
+  final Pet pet;
 
-  const MonthlyReportScreen({required this.petId});
+  const MonthlyReportScreen({required this.pet});
 
   @override
   State<MonthlyReportScreen> createState() => _MonthlyReportScreenState();
