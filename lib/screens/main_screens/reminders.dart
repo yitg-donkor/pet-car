@@ -158,7 +158,7 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
               return _buildReminderCard(
                 reminder: reminder,
                 onToggle: () => _toggleCompletion(reminder),
-                onDelete: () => _deleteReminder(reminder.id!),
+                onDelete: () async => await _deleteReminder(reminder.id!),
               );
             },
           ),
@@ -187,7 +187,7 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
               return _buildReminderCard(
                 reminder: reminder,
                 onToggle: () => _toggleCompletion(reminder),
-                onDelete: () => _deleteReminder(reminder.id!),
+                onDelete: () async => await _deleteReminder(reminder.id!),
               );
             },
           ),
@@ -216,7 +216,7 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
               return _buildReminderCard(
                 reminder: reminder,
                 onToggle: () => _toggleCompletion(reminder),
-                onDelete: () => _deleteReminder(reminder.id!),
+                onDelete: () async => await _deleteReminder(reminder.id!),
               );
             },
           ),
@@ -269,9 +269,10 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
                 _buildSectionHeader('Today'),
                 ...today.map(
                   (r) => _buildReminderCard(
+                    key: ValueKey('today_${r.id}'),
                     reminder: r,
                     onToggle: () => _toggleCompletion(r),
-                    onDelete: () => _deleteReminder(r.id!),
+                    onDelete: () async => await _deleteReminder(r.id!),
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -280,9 +281,10 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
                 _buildSectionHeader('This Week'),
                 ...thisWeek.map(
                   (r) => _buildReminderCard(
+                    key: ValueKey('week_${r.id}'),
                     reminder: r,
                     onToggle: () => _toggleCompletion(r),
-                    onDelete: () => _deleteReminder(r.id!),
+                    onDelete: () async => await _deleteReminder(r.id!),
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -291,9 +293,10 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
                 _buildSectionHeader('This Month'),
                 ...thisMonth.map(
                   (r) => _buildReminderCard(
+                    key: ValueKey('month_${r.id}'),
                     reminder: r,
                     onToggle: () => _toggleCompletion(r),
-                    onDelete: () => _deleteReminder(r.id!),
+                    onDelete: () async => await _deleteReminder(r.id!),
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -302,9 +305,10 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
                 _buildSectionHeader('Later'),
                 ...later.map(
                   (r) => _buildReminderCard(
+                    key: ValueKey('later_${r.id}'),
                     reminder: r,
                     onToggle: () => _toggleCompletion(r),
-                    onDelete: () => _deleteReminder(r.id!),
+                    onDelete: () async => await _deleteReminder(r.id!),
                   ),
                 ),
               ],
@@ -348,16 +352,23 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
   }
 
   Widget _buildReminderCard({
+    Key? key,
     required Reminder reminder,
     required VoidCallback onToggle,
-    required VoidCallback onDelete,
+    required Future<void> Function() onDelete,
   }) {
     final icon = _getIconForReminder(reminder.title);
     final color = _getColorForImportance(reminder.importanceLevel);
 
     return Dismissible(
-      key: Key(reminder.id!),
+      key: key ?? Key(reminder.id!),
       direction: DismissDirection.endToStart,
+      confirmDismiss: (direction) async {
+        // Perform the deletion here and wait for it to complete
+        await onDelete();
+        // Return false because we've already handled the deletion and UI update
+        return false;
+      },
       background: Container(
         margin: const EdgeInsets.only(bottom: 15),
         padding: const EdgeInsets.only(right: 20),
@@ -368,7 +379,6 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
         ),
         child: const Icon(Icons.delete, color: Colors.white),
       ),
-      onDismissed: (direction) => onDelete(),
       child: Container(
         margin: const EdgeInsets.only(bottom: 15),
         padding: const EdgeInsets.all(20),
@@ -530,20 +540,41 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
   }
 
   Future<void> _deleteReminder(String id) async {
-    final db = ref.read(reminderDatabaseProvider);
-    await db.deleteReminder(id);
+    try {
+      final db = ref.read(reminderDatabaseProvider);
+      await db.deleteReminder(id);
 
-    // Delete from Supabase if online
-    final syncService = ref.read(unifiedSyncServiceProvider);
-    if (await syncService.hasInternetConnection()) {
-      try {
-        await syncService.supabase.from('reminders').delete().eq('id', id);
-      } catch (e) {
-        print('Error deleting from Supabase: $e');
+      // Delete from Supabase if online
+      final syncService = ref.read(unifiedSyncServiceProvider);
+      if (await syncService.hasInternetConnection()) {
+        try {
+          await syncService.supabase.from('reminders').delete().eq('id', id);
+        } catch (e) {
+          print('Error deleting from Supabase: $e');
+        }
+      }
+
+      // Invalidate providers to refresh the UI
+      _invalidateAllProviders();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Reminder deleted'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to delete reminder: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
-
-    _invalidateAllProviders();
   }
 
   void _showAddReminderDialog(BuildContext context) {

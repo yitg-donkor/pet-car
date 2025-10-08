@@ -145,6 +145,7 @@ class _AddPet extends ConsumerState<AddPet> {
             _microchipController.text.trim().isNotEmpty
                 ? _microchipController.text.trim()
                 : null,
+        age: _calculateAge(),
       );
 
       await ref.read(petsOfflineProvider.notifier).addPet(pet);

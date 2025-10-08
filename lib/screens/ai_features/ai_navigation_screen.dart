@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pet_care/providers/pet_providers.dart';
 import 'package:pet_care/screens/ai_features/feeding_schedulescren.dart';
 import 'package:pet_care/screens/ai_features/health_insights.dart';
 import 'package:pet_care/screens/ai_features/medical_historyanalysis_screen.dart';
@@ -13,18 +15,17 @@ import 'package:pet_care/screens/ai_features/training_tips.dart';
 // AI DASHBOARD SCREEN
 // ============================================
 
-class AIDashboardScreen extends StatefulWidget {
+class AIDashboardScreen extends ConsumerStatefulWidget {
   final String userId;
-  final String? currentPetId; // Optional: pre-select a pet
+  // Optional: pre-select a pet
 
-  const AIDashboardScreen({Key? key, required this.userId, this.currentPetId})
-    : super(key: key);
+  const AIDashboardScreen({Key? key, required this.userId}) : super(key: key);
 
   @override
-  State<AIDashboardScreen> createState() => _AIDashboardScreenState();
+  ConsumerState<AIDashboardScreen> createState() => _AIDashboardScreenState();
 }
 
-class _AIDashboardScreenState extends State<AIDashboardScreen> {
+class _AIDashboardScreenState extends ConsumerState<AIDashboardScreen> {
   bool isPremium =
       true; // TODO: Set to false, check actual premium status later
 
@@ -162,7 +163,8 @@ class _AIDashboardScreenState extends State<AIDashboardScreen> {
                       Colors.purple.shade400,
                       Colors.deepPurple.shade400,
                     ],
-                    onTap: () => _navigateToMedicalAnalysis(context),
+                    // onTap: () => _navigateToMedicalAnalysis(context),
+                    onTap: () => _navigateToMedicalAnalysis(context, ref),
                     isPremium: false,
                   ),
 
@@ -189,7 +191,7 @@ class _AIDashboardScreenState extends State<AIDashboardScreen> {
                     title: 'Feeding Schedule',
                     description: 'Personalized meal plans',
                     gradient: [Colors.teal.shade400, Colors.cyan.shade400],
-                    onTap: () => _navigateToFeedingSchedule(context),
+                    onTap: () => _navigateToFeedingSchedule(context, ref),
                     isPremium: false,
                   ),
 
@@ -198,7 +200,7 @@ class _AIDashboardScreenState extends State<AIDashboardScreen> {
                     title: 'Training Tips',
                     description: 'Behavior guidance & training',
                     gradient: [Colors.indigo.shade400, Colors.blue.shade400],
-                    onTap: () => _navigateToTrainingTips(context),
+                    onTap: () => _navigateToTrainingTips(context, ref),
                     isPremium: false,
                   ),
 
@@ -213,7 +215,7 @@ class _AIDashboardScreenState extends State<AIDashboardScreen> {
                     title: 'Health Insights',
                     description: 'AI-powered health trends',
                     gradient: [Colors.lightBlue.shade400, Colors.blue.shade600],
-                    onTap: () => _navigateToHealthInsights(context),
+                    onTap: () => _navigateToHealthInsights(context, ref),
                     isPremium: true, // Premium feature
                   ),
 
@@ -225,7 +227,7 @@ class _AIDashboardScreenState extends State<AIDashboardScreen> {
                       Colors.deepPurple.shade400,
                       Colors.purple.shade600,
                     ],
-                    onTap: () => _navigateToMonthlyReport(context),
+                    onTap: () => _navigateToMonthlyReport(context, ref),
                     isPremium: true, // Premium feature
                   ),
 
@@ -460,16 +462,16 @@ class _AIDashboardScreenState extends State<AIDashboardScreen> {
     );
   }
 
-  void _navigateToMedicalAnalysis(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder:
-            (context) =>
-                MedicalHistoryAnalysisScreen(petId: widget.currentPetId ?? ''),
-      ),
-    );
-  }
+  // void _navigateToMedicalAnalysis(BuildContext context) {
+  //   Navigator.push(
+  //     context,
+  //     MaterialPageRoute(
+  //       builder:
+  //           (context) =>
+  //               MedicalHistoryAnalysisScreen(petId: widget.currentPetId ?? ''),
+  //     ),
+  //   );
+  // }
 
   void _navigateToSmartReminders(BuildContext context) {
     Navigator.push(
@@ -480,43 +482,250 @@ class _AIDashboardScreenState extends State<AIDashboardScreen> {
     );
   }
 
-  void _navigateToFeedingSchedule(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder:
-            (context) =>
-                FeedingScheduleScreen(petId: widget.currentPetId ?? ''),
-      ),
+  void _navigateToFeedingSchedule(BuildContext context, WidgetRef ref) async {
+    // ✅ Load data FIRST
+    final pets = await ref.read(petsOfflineProvider.future);
+
+    if (!context.mounted) return;
+
+    // Show bottom sheet with already-loaded data
+    showModalBottomSheet(
+      context: context,
+      builder:
+          (context) => Container(
+            padding: EdgeInsets.all(16),
+            child: Column(
+              children: [
+                Text(
+                  'Select a Pet',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                Divider(),
+                if (pets.isEmpty)
+                  Text('No pets available')
+                else
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: pets.length,
+                      itemBuilder: (context, index) {
+                        final pet = pets[index];
+                        return ListTile(
+                          leading: CircleAvatar(
+                            backgroundImage:
+                                pet.photoUrl != null
+                                    ? NetworkImage(pet.photoUrl!)
+                                    : AssetImage(
+                                          'assets/images/pet_placeholder.png',
+                                        )
+                                        as ImageProvider,
+                          ),
+                          title: Text(pet.name),
+                          subtitle: Text(
+                            '${pet.species} - ${pet.breed ?? 'Unknown'}',
+                          ),
+                          onTap: () {
+                            Navigator.pop(context);
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder:
+                                    (context) =>
+                                        FeedingScheduleScreen(pet: pet),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          ),
     );
   }
 
-  void _navigateToTrainingTips(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder:
-            (context) => TrainingTipsScreen(petId: widget.currentPetId ?? ''),
-      ),
+  void _navigateToTrainingTips(BuildContext context, WidgetRef ref) async {
+    // ✅ Load data FIRST
+    final pets = await ref.read(petsOfflineProvider.future);
+
+    if (!context.mounted) return;
+
+    // Show bottom sheet with already-loaded data
+    showModalBottomSheet(
+      context: context,
+      builder:
+          (context) => Container(
+            padding: EdgeInsets.all(16),
+            child: Column(
+              children: [
+                Text(
+                  'Select a Pet',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                Divider(),
+                if (pets.isEmpty)
+                  Text('No pets available')
+                else
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: pets.length,
+                      itemBuilder: (context, index) {
+                        final pet = pets[index];
+                        return ListTile(
+                          leading: CircleAvatar(
+                            backgroundImage:
+                                pet.photoUrl != null
+                                    ? NetworkImage(pet.photoUrl!)
+                                    : AssetImage(
+                                          'assets/images/pet_placeholder.png',
+                                        )
+                                        as ImageProvider,
+                          ),
+                          title: Text(pet.name),
+                          subtitle: Text(
+                            '${pet.species} - ${pet.breed ?? 'Unknown'}',
+                          ),
+                          onTap: () {
+                            Navigator.pop(context);
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder:
+                                    (context) => TrainingTipsScreen(pet: pet),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          ),
     );
   }
 
-  void _navigateToHealthInsights(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder:
-            (context) => HealthInsightsScreen(petId: widget.currentPetId ?? ''),
-      ),
+  void _navigateToHealthInsights(BuildContext context, WidgetRef ref) async {
+    // ✅ Load data FIRST
+    final pets = await ref.read(petsOfflineProvider.future);
+
+    if (!context.mounted) return;
+
+    // Show bottom sheet with already-loaded data
+    showModalBottomSheet(
+      context: context,
+      builder:
+          (context) => Container(
+            padding: EdgeInsets.all(16),
+            child: Column(
+              children: [
+                Text(
+                  'Select a Pet',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                Divider(),
+                if (pets.isEmpty)
+                  Text('No pets available')
+                else
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: pets.length,
+                      itemBuilder: (context, index) {
+                        final pet = pets[index];
+                        return ListTile(
+                          leading: CircleAvatar(
+                            backgroundImage:
+                                pet.photoUrl != null
+                                    ? NetworkImage(pet.photoUrl!)
+                                    : AssetImage(
+                                          'assets/images/pet_placeholder.png',
+                                        )
+                                        as ImageProvider,
+                          ),
+                          title: Text(pet.name),
+                          subtitle: Text(
+                            '${pet.species} - ${pet.breed ?? 'Unknown'}',
+                          ),
+                          onTap: () {
+                            Navigator.pop(context);
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder:
+                                    (context) =>
+                                        HealthInsightsScreen(petId: pet.id),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          ),
     );
   }
 
-  void _navigateToMonthlyReport(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => MonthlyReportScreen(userId: widget.userId),
-      ),
+  void _navigateToMonthlyReport(BuildContext context, WidgetRef ref) async {
+    // ✅ Load data FIRST
+    final pets = await ref.read(petsOfflineProvider.future);
+
+    if (!context.mounted) return;
+
+    // Show bottom sheet with already-loaded data
+    showModalBottomSheet(
+      context: context,
+      builder:
+          (context) => Container(
+            padding: EdgeInsets.all(16),
+            child: Column(
+              children: [
+                Text(
+                  'Select a Pet',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                Divider(),
+                if (pets.isEmpty)
+                  Text('No pets available')
+                else
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: pets.length,
+                      itemBuilder: (context, index) {
+                        final pet = pets[index];
+                        return ListTile(
+                          leading: CircleAvatar(
+                            backgroundImage:
+                                pet.photoUrl != null
+                                    ? NetworkImage(pet.photoUrl!)
+                                    : AssetImage(
+                                          'assets/images/pet_placeholder.png',
+                                        )
+                                        as ImageProvider,
+                          ),
+                          title: Text(pet.name),
+                          subtitle: Text(
+                            '${pet.species} - ${pet.breed ?? 'Unknown'}',
+                          ),
+                          onTap: () {
+                            Navigator.pop(context);
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder:
+                                    (context) =>
+                                        MonthlyReportScreen(petId: pet.id),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          ),
     );
   }
 
@@ -558,6 +767,57 @@ class _AIDashboardScreenState extends State<AIDashboardScreen> {
           ),
     );
   }
+}
+
+void _navigateToMedicalAnalysis(BuildContext context, WidgetRef ref) {
+  final petsAsync = ref.watch(petsOfflineProvider);
+  showBottomSheet(
+    context: context,
+    builder:
+        (context) => Container(
+          height: 200,
+          color: Colors.white,
+          child: petsAsync.when(
+            data: (pets) {
+              if (pets.isEmpty) {
+                return Center(child: Text('No pets available'));
+              }
+              return ListView.builder(
+                itemCount: pets.length,
+                itemBuilder: (context, index) {
+                  final pet = pets[index];
+                  return ListTile(
+                    leading: CircleAvatar(
+                      backgroundImage:
+                          pet.photoUrl != null
+                              ? NetworkImage(pet.photoUrl!)
+                              : AssetImage('assets/images/pet_placeholder.png')
+                                  as ImageProvider,
+                    ),
+                    title: Text(pet.name),
+                    subtitle: Text(
+                      '${pet.species} - ${pet.breed ?? 'Unknown'}',
+                    ),
+                    onTap: () {
+                      Navigator.pop(context); // Close the bottom sheet
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder:
+                              (context) =>
+                                  MedicalHistoryAnalysisScreen(petId: pet.id),
+                        ),
+                      );
+                    },
+                  );
+                },
+              );
+            },
+            loading: () => Center(child: CircularProgressIndicator()),
+            error: (error, stack) => Center(child: Text('Error loading pets')),
+          ),
+        ),
+  );
 }
 
 // ============================================

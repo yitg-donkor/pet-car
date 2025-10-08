@@ -1,13 +1,14 @@
-// 4. TRAINING TIPS SCREEN
+// TRAINING TIPS SCREEN
 // ============================================
 
 import 'package:flutter/material.dart';
 import 'package:pet_care/services/firebase_ai_service.dart';
+import 'package:pet_care/models/pet.dart'; // Import your Pet model
 
 class TrainingTipsScreen extends StatefulWidget {
-  final String petId;
+  final Pet pet;
 
-  const TrainingTipsScreen({required this.petId});
+  const TrainingTipsScreen({Key? key, required this.pet}) : super(key: key);
 
   @override
   State<TrainingTipsScreen> createState() => _TrainingTipsScreenState();
@@ -17,12 +18,28 @@ class _TrainingTipsScreenState extends State<TrainingTipsScreen> {
   final PetAIHelper _aiHelper = PetAIHelper();
   final _formKey = GlobalKey<FormState>();
 
-  String _species = 'Dog';
-  String _breed = '';
+  final TextEditingController _speciesController = TextEditingController();
+  final TextEditingController _breedController = TextEditingController();
+
   String _behaviorIssue = '';
 
   String? _tips;
   bool _isGenerating = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Set the text controllers with pet data
+    _speciesController.text = widget.pet.species;
+    _breedController.text = widget.pet.breed ?? '';
+  }
+
+  @override
+  void dispose() {
+    _speciesController.dispose();
+    _breedController.dispose();
+    super.dispose();
+  }
 
   Future<void> _generateTips() async {
     if (!_formKey.currentState!.validate()) return;
@@ -34,8 +51,8 @@ class _TrainingTipsScreenState extends State<TrainingTipsScreen> {
 
     try {
       final tips = await _aiHelper.getTrainingTips(
-        _species,
-        _breed,
+        _speciesController.text,
+        _breedController.text,
         _behaviorIssue,
       );
 
@@ -55,7 +72,7 @@ class _TrainingTipsScreenState extends State<TrainingTipsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Training Tips'),
+        title: Text('Training Tips - ${widget.pet.name}'),
         backgroundColor: Colors.indigo,
       ),
       body: SingleChildScrollView(
@@ -72,7 +89,7 @@ class _TrainingTipsScreenState extends State<TrainingTipsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Behavior Information',
+                        'Pet Information',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -80,47 +97,35 @@ class _TrainingTipsScreenState extends State<TrainingTipsScreen> {
                       ),
                       SizedBox(height: 16),
 
-                      // Species
-                      DropdownButtonFormField<String>(
-                        value: _species,
+                      // Display Species (read-only)
+                      TextFormField(
+                        controller: _speciesController,
                         decoration: InputDecoration(
                           labelText: 'Species',
                           border: OutlineInputBorder(),
+                          filled: true,
+                          fillColor: Colors.grey[100],
                         ),
-                        items:
-                            ['Dog', 'Cat', 'Bird', 'Rabbit']
-                                .map(
-                                  (s) => DropdownMenuItem(
-                                    value: s,
-                                    child: Text(s),
-                                  ),
-                                )
-                                .toList(),
-                        onChanged: (value) {
-                          setState(() => _species = value!);
-                        },
+                        readOnly: true,
                       ),
 
                       SizedBox(height: 16),
 
-                      // Breed
+                      // Display Breed (read-only)
                       TextFormField(
+                        controller: _breedController,
                         decoration: InputDecoration(
                           labelText: 'Breed',
                           border: OutlineInputBorder(),
+                          filled: true,
+                          fillColor: Colors.grey[100],
                         ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter breed';
-                          }
-                          return null;
-                        },
-                        onChanged: (value) => _breed = value,
+                        readOnly: true,
                       ),
 
                       SizedBox(height: 16),
 
-                      // Behavior Issue
+                      // Only behavior issue is editable
                       TextFormField(
                         decoration: InputDecoration(
                           labelText: 'Behavior Issue',
