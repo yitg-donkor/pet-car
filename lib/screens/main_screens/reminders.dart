@@ -665,7 +665,7 @@ class _AddReminderDialogState extends ConsumerState<_AddReminderDialog> {
                   WidgetsBinding.instance.addPostFrameCallback((_) {
                     if (mounted) {
                       setState(() {
-                        selectedPetId = pets.first.id!;
+                        selectedPetId = pets.first.id;
                       });
                     }
                   });

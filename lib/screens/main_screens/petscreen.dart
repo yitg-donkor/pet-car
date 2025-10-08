@@ -117,11 +117,11 @@ class PetsScreen extends ConsumerWidget {
     );
   }
 
-  String _calculateAge(DateTime? birthDate) {
-    if (birthDate == null) return 'Unknown';
-    final age = DateTime.now().difference(birthDate).inDays ~/ 365;
-    return '$age ${age == 1 ? 'year' : 'years'}';
-  }
+  // String _calculateAge(DateTime? birthDate) {
+  //   if (birthDate == null) return 'Unknown';
+  //   final age = DateTime.now().difference(birthDate).inDays ~/ 365;
+  //   return '$age ${age == 1 ? 'year' : 'years'}';
+  // }
 
   Widget _buildPetCard({
     required String name,

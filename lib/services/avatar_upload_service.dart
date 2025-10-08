@@ -270,7 +270,7 @@ class AvatarUploadService {
         userMessage =
             'File already exists. This shouldn\'t happen with timestamp names.';
       } else {
-        userMessage = e.message ?? 'Storage error occurred';
+        userMessage = e.message;
       }
 
       throw AvatarUploadException(userMessage);

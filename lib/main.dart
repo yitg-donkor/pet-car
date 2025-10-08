@@ -2,7 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pet_care/firebase_options.dart';
-import 'package:pet_care/screens/ai_features/aichatscreen.dart';
+
 import 'package:pet_care/screens/main_screens/pet_info.dart';
 import 'package:pet_care/screens/onboarding_screens/introduction.dart';
 import 'package:pet_care/screens/onboarding_screens/onboarding_flow_screen.dart';

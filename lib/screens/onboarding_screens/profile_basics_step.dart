@@ -213,15 +213,15 @@ class _ProfileBasicsStepState extends ConsumerState<ProfileBasicsStep> {
     return _usernameError;
   }
 
-  String? _validateZipCode(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return 'Please enter ZIP code';
-    }
-    if (value.length != 5) {
-      return 'ZIP code must be 5 digits';
-    }
-    return null;
-  }
+  // String? _validateZipCode(String? value) {
+  //   if (value == null || value.trim().isEmpty) {
+  //     return 'Please enter ZIP code';
+  //   }
+  //   if (value.length != 5) {
+  //     return 'ZIP code must be 5 digits';
+  //   }
+  //   return null;
+  // }
 
   void _handleNext() {
     if (!_formKey.currentState!.validate()) return;
