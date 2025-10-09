@@ -33,7 +33,7 @@ class _MonthlyReportScreenState extends State<MonthlyReportScreen> {
     });
 
     try {
-      // TODO: Fetch actual data from Firestore
+      // TODO: Fetch actual data from db
       final prompt = '''
       Generate a comprehensive monthly pet care report for September 2025:
       
