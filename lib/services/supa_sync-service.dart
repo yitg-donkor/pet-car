@@ -4,6 +4,7 @@
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:pet_care/local_db/sqflite_db.dart';
+import 'package:pet_care/models/activity_log.dart';
 import 'package:pet_care/models/medical_record.dart';
 import 'package:pet_care/models/pet.dart';
 import 'package:pet_care/models/reminder.dart';
@@ -14,6 +15,7 @@ class UnifiedSyncService {
   final PetLocalDB petLocalDB;
   final MedicalRecordLocalDB medicalRecordLocalDB;
   final ReminderDatabaseService reminderLocalDB;
+  final ActivityLogLocalDB activityLogLocalDB;
   final Connectivity connectivity = Connectivity();
 
   UnifiedSyncService({
@@ -21,6 +23,7 @@ class UnifiedSyncService {
     required this.petLocalDB,
     required this.medicalRecordLocalDB,
     required this.reminderLocalDB,
+    required this.activityLogLocalDB,
   });
 
   Future<bool> hasInternetConnection() async {
@@ -189,6 +192,54 @@ class UnifiedSyncService {
     }
   }
 
+  Future<void> syncActivityLogsToSupabase() async {
+    if (!await hasInternetConnection()) return;
+
+    try {
+      final unsyncedLogs = await activityLogLocalDB.getUnsyncedLogs();
+
+      for (var log in unsyncedLogs) {
+        try {
+          await supabase.from('activity_logs').upsert(log.toSupabaseMap());
+          await activityLogLocalDB.markAsSynced(log.id);
+        } catch (e) {
+          print('Error syncing activity log ${log.id}: $e');
+        }
+      }
+
+      print('Synced ${unsyncedLogs.length} activity logs to Supabase');
+    } catch (e) {
+      print('Error syncing activity logs to Supabase: $e');
+    }
+  }
+
+  Future<void> syncActivityLogsFromSupabase(String userId) async {
+    if (!await hasInternetConnection()) return;
+
+    try {
+      final response = await supabase
+          .from('activity_logs')
+          .select('''
+          *,
+          pets!inner(owner_id)
+        ''')
+          .eq('pets.owner_id', userId);
+
+      final logs =
+          (response as List)
+              .map((json) => ActivityLog.fromSupabase(json))
+              .toList();
+
+      for (var log in logs) {
+        await activityLogLocalDB.upsertActivityLog(log);
+      }
+
+      print('Synced ${logs.length} activity logs from Supabase');
+    } catch (e) {
+      print('Error syncing activity logs from Supabase: $e');
+    }
+  }
+
   // ============================================
   // FULL SYNC (All Data)
   // ============================================
@@ -206,11 +257,13 @@ class UnifiedSyncService {
       await syncPetsToSupabase();
       await syncMedicalRecordsToSupabase();
       await syncRemindersToSupabase();
+      await syncActivityLogsToSupabase();
 
       // Then download latest from Supabase
       await syncPetsFromSupabase(userId);
       await syncMedicalRecordsFromSupabase(userId);
       await syncRemindersFromSupabase(userId);
+      await syncActivityLogsFromSupabase(userId);
 
       print('Full sync completed successfully');
     } catch (e) {

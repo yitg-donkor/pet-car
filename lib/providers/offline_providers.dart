@@ -1,10 +1,12 @@
 // providers/offline_providers.dart
+import 'package:pet_care/providers/activity_log_providers.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/pet.dart';
 import '../models/medical_record.dart';
 import '../models/reminder.dart';
+import '../models/activity_log.dart';
 import '../local_db/sqflite_db.dart';
 import 'auth_providers.dart';
 import 'dart:async';
@@ -35,6 +37,11 @@ ReminderDatabaseService reminderDatabase(ReminderDatabaseRef ref) {
   return ReminderDatabaseService();
 }
 
+@riverpod
+ActivityLogLocalDB activityLogLocalDB(ActivityLogLocalDBRef ref) {
+  return ActivityLogLocalDB();
+}
+
 // ============================================
 // UNIFIED SYNC SERVICE
 // ============================================
@@ -44,6 +51,7 @@ class UnifiedSyncService {
   final PetLocalDB petLocalDB;
   final MedicalRecordLocalDB medicalRecordLocalDB;
   final ReminderDatabaseService reminderLocalDB;
+  final ActivityLogLocalDB activityLogLocalDB;
   final Connectivity connectivity = Connectivity();
 
   UnifiedSyncService({
@@ -51,6 +59,7 @@ class UnifiedSyncService {
     required this.petLocalDB,
     required this.medicalRecordLocalDB,
     required this.reminderLocalDB,
+    required this.activityLogLocalDB,
   });
 
   Future<bool> hasInternetConnection() async {
@@ -161,6 +170,56 @@ class UnifiedSyncService {
     }
   }
 
+  // ACTIVITY LOGS SYNC
+
+  Future<void> syncActivityLogsToSupabase() async {
+    if (!await hasInternetConnection()) return;
+
+    try {
+      final unsyncedLogs = await activityLogLocalDB.getUnsyncedLogs();
+
+      for (var log in unsyncedLogs) {
+        try {
+          await supabase.from('activity_logs').upsert(log.toSupabaseMap());
+          await activityLogLocalDB.markAsSynced(log.id);
+        } catch (e) {
+          print('Error syncing activity log ${log.id}: $e');
+        }
+      }
+
+      print('Synced ${unsyncedLogs.length} activity logs to Supabase');
+    } catch (e) {
+      print('Error syncing activity logs to Supabase: $e');
+    }
+  }
+
+  Future<void> syncActivityLogsFromSupabase(String userId) async {
+    if (!await hasInternetConnection()) return;
+
+    try {
+      final response = await supabase
+          .from('activity_logs')
+          .select('''
+          *,
+          pets!inner(owner_id)
+        ''')
+          .eq('pets.owner_id', userId);
+
+      final logs =
+          (response as List)
+              .map((json) => ActivityLog.fromSupabase(json))
+              .toList();
+
+      for (var log in logs) {
+        await activityLogLocalDB.upsertActivityLog(log);
+      }
+
+      print('Synced ${logs.length} activity logs from Supabase');
+    } catch (e) {
+      print('Error syncing activity logs from Supabase: $e');
+    }
+  }
+
   // REMINDERS SYNC
   Future<void> syncRemindersToSupabase() async {
     if (!await hasInternetConnection()) return;
@@ -224,11 +283,13 @@ class UnifiedSyncService {
       await syncPetsToSupabase();
       await syncMedicalRecordsToSupabase();
       await syncRemindersToSupabase();
+      await syncActivityLogsToSupabase();
 
       // Then download latest from Supabase
       await syncPetsFromSupabase(userId);
       await syncMedicalRecordsFromSupabase(userId);
       await syncRemindersFromSupabase(userId);
+      await syncActivityLogsFromSupabase(userId);
 
       print('Full sync completed successfully');
     } catch (e) {
@@ -243,12 +304,14 @@ UnifiedSyncService unifiedSyncService(UnifiedSyncServiceRef ref) {
   final petLocalDB = ref.watch(petLocalDBProvider);
   final medicalRecordLocalDB = ref.watch(medicalRecordLocalDBProvider);
   final reminderLocalDB = ref.watch(reminderDatabaseProvider);
+  final activityLogLocalDB = ref.watch(activityLogLocalDBProvider);
 
   return UnifiedSyncService(
     supabase: supabase,
     petLocalDB: petLocalDB,
     medicalRecordLocalDB: medicalRecordLocalDB,
     reminderLocalDB: reminderLocalDB,
+    activityLogLocalDB: activityLogLocalDB,
   );
 }
 
@@ -345,6 +408,74 @@ Future<List<Reminder>> allReminders(AllRemindersRef ref) async {
   final db = ref.watch(reminderDatabaseProvider);
   return db.getAllReminders();
 }
+
+//offline first activity log provider
+// @riverpod
+// class PetActivityLogsOffline extends _$PetActivityLogsOffline {
+//   @override
+//   Future<List<ActivityLog>> build(String petId) async {
+//     // Always read from local DB first
+//     final activityLogDB = ref.watch(activityLogLocalDBProvider);
+//     final localLogs = await activityLogDB.getActivityLogsForPet(petId);
+
+//     // Sync in background
+//     final user = ref.watch(currentUserProvider);
+//     if (user != null) {
+//       final syncService = ref.watch(unifiedSyncServiceProvider);
+//       syncService.syncActivityLogsFromSupabase(user.id).catchError((e) {
+//         print('Background sync error: $e');
+//       });
+//     }
+
+//     return localLogs;
+//   }
+
+//   Future<void> addLog(ActivityLog log) async {
+//     final activityLogDB = ref.read(activityLogLocalDBProvider);
+//     await activityLogDB.createActivityLog(log);
+
+//     // Sync in background
+//     final syncService = ref.read(unifiedSyncServiceProvider);
+//     syncService.syncActivityLogsToSupabase().catchError((e) {
+//       print('Background sync error: $e');
+//     });
+
+//     ref.invalidateSelf();
+//   }
+
+//   Future<void> updateLog(ActivityLog log) async {
+//     final activityLogDB = ref.read(activityLogLocalDBProvider);
+//     await activityLogDB.updateActivityLog(log);
+
+//     // Sync in background
+//     final syncService = ref.read(unifiedSyncServiceProvider);
+//     syncService.syncActivityLogsToSupabase().catchError((e) {
+//       print('Background sync error: $e');
+//     });
+
+//     ref.invalidateSelf();
+//   }
+
+//   Future<void> deleteLog(String logId) async {
+//     final activityLogDB = ref.read(activityLogLocalDBProvider);
+//     await activityLogDB.deleteActivityLog(logId);
+
+//     // Delete from Supabase if online
+//     final syncService = ref.read(unifiedSyncServiceProvider);
+//     if (await syncService.hasInternetConnection()) {
+//       try {
+//         await syncService.supabase
+//             .from('activity_logs')
+//             .delete()
+//             .eq('id', logId);
+//       } catch (e) {
+//         print('Error deleting from Supabase: $e');
+//       }
+//     }
+
+//     ref.invalidateSelf();
+//   }
+// }
 
 // ============================================
 // CONNECTIVITY STATUS PROVIDER

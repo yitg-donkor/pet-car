@@ -120,7 +120,7 @@ final allRemindersRefreshProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef AllRemindersRefreshRef = AutoDisposeFutureProviderRef<List<Reminder>>;
-String _$todayRemindersHash() => r'38c4a4beec5aeca6b96d05c12a9ea73407fcfb18';
+String _$todayRemindersHash() => r'a54a51af54527dfa70a2ea4d2e97bc0bdbedcdcc';
 
 /// See also [todayReminders].
 @ProviderFor(todayReminders)
@@ -139,7 +139,7 @@ final todayRemindersProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef TodayRemindersRef = AutoDisposeFutureProviderRef<List<Reminder>>;
-String _$weeklyRemindersHash() => r'b0b12d045a0ea832d258cabc0a15baa27d5fcf92';
+String _$weeklyRemindersHash() => r'9830d4dfd69d63aa4a576f912eedbc377d7b1eeb';
 
 /// See also [weeklyReminders].
 @ProviderFor(weeklyReminders)
@@ -158,7 +158,7 @@ final weeklyRemindersProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef WeeklyRemindersRef = AutoDisposeFutureProviderRef<List<Reminder>>;
-String _$monthlyRemindersHash() => r'd9d4c62dfbfbc3f37abc45d09229198cd356486c';
+String _$monthlyRemindersHash() => r'aadce614feb1c8f3b603515ed493bb511cd81298';
 
 /// See also [monthlyReminders].
 @ProviderFor(monthlyReminders)
@@ -522,7 +522,7 @@ final syncStatusProvider =
     );
 
 typedef _$SyncStatus = AutoDisposeAsyncNotifier<Map<String, int>>;
-String _$manualSyncHash() => r'5701d5780dd69d98a3a52905d0ff90d63d49c0b0';
+String _$manualSyncHash() => r'0145f5ac6bda8ce05e561f030a74602d54525994';
 
 /// See also [ManualSync].
 @ProviderFor(ManualSync)

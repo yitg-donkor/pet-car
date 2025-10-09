@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pet_care/models/medical_record.dart';
 import 'package:pet_care/models/reminder.dart';
 import 'package:pet_care/providers/auth_providers.dart';
 import 'package:pet_care/providers/offline_providers.dart';
@@ -531,12 +532,116 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
 
   Future<void> _toggleCompletion(Reminder reminder) async {
     final db = ref.read(reminderDatabaseProvider);
+
+    // If marking as complete, show dialog to create medical record
+    if (!reminder.isCompleted) {
+      final shouldCreateRecord = await _showCreateMedicalRecordDialog(reminder);
+
+      if (shouldCreateRecord == true) {
+        // User wants to create a record
+        await _createMedicalRecordFromReminder(reminder);
+      }
+    }
+
+    // Toggle the completion status
     await db.toggleCompletion(reminder.id!, !reminder.isCompleted);
 
     final syncService = ref.read(unifiedSyncServiceProvider);
     await syncService.syncRemindersToSupabase();
 
     _invalidateAllProviders();
+  }
+
+  Future<bool?> _showCreateMedicalRecordDialog(Reminder reminder) async {
+    return showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: const Text('Create Medical Record?'),
+            content: Text(
+              'Would you like to create a medical record for "${reminder.title}"?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Skip'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF4CAF50),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                child: const Text('Create Record'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  // ============================================
+  // NEW: CREATE MEDICAL RECORD FROM REMINDER
+  // ============================================
+  Future<void> _createMedicalRecordFromReminder(Reminder reminder) async {
+    // Show a form dialog with pre-filled data
+    final result = await showDialog<Map<String, dynamic>?>(
+      context: context,
+      builder: (context) => _MedicalRecordFormDialog(reminder: reminder),
+    );
+
+    if (result != null) {
+      // Create the medical record
+      final medicalRecordDB = ref.read(medicalRecordLocalDBProvider);
+
+      final record = MedicalRecord(
+        id: '', // Will be generated
+        petId: reminder.petId,
+        recordType: result['recordType'] ?? _inferRecordType(reminder.title),
+        title: result['title'] ?? reminder.title,
+        description: result['description'],
+        date: DateTime.now(),
+        veterinarian: result['veterinarian'],
+        cost: result['cost'],
+        nextDueDate: result['nextDueDate'],
+      );
+
+      await medicalRecordDB.createMedicalRecord(record);
+
+      // Sync to Supabase
+      final syncService = ref.read(unifiedSyncServiceProvider);
+      await syncService.syncMedicalRecordsToSupabase();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Medical record created!')),
+        );
+      }
+    }
+  }
+
+  String _inferRecordType(String title) {
+    final titleLower = title.toLowerCase();
+    if (titleLower.contains('vaccination') || titleLower.contains('vaccine')) {
+      return 'vaccination';
+    }
+    if (titleLower.contains('checkup') || titleLower.contains('vet visit')) {
+      return 'checkup';
+    }
+    if (titleLower.contains('medication') || titleLower.contains('medicine')) {
+      return 'medication';
+    }
+    if (titleLower.contains('surgery')) {
+      return 'surgery';
+    }
+    if (titleLower.contains('groom')) {
+      return 'grooming';
+    }
+    return 'other';
   }
 
   Future<void> _deleteReminder(String id) async {
@@ -855,5 +960,211 @@ class _AddReminderDialogState extends ConsumerState<_AddReminderDialog> {
         context,
       ).showSnackBar(const SnackBar(content: Text('Reminder added!')));
     }
+  }
+}
+
+class _MedicalRecordFormDialog extends StatefulWidget {
+  final Reminder reminder;
+
+  const _MedicalRecordFormDialog({required this.reminder});
+
+  @override
+  State<_MedicalRecordFormDialog> createState() =>
+      _MedicalRecordFormDialogState();
+}
+
+class _MedicalRecordFormDialogState extends State<_MedicalRecordFormDialog> {
+  late TextEditingController titleController;
+  late TextEditingController descriptionController;
+  late TextEditingController veterinarianController;
+  late TextEditingController costController;
+  String selectedRecordType = 'other';
+  DateTime? nextDueDate;
+
+  @override
+  void initState() {
+    super.initState();
+    titleController = TextEditingController(text: widget.reminder.title);
+    descriptionController = TextEditingController(
+      text: widget.reminder.description ?? '',
+    );
+    veterinarianController = TextEditingController();
+    costController = TextEditingController();
+    selectedRecordType = _inferRecordType(widget.reminder.title);
+  }
+
+  String _inferRecordType(String title) {
+    final titleLower = title.toLowerCase();
+    if (titleLower.contains('vaccination') || titleLower.contains('vaccine')) {
+      return 'vaccination';
+    }
+    if (titleLower.contains('checkup') || titleLower.contains('vet visit')) {
+      return 'checkup';
+    }
+    if (titleLower.contains('medication') || titleLower.contains('medicine')) {
+      return 'medication';
+    }
+    if (titleLower.contains('surgery')) {
+      return 'surgery';
+    }
+    if (titleLower.contains('groom')) {
+      return 'grooming';
+    }
+    return 'other';
+  }
+
+  @override
+  void dispose() {
+    titleController.dispose();
+    descriptionController.dispose();
+    veterinarianController.dispose();
+    costController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: const Text('Medical Record Details'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: titleController,
+              decoration: InputDecoration(
+                labelText: 'Title',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+            const SizedBox(height: 15),
+            DropdownButtonFormField<String>(
+              value: selectedRecordType,
+              decoration: InputDecoration(
+                labelText: 'Record Type',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              items: const [
+                DropdownMenuItem(
+                  value: 'vaccination',
+                  child: Text('Vaccination'),
+                ),
+                DropdownMenuItem(value: 'checkup', child: Text('Checkup')),
+                DropdownMenuItem(
+                  value: 'medication',
+                  child: Text('Medication'),
+                ),
+                DropdownMenuItem(value: 'surgery', child: Text('Surgery')),
+                DropdownMenuItem(value: 'grooming', child: Text('Grooming')),
+                DropdownMenuItem(value: 'other', child: Text('Other')),
+              ],
+              onChanged: (value) {
+                setState(() => selectedRecordType = value ?? 'other');
+              },
+            ),
+            const SizedBox(height: 15),
+            TextField(
+              controller: descriptionController,
+              decoration: InputDecoration(
+                labelText: 'Description',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              maxLines: 3,
+            ),
+            const SizedBox(height: 15),
+            TextField(
+              controller: veterinarianController,
+              decoration: InputDecoration(
+                labelText: 'Veterinarian (Optional)',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+            const SizedBox(height: 15),
+            TextField(
+              controller: costController,
+              decoration: InputDecoration(
+                labelText: 'Cost (Optional)',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                prefixText: '\$ ',
+              ),
+              keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 15),
+            TextField(
+              decoration: InputDecoration(
+                labelText: 'Next Due Date (Optional)',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                suffixIcon: const Icon(Icons.calendar_today),
+              ),
+              readOnly: true,
+              controller: TextEditingController(
+                text:
+                    nextDueDate != null
+                        ? '${nextDueDate!.day}/${nextDueDate!.month}/${nextDueDate!.year}'
+                        : '',
+              ),
+              onTap: () async {
+                final date = await showDatePicker(
+                  context: context,
+                  initialDate: DateTime.now(),
+                  firstDate: DateTime.now(),
+                  lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
+                );
+                if (date != null) {
+                  setState(() => nextDueDate = date);
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            Navigator.pop(context, {
+              'title': titleController.text,
+              'recordType': selectedRecordType,
+              'description':
+                  descriptionController.text.isEmpty
+                      ? null
+                      : descriptionController.text,
+              'veterinarian':
+                  veterinarianController.text.isEmpty
+                      ? null
+                      : veterinarianController.text,
+              'cost':
+                  costController.text.isEmpty
+                      ? null
+                      : double.tryParse(costController.text),
+              'nextDueDate': nextDueDate,
+            });
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF4CAF50),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+          child: const Text('Save Record'),
+        ),
+      ],
+    );
   }
 }

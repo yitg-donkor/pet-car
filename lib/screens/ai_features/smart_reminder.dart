@@ -38,9 +38,9 @@ class _SmartRemindersScreenState extends State<SmartRemindersScreen> {
 
       final prompt = '''
 Based on this pet profile:
-- Species: Dog
-- Breed: Golden Retriever
-- Age: 3 years old
+- Species: ${widget.pet.species}
+- Breed: ${widget.pet.breed}
+- Age: ${widget.pet.age}
 - Last vaccination: 6 months ago (Rabies booster)
 - Last checkup: 8 months ago
 - Last grooming: 1 month ago

@@ -2,6 +2,9 @@
 // FIXED SQFLITE LOCAL DATABASE
 // ============================================
 
+import 'dart:convert';
+
+import 'package:pet_care/models/activity_log.dart';
 import 'package:pet_care/models/medical_record.dart';
 import 'package:pet_care/models/pet.dart';
 import 'package:pet_care/models/reminder.dart';
@@ -25,7 +28,37 @@ class LocalDatabaseService {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, filePath);
 
-    return await openDatabase(path, version: 1, onCreate: _createDB);
+    // Change version from 1 to 2
+    return await openDatabase(
+      path,
+      version: 2,
+      onCreate: _createDB,
+      onUpgrade: _onUpgrade,
+    );
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      // Add the activity_logs table from the artifact
+      await db.execute('''
+  CREATE TABLE activity_logs (
+    id TEXT PRIMARY KEY,
+    pet_id TEXT NOT NULL,
+    activity_type TEXT NOT NULL,
+    title TEXT NOT NULL,
+    details TEXT,
+    timestamp TEXT NOT NULL,
+    duration INTEGER,
+    amount TEXT,
+    metadata TEXT,
+    is_health_related INTEGER NOT NULL DEFAULT 0,
+    is_synced INTEGER NOT NULL DEFAULT 0,
+    last_modified TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (pet_id) REFERENCES pets (id) ON DELETE CASCADE
+  )
+''');
+    }
   }
 
   Future<void> _createDB(Database db, int version) async {
@@ -83,6 +116,24 @@ class LocalDatabaseService {
         last_modified TEXT NOT NULL
       )
     ''');
+    await db.execute('''
+  CREATE TABLE activity_logs (
+    id TEXT PRIMARY KEY,
+    pet_id TEXT NOT NULL,
+    activity_type TEXT NOT NULL,
+    title TEXT NOT NULL,
+    details TEXT,
+    timestamp TEXT NOT NULL,
+    duration INTEGER,
+    amount TEXT,
+    metadata TEXT,
+    is_health_related INTEGER NOT NULL DEFAULT 0,
+    is_synced INTEGER NOT NULL DEFAULT 0,
+    last_modified TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (pet_id) REFERENCES pets (id) ON DELETE CASCADE
+  )
+''');
 
     // User profiles table
     await db.execute('''
@@ -481,4 +532,179 @@ class ReminderDatabaseService {
     final db = await _dbService.database;
     db.close();
   }
+}
+
+class ActivityLogLocalDB {
+  final LocalDatabaseService _dbService = LocalDatabaseService.instance;
+
+  String _generateUuid() {
+    return const Uuid().v4();
+  }
+
+  // Create
+  Future<String> createActivityLog(ActivityLog log) async {
+    final db = await _dbService.database;
+    final id = log.id.isEmpty ? _generateUuid() : log.id;
+
+    await db.insert('activity_logs', {
+      'id': id,
+      'pet_id': log.petId,
+      'activity_type': log.activityType,
+      'title': log.title,
+      'details': log.details,
+      'timestamp': log.timestamp.toIso8601String(),
+      'duration': log.duration,
+      'amount': log.amount,
+      'metadata': log.metadata != null ? jsonEncode(log.metadata) : null,
+      'is_health_related': log.isHealthRelated ? 1 : 0,
+      'is_synced': 0,
+      'last_modified': DateTime.now().toIso8601String(),
+      'created_at': DateTime.now().toIso8601String(),
+    });
+
+    return id;
+  }
+
+  // Get all logs for a pet
+  Future<List<ActivityLog>> getActivityLogsForPet(String petId) async {
+    final db = await _dbService.database;
+    final result = await db.query(
+      'activity_logs',
+      where: 'pet_id = ?',
+      whereArgs: [petId],
+      orderBy: 'timestamp DESC',
+    );
+
+    return result.map((map) => ActivityLog.fromJson(map)).toList();
+  }
+
+  // Get logs by date range
+  Future<List<ActivityLog>> getLogsByDateRange(
+    String petId,
+    DateTime startDate,
+    DateTime endDate,
+  ) async {
+    final db = await _dbService.database;
+    final result = await db.query(
+      'activity_logs',
+      where: 'pet_id = ? AND timestamp BETWEEN ? AND ?',
+      whereArgs: [
+        petId,
+        startDate.toIso8601String(),
+        endDate.toIso8601String(),
+      ],
+      orderBy: 'timestamp DESC',
+    );
+
+    return result.map((map) => ActivityLog.fromJson(map)).toList();
+  }
+
+  // Get health-related logs
+  Future<List<ActivityLog>> getHealthLogs(String petId) async {
+    final db = await _dbService.database;
+    final result = await db.query(
+      'activity_logs',
+      where: 'pet_id = ? AND is_health_related = ?',
+      whereArgs: [petId, 1],
+      orderBy: 'timestamp DESC',
+    );
+
+    return result.map((map) => ActivityLog.fromJson(map)).toList();
+  }
+
+  // Get logs by activity type
+  Future<List<ActivityLog>> getLogsByType(
+    String petId,
+    String activityType,
+  ) async {
+    final db = await _dbService.database;
+    final result = await db.query(
+      'activity_logs',
+      where: 'pet_id = ? AND activity_type = ?',
+      whereArgs: [petId, activityType],
+      orderBy: 'timestamp DESC',
+    );
+
+    return result.map((map) => ActivityLog.fromJson(map)).toList();
+  }
+
+  // Get all logs for an owner (across all pets)
+  Future<List<ActivityLog>> getAllLogsForOwner(String ownerId) async {
+    final db = await _dbService.database;
+    final result = await db.rawQuery(
+      '''
+      SELECT activity_logs.* 
+      FROM activity_logs
+      INNER JOIN pets ON activity_logs.pet_id = pets.id
+      WHERE pets.owner_id = ?
+      ORDER BY activity_logs.timestamp DESC
+    ''',
+      [ownerId],
+    );
+
+    return result.map((map) => ActivityLog.fromJson(map)).toList();
+  }
+
+  // Get unsynced logs
+  Future<List<ActivityLog>> getUnsyncedLogs() async {
+    final db = await _dbService.database;
+    final result = await db.query(
+      'activity_logs',
+      where: 'is_synced = ?',
+      whereArgs: [0],
+    );
+
+    return result.map((map) => ActivityLog.fromJson(map)).toList();
+  }
+
+  // Update log
+  Future<void> updateActivityLog(ActivityLog log) async {
+    final db = await _dbService.database;
+    await db.update(
+      'activity_logs',
+      {
+        'activity_type': log.activityType,
+        'title': log.title,
+        'details': log.details,
+        'timestamp': log.timestamp.toIso8601String(),
+        'duration': log.duration,
+        'amount': log.amount,
+        'metadata': log.metadata != null ? jsonEncode(log.metadata) : null,
+        'is_health_related': log.isHealthRelated ? 1 : 0,
+        'is_synced': 0,
+        'last_modified': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [log.id],
+    );
+  }
+
+  // Delete log
+  Future<void> deleteActivityLog(String logId) async {
+    final db = await _dbService.database;
+    await db.delete('activity_logs', where: 'id = ?', whereArgs: [logId]);
+  }
+
+  // Upsert (for syncing from Supabase)
+  Future<void> upsertActivityLog(ActivityLog log) async {
+    final db = await _dbService.database;
+    await db.insert(
+      'activity_logs',
+      log.toJson(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  // Mark as synced
+  Future<void> markAsSynced(String logId) async {
+    final db = await _dbService.database;
+    await db.update(
+      'activity_logs',
+      {'is_synced': 1},
+      where: 'id = ?',
+      whereArgs: [logId],
+    );
+  }
+
+  // Close database
 }
