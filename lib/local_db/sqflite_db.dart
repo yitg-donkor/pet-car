@@ -386,11 +386,10 @@ class MedicalRecordLocalDB {
 }
 
 // ============================================
-// REMINDER DATABASE SERVICE (FIXED)
+// REMINDER DATABASE SERVICE (UPDATED)
 // ============================================
 
 class ReminderDatabaseService {
-  // Use the shared LocalDatabaseService instance
   final LocalDatabaseService _dbService = LocalDatabaseService.instance;
 
   String _generateUuid() {
@@ -477,12 +476,169 @@ class ReminderDatabaseService {
     return result.map((map) => Reminder.fromMap(map)).toList();
   }
 
-  // Read today's reminders
+  // UPDATED: Smart getTodayReminders that handles all frequency types
   Future<List<Reminder>> getTodayReminders() async {
+    final db = await _dbService.database;
     final now = DateTime.now();
-    final startOfDay = DateTime(now.year, now.month, now.day);
-    final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59);
-    return getRemindersByDateRange(startOfDay, endOfDay);
+    final todayStart = DateTime(now.year, now.month, now.day);
+    final todayEnd = DateTime(now.year, now.month, now.day, 23, 59, 59);
+
+    // Get all reminders
+    final allReminders = await db.query('reminders');
+    final reminders = allReminders.map((map) => Reminder.fromMap(map)).toList();
+
+    final todayReminders = <Reminder>[];
+
+    for (var reminder in reminders) {
+      final reminderDate = reminder.reminderDate;
+
+      switch (reminder.reminderType) {
+        case 'daily':
+          // Daily reminders: match if time is today (any date stored, but show every day)
+          todayReminders.add(reminder);
+          break;
+
+        case 'weekly':
+          // Weekly reminders: match if today is the same day of week
+          if (reminderDate.weekday == now.weekday) {
+            todayReminders.add(reminder);
+          }
+          break;
+
+        case 'monthly':
+          // Monthly reminders: match if today is the same day of month
+          if (reminderDate.day == now.day) {
+            todayReminders.add(reminder);
+          }
+          break;
+
+        case 'once':
+        default:
+          // One-time reminders: match if date is exactly today
+          if (reminderDate.isAfter(
+                todayStart.subtract(const Duration(seconds: 1)),
+              ) &&
+              reminderDate.isBefore(todayEnd.add(const Duration(seconds: 1)))) {
+            todayReminders.add(reminder);
+          }
+          break;
+      }
+    }
+
+    // Sort by time
+    todayReminders.sort((a, b) => a.reminderDate.compareTo(b.reminderDate));
+
+    return todayReminders;
+  }
+
+  // Get this week's reminders (for weekly tab)
+  Future<List<Reminder>> getWeeklyReminders() async {
+    final db = await _dbService.database;
+    final now = DateTime.now();
+    final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+    final endOfWeek = startOfWeek.add(
+      const Duration(days: 6, hours: 23, minutes: 59, seconds: 59),
+    );
+
+    final allReminders = await db.query('reminders');
+    final reminders = allReminders.map((map) => Reminder.fromMap(map)).toList();
+
+    final weeklyReminders = <Reminder>[];
+
+    for (var reminder in reminders) {
+      final reminderDate = reminder.reminderDate;
+
+      switch (reminder.reminderType) {
+        case 'daily':
+          // Daily reminders show every day, so include them
+          weeklyReminders.add(reminder);
+          break;
+
+        case 'weekly':
+          // Weekly reminders: include all
+          weeklyReminders.add(reminder);
+          break;
+
+        case 'monthly':
+          // Monthly reminders: include if day falls within this week
+          final thisWeekDates = List.generate(
+            7,
+            (i) => startOfWeek.add(Duration(days: i)),
+          );
+          if (thisWeekDates.any((date) => date.day == reminderDate.day)) {
+            weeklyReminders.add(reminder);
+          }
+          break;
+
+        case 'once':
+        default:
+          // One-time reminders: include if within this week
+          if (reminderDate.isAfter(
+                startOfWeek.subtract(const Duration(seconds: 1)),
+              ) &&
+              reminderDate.isBefore(
+                endOfWeek.add(const Duration(seconds: 1)),
+              )) {
+            weeklyReminders.add(reminder);
+          }
+          break;
+      }
+    }
+
+    weeklyReminders.sort((a, b) => a.reminderDate.compareTo(b.reminderDate));
+
+    return weeklyReminders;
+  }
+
+  // Get this month's reminders (for monthly tab)
+  Future<List<Reminder>> getMonthlyReminders() async {
+    final db = await _dbService.database;
+    final now = DateTime.now();
+    final startOfMonth = DateTime(now.year, now.month, 1);
+    final endOfMonth = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
+
+    final allReminders = await db.query('reminders');
+    final reminders = allReminders.map((map) => Reminder.fromMap(map)).toList();
+
+    final monthlyReminders = <Reminder>[];
+
+    for (var reminder in reminders) {
+      final reminderDate = reminder.reminderDate;
+
+      switch (reminder.reminderType) {
+        case 'daily':
+          // Daily reminders show every day
+          monthlyReminders.add(reminder);
+          break;
+
+        case 'weekly':
+          // Weekly reminders: show all (they repeat every week)
+          monthlyReminders.add(reminder);
+          break;
+
+        case 'monthly':
+          // Monthly reminders: show all
+          monthlyReminders.add(reminder);
+          break;
+
+        case 'once':
+        default:
+          // One-time reminders: include if within this month
+          if (reminderDate.isAfter(
+                startOfMonth.subtract(const Duration(seconds: 1)),
+              ) &&
+              reminderDate.isBefore(
+                endOfMonth.add(const Duration(seconds: 1)),
+              )) {
+            monthlyReminders.add(reminder);
+          }
+          break;
+      }
+    }
+
+    monthlyReminders.sort((a, b) => a.reminderDate.compareTo(b.reminderDate));
+
+    return monthlyReminders;
   }
 
   // Update

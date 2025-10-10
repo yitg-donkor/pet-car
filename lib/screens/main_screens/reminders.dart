@@ -28,7 +28,6 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
   void didChangeDependencies() {
     super.didChangeDependencies();
 
-    // Only sync once
     if (!_isInitialSyncDone) {
       _isInitialSyncDone = true;
       _performInitialSync();
@@ -365,9 +364,7 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
       key: key ?? Key(reminder.id!),
       direction: DismissDirection.endToStart,
       confirmDismiss: (direction) async {
-        // Perform the deletion here and wait for it to complete
         await onDelete();
-        // Return false because we've already handled the deletion and UI update
         return false;
       },
       background: Container(
@@ -519,8 +516,19 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
 
   String _formatReminderTime(Reminder reminder) {
     final time = reminder.reminderDate;
-    final now = DateTime.now();
 
+    // Format based on reminder type
+    if (reminder.reminderType == 'daily') {
+      return 'Daily at ${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+    } else if (reminder.reminderType == 'weekly') {
+      final dayName = _getDayName(time.weekday);
+      return '$dayName at ${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+    } else if (reminder.reminderType == 'monthly') {
+      return 'Monthly on day ${time.day} at ${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+    }
+
+    // One-time reminder
+    final now = DateTime.now();
     if (time.year == now.year &&
         time.month == now.month &&
         time.day == now.day) {
@@ -530,20 +538,30 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
     return '${time.day}/${time.month}/${time.year} ${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
   }
 
+  String _getDayName(int weekday) {
+    const days = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ];
+    return days[weekday - 1];
+  }
+
   Future<void> _toggleCompletion(Reminder reminder) async {
     final db = ref.read(reminderDatabaseProvider);
 
-    // If marking as complete, show dialog to create medical record
     if (!reminder.isCompleted) {
       final shouldCreateRecord = await _showCreateMedicalRecordDialog(reminder);
 
       if (shouldCreateRecord == true) {
-        // User wants to create a record
         await _createMedicalRecordFromReminder(reminder);
       }
     }
 
-    // Toggle the completion status
     await db.toggleCompletion(reminder.id!, !reminder.isCompleted);
 
     final syncService = ref.read(unifiedSyncServiceProvider);
@@ -584,22 +602,17 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
     );
   }
 
-  // ============================================
-  // NEW: CREATE MEDICAL RECORD FROM REMINDER
-  // ============================================
   Future<void> _createMedicalRecordFromReminder(Reminder reminder) async {
-    // Show a form dialog with pre-filled data
     final result = await showDialog<Map<String, dynamic>?>(
       context: context,
       builder: (context) => _MedicalRecordFormDialog(reminder: reminder),
     );
 
     if (result != null) {
-      // Create the medical record
       final medicalRecordDB = ref.read(medicalRecordLocalDBProvider);
 
       final record = MedicalRecord(
-        id: '', // Will be generated
+        id: '',
         petId: reminder.petId,
         recordType: result['recordType'] ?? _inferRecordType(reminder.title),
         title: result['title'] ?? reminder.title,
@@ -612,7 +625,6 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
 
       await medicalRecordDB.createMedicalRecord(record);
 
-      // Sync to Supabase
       final syncService = ref.read(unifiedSyncServiceProvider);
       await syncService.syncMedicalRecordsToSupabase();
 
@@ -649,7 +661,6 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
       final db = ref.read(reminderDatabaseProvider);
       await db.deleteReminder(id);
 
-      // Delete from Supabase if online
       final syncService = ref.read(unifiedSyncServiceProvider);
       if (await syncService.hasInternetConnection()) {
         try {
@@ -659,7 +670,6 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
         }
       }
 
-      // Invalidate providers to refresh the UI
       _invalidateAllProviders();
 
       if (mounted) {
@@ -692,7 +702,6 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
   }
 }
 
-// Separate widget for the dialog to properly handle Consumer
 class _AddReminderDialog extends ConsumerStatefulWidget {
   final WidgetRef parentRef;
 
@@ -710,6 +719,7 @@ class _AddReminderDialogState extends ConsumerState<_AddReminderDialog> {
   String selectedImportance = 'medium';
   DateTime selectedDateTime = DateTime.now();
   TimeOfDay selectedTime = TimeOfDay.now();
+  int selectedDayOfWeek = DateTime.now().weekday;
 
   @override
   void dispose() {
@@ -765,7 +775,6 @@ class _AddReminderDialogState extends ConsumerState<_AddReminderDialog> {
                   );
                 }
 
-                // Set initial value if not set
                 if (selectedPetId.isEmpty && pets.isNotEmpty) {
                   WidgetsBinding.instance.addPostFrameCallback((_) {
                     if (mounted) {
@@ -821,41 +830,6 @@ class _AddReminderDialogState extends ConsumerState<_AddReminderDialog> {
                   ),
             ),
             const SizedBox(height: 15),
-            TextField(
-              decoration: InputDecoration(
-                labelText: 'Date & Time',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                suffixIcon: const Icon(Icons.calendar_today),
-              ),
-              readOnly: true,
-              controller: TextEditingController(
-                text:
-                    '${selectedDateTime.day}/${selectedDateTime.month}/${selectedDateTime.year} ${selectedTime.format(context)}',
-              ),
-              onTap: () async {
-                final date = await showDatePicker(
-                  context: context,
-                  initialDate: selectedDateTime,
-                  firstDate: DateTime.now(),
-                  lastDate: DateTime.now().add(const Duration(days: 365)),
-                );
-                if (date != null) {
-                  final time = await showTimePicker(
-                    context: context,
-                    initialTime: selectedTime,
-                  );
-                  if (time != null) {
-                    setState(() {
-                      selectedDateTime = date;
-                      selectedTime = time;
-                    });
-                  }
-                }
-              },
-            ),
-            const SizedBox(height: 15),
             DropdownButtonFormField<String>(
               value: selectedFrequency,
               decoration: InputDecoration(
@@ -874,6 +848,11 @@ class _AddReminderDialogState extends ConsumerState<_AddReminderDialog> {
                   (value) =>
                       setState(() => selectedFrequency = value ?? 'once'),
             ),
+            const SizedBox(height: 15),
+
+            // Dynamic date/time picker based on frequency
+            _buildDateTimePicker(),
+
             const SizedBox(height: 15),
             DropdownButtonFormField<String>(
               value: selectedImportance,
@@ -914,6 +893,181 @@ class _AddReminderDialogState extends ConsumerState<_AddReminderDialog> {
     );
   }
 
+  Widget _buildDateTimePicker() {
+    switch (selectedFrequency) {
+      case 'daily':
+        // Only show time picker for daily reminders
+        return TextField(
+          decoration: InputDecoration(
+            labelText: 'Time',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+            suffixIcon: const Icon(Icons.access_time),
+          ),
+          readOnly: true,
+          controller: TextEditingController(text: selectedTime.format(context)),
+          onTap: () async {
+            final time = await showTimePicker(
+              context: context,
+              initialTime: selectedTime,
+            );
+            if (time != null) {
+              setState(() {
+                selectedTime = time;
+              });
+            }
+          },
+        );
+
+      case 'weekly':
+        // Show day of week picker + time picker
+        return Column(
+          children: [
+            DropdownButtonFormField<int>(
+              value: selectedDayOfWeek,
+              decoration: InputDecoration(
+                labelText: 'Day of Week',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              items: const [
+                DropdownMenuItem(value: 1, child: Text('Monday')),
+                DropdownMenuItem(value: 2, child: Text('Tuesday')),
+                DropdownMenuItem(value: 3, child: Text('Wednesday')),
+                DropdownMenuItem(value: 4, child: Text('Thursday')),
+                DropdownMenuItem(value: 5, child: Text('Friday')),
+                DropdownMenuItem(value: 6, child: Text('Saturday')),
+                DropdownMenuItem(value: 7, child: Text('Sunday')),
+              ],
+              onChanged: (value) {
+                setState(() {
+                  selectedDayOfWeek = value ?? 1;
+                });
+              },
+            ),
+            const SizedBox(height: 15),
+            TextField(
+              decoration: InputDecoration(
+                labelText: 'Time',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                suffixIcon: const Icon(Icons.access_time),
+              ),
+              readOnly: true,
+              controller: TextEditingController(
+                text: selectedTime.format(context),
+              ),
+              onTap: () async {
+                final time = await showTimePicker(
+                  context: context,
+                  initialTime: selectedTime,
+                );
+                if (time != null) {
+                  setState(() {
+                    selectedTime = time;
+                  });
+                }
+              },
+            ),
+          ],
+        );
+
+      case 'monthly':
+        // Show day of month picker + time picker
+        return Column(
+          children: [
+            TextField(
+              decoration: InputDecoration(
+                labelText: 'Day of Month',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                suffixIcon: const Icon(Icons.calendar_today),
+              ),
+              readOnly: true,
+              controller: TextEditingController(
+                text: 'Day ${selectedDateTime.day}',
+              ),
+              onTap: () async {
+                final date = await showDatePicker(
+                  context: context,
+                  initialDate: selectedDateTime,
+                  firstDate: DateTime.now(),
+                  lastDate: DateTime.now().add(const Duration(days: 365)),
+                );
+                if (date != null) {
+                  setState(() {
+                    selectedDateTime = date;
+                  });
+                }
+              },
+            ),
+            const SizedBox(height: 15),
+            TextField(
+              decoration: InputDecoration(
+                labelText: 'Time',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                suffixIcon: const Icon(Icons.access_time),
+              ),
+              readOnly: true,
+              controller: TextEditingController(
+                text: selectedTime.format(context),
+              ),
+              onTap: () async {
+                final time = await showTimePicker(
+                  context: context,
+                  initialTime: selectedTime,
+                );
+                if (time != null) {
+                  setState(() {
+                    selectedTime = time;
+                  });
+                }
+              },
+            ),
+          ],
+        );
+
+      default:
+        // One-time reminder: full date + time picker
+        return TextField(
+          decoration: InputDecoration(
+            labelText: 'Date & Time',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+            suffixIcon: const Icon(Icons.calendar_today),
+          ),
+          readOnly: true,
+          controller: TextEditingController(
+            text:
+                '${selectedDateTime.day}/${selectedDateTime.month}/${selectedDateTime.year} ${selectedTime.format(context)}',
+          ),
+          onTap: () async {
+            final date = await showDatePicker(
+              context: context,
+              initialDate: selectedDateTime,
+              firstDate: DateTime.now(),
+              lastDate: DateTime.now().add(const Duration(days: 365)),
+            );
+            if (date != null) {
+              final time = await showTimePicker(
+                context: context,
+                initialTime: selectedTime,
+              );
+              if (time != null) {
+                setState(() {
+                  selectedDateTime = date;
+                  selectedTime = time;
+                });
+              }
+            }
+          },
+        );
+    }
+  }
+
   Future<void> _saveReminder(BuildContext context) async {
     if (titleController.text.isEmpty || selectedPetId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -922,13 +1076,99 @@ class _AddReminderDialogState extends ConsumerState<_AddReminderDialog> {
       return;
     }
 
-    final reminderDateTime = DateTime(
-      selectedDateTime.year,
-      selectedDateTime.month,
-      selectedDateTime.day,
-      selectedTime.hour,
-      selectedTime.minute,
-    );
+    DateTime reminderDateTime;
+
+    // Create reminder date based on frequency type
+    switch (selectedFrequency) {
+      case 'daily':
+        // For daily, store with today's date but the selected time
+        final now = DateTime.now();
+        reminderDateTime = DateTime(
+          now.year,
+          now.month,
+          now.day,
+          selectedTime.hour,
+          selectedTime.minute,
+        );
+        break;
+
+      case 'weekly':
+        // For weekly, find the next occurrence of the selected day
+        final now = DateTime.now();
+        int daysUntilTarget = (selectedDayOfWeek - now.weekday) % 7;
+        if (daysUntilTarget == 0) {
+          // If it's today, check if time has passed
+          final todayAtTime = DateTime(
+            now.year,
+            now.month,
+            now.day,
+            selectedTime.hour,
+            selectedTime.minute,
+          );
+          if (todayAtTime.isBefore(now)) {
+            daysUntilTarget = 7; // Schedule for next week
+          }
+        }
+
+        reminderDateTime = DateTime(
+          now.year,
+          now.month,
+          now.day + daysUntilTarget,
+          selectedTime.hour,
+          selectedTime.minute,
+        );
+        break;
+
+      case 'monthly':
+        // For monthly, use the selected day of month with current/next month
+        final now = DateTime.now();
+        int targetMonth = now.month;
+        int targetYear = now.year;
+
+        // If the day has passed this month, schedule for next month
+        if (selectedDateTime.day < now.day) {
+          targetMonth++;
+          if (targetMonth > 12) {
+            targetMonth = 1;
+            targetYear++;
+          }
+        } else if (selectedDateTime.day == now.day) {
+          // If it's today, check if time has passed
+          final todayAtTime = DateTime(
+            now.year,
+            now.month,
+            now.day,
+            selectedTime.hour,
+            selectedTime.minute,
+          );
+          if (todayAtTime.isBefore(now)) {
+            targetMonth++;
+            if (targetMonth > 12) {
+              targetMonth = 1;
+              targetYear++;
+            }
+          }
+        }
+
+        reminderDateTime = DateTime(
+          targetYear,
+          targetMonth,
+          selectedDateTime.day,
+          selectedTime.hour,
+          selectedTime.minute,
+        );
+        break;
+
+      default:
+        // One-time reminder
+        reminderDateTime = DateTime(
+          selectedDateTime.year,
+          selectedDateTime.month,
+          selectedDateTime.day,
+          selectedTime.hour,
+          selectedTime.minute,
+        );
+    }
 
     final reminder = Reminder(
       petId: selectedPetId,
@@ -948,7 +1188,6 @@ class _AddReminderDialogState extends ConsumerState<_AddReminderDialog> {
     final syncService = widget.parentRef.read(unifiedSyncServiceProvider);
     await syncService.syncRemindersToSupabase();
 
-    // Invalidate all reminder providers
     widget.parentRef.invalidate(todayRemindersProvider);
     widget.parentRef.invalidate(weeklyRemindersProvider);
     widget.parentRef.invalidate(monthlyRemindersProvider);

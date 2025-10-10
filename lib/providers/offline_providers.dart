@@ -388,7 +388,7 @@ Future<List<Reminder>> allRemindersRefresh(AllRemindersRefreshRef ref) async {
 @riverpod
 Future<List<Reminder>> todayReminders(TodayRemindersRef ref) async {
   final db = ref.watch(reminderDatabaseProvider);
-  return db.getRemindersByType('daily');
+  return db.getTodayReminders();
 }
 
 @riverpod
@@ -408,74 +408,6 @@ Future<List<Reminder>> allReminders(AllRemindersRef ref) async {
   final db = ref.watch(reminderDatabaseProvider);
   return db.getAllReminders();
 }
-
-//offline first activity log provider
-// @riverpod
-// class PetActivityLogsOffline extends _$PetActivityLogsOffline {
-//   @override
-//   Future<List<ActivityLog>> build(String petId) async {
-//     // Always read from local DB first
-//     final activityLogDB = ref.watch(activityLogLocalDBProvider);
-//     final localLogs = await activityLogDB.getActivityLogsForPet(petId);
-
-//     // Sync in background
-//     final user = ref.watch(currentUserProvider);
-//     if (user != null) {
-//       final syncService = ref.watch(unifiedSyncServiceProvider);
-//       syncService.syncActivityLogsFromSupabase(user.id).catchError((e) {
-//         print('Background sync error: $e');
-//       });
-//     }
-
-//     return localLogs;
-//   }
-
-//   Future<void> addLog(ActivityLog log) async {
-//     final activityLogDB = ref.read(activityLogLocalDBProvider);
-//     await activityLogDB.createActivityLog(log);
-
-//     // Sync in background
-//     final syncService = ref.read(unifiedSyncServiceProvider);
-//     syncService.syncActivityLogsToSupabase().catchError((e) {
-//       print('Background sync error: $e');
-//     });
-
-//     ref.invalidateSelf();
-//   }
-
-//   Future<void> updateLog(ActivityLog log) async {
-//     final activityLogDB = ref.read(activityLogLocalDBProvider);
-//     await activityLogDB.updateActivityLog(log);
-
-//     // Sync in background
-//     final syncService = ref.read(unifiedSyncServiceProvider);
-//     syncService.syncActivityLogsToSupabase().catchError((e) {
-//       print('Background sync error: $e');
-//     });
-
-//     ref.invalidateSelf();
-//   }
-
-//   Future<void> deleteLog(String logId) async {
-//     final activityLogDB = ref.read(activityLogLocalDBProvider);
-//     await activityLogDB.deleteActivityLog(logId);
-
-//     // Delete from Supabase if online
-//     final syncService = ref.read(unifiedSyncServiceProvider);
-//     if (await syncService.hasInternetConnection()) {
-//       try {
-//         await syncService.supabase
-//             .from('activity_logs')
-//             .delete()
-//             .eq('id', logId);
-//       } catch (e) {
-//         print('Error deleting from Supabase: $e');
-//       }
-//     }
-
-//     ref.invalidateSelf();
-//   }
-// }
 
 // ============================================
 // CONNECTIVITY STATUS PROVIDER
