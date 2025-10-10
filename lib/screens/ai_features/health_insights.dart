@@ -131,9 +131,7 @@ class _HealthInsightsScreenState extends ConsumerState<HealthInsightsScreen> {
       // Add data limitation warning if needed
       if (_hasLimitedData) {
         analysis =
-            '⚠️ LIMITED DATA NOTICE: This analysis is based on limited records. '
-                'Add more medical records and activity logs for more accurate insights.\n\n' +
-            analysis;
+            '⚠️ LIMITED DATA NOTICE: This analysis is based on limited records. Add more medical records and activity logs for more accurate insights.\n\n$analysis';
       }
 
       setState(() {

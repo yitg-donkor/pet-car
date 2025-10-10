@@ -388,7 +388,7 @@ Future<List<Reminder>> allRemindersRefresh(AllRemindersRefreshRef ref) async {
 @riverpod
 Future<List<Reminder>> todayReminders(TodayRemindersRef ref) async {
   final db = ref.watch(reminderDatabaseProvider);
-  return db.getTodayReminders();
+  return db.getRemindersByType('daily');
 }
 
 @riverpod
