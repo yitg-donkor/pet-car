@@ -512,7 +512,8 @@ class _HomescreenState extends ConsumerState<Homescreen> {
   }
 
   Widget _buildRemindersSection(List<Reminder> reminders) {
-    if (reminders.isEmpty) {
+    final activeReminders = reminders.where((r) => !r.isCompleted).toList();
+    if (activeReminders.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(40),
         decoration: BoxDecoration(
@@ -546,8 +547,9 @@ class _HomescreenState extends ConsumerState<Homescreen> {
     }
 
     // Show max 3 reminders on home screen
-    final displayReminders = reminders.take(3).toList();
-    final remainingCount = reminders.length - 3;
+    final displayReminders = activeReminders.take(3).toList();
+
+    final remainingCount = activeReminders.length - 3;
 
     return Column(
       children: [

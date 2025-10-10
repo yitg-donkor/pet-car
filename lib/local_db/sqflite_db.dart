@@ -671,6 +671,108 @@ class ReminderDatabaseService {
     );
   }
 
+  // Add to ReminderDatabaseService in sqflite_db.dart
+
+  Future<void> resetRecurringReminders() async {
+    final db = await _dbService.database;
+    final now = DateTime.now();
+
+    // Get all completed reminders
+    final result = await db.query(
+      'reminders',
+      where: 'is_completed = ?',
+      whereArgs: [1],
+    );
+
+    final reminders = result.map((map) => Reminder.fromMap(map)).toList();
+
+    for (var reminder in reminders) {
+      bool shouldReset = false;
+      DateTime newDate = reminder.reminderDate;
+
+      switch (reminder.reminderType) {
+        case 'daily':
+          // Reset if it's a new day
+          if (reminder.reminderDate.day != now.day ||
+              reminder.reminderDate.month != now.month ||
+              reminder.reminderDate.year != now.year) {
+            shouldReset = true;
+            newDate = DateTime(
+              now.year,
+              now.month,
+              now.day,
+              reminder.reminderDate.hour,
+              reminder.reminderDate.minute,
+            );
+          }
+          break;
+
+        case 'weekly':
+          // Reset if a week has passed
+          final daysSinceCompleted =
+              now.difference(reminder.reminderDate).inDays;
+          if (daysSinceCompleted >= 7) {
+            shouldReset = true;
+            // Move to next occurrence of that weekday
+            int daysToAdd = 7 - (daysSinceCompleted % 7);
+            if (daysToAdd == 7) daysToAdd = 0;
+            newDate = now.add(Duration(days: daysToAdd));
+            newDate = DateTime(
+              newDate.year,
+              newDate.month,
+              newDate.day,
+              reminder.reminderDate.hour,
+              reminder.reminderDate.minute,
+            );
+          }
+          break;
+
+        case 'monthly':
+          // Reset if a month has passed
+          if (reminder.reminderDate.month != now.month ||
+              reminder.reminderDate.year != now.year) {
+            shouldReset = true;
+            // Keep same day of month, update to current/next month
+            int targetMonth = now.month;
+            int targetYear = now.year;
+            if (reminder.reminderDate.day < now.day) {
+              targetMonth++;
+              if (targetMonth > 12) {
+                targetMonth = 1;
+                targetYear++;
+              }
+            }
+            newDate = DateTime(
+              targetYear,
+              targetMonth,
+              reminder.reminderDate.day,
+              reminder.reminderDate.hour,
+              reminder.reminderDate.minute,
+            );
+          }
+          break;
+
+        case 'once':
+          // One-time reminders never reset
+          break;
+      }
+
+      if (shouldReset) {
+        await db.update(
+          'reminders',
+          {
+            'is_completed': 0,
+            'reminder_date': newDate.toIso8601String(),
+            'is_synced': 0,
+            'last_modified': DateTime.now().toIso8601String(),
+          },
+          where: 'id = ?',
+          whereArgs: [reminder.id],
+        );
+      }
+    }
+  }
+
   // Delete
   Future<int> deleteReminder(String id) async {
     final db = await _dbService.database;

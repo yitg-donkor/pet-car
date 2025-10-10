@@ -11,8 +11,10 @@ import 'package:pet_care/screens/pet_selection_screens/add_pet.dart';
 import 'package:pet_care/screens/pet_selection_screens/editpetscreen.dart';
 import 'package:pet_care/screens/pet_selection_screens/pet_selection.dart';
 import 'package:pet_care/screens/onboarding_screens/signupscreen.dart';
+import 'package:pet_care/services/notification_service.dart';
 import 'package:pet_care/widgets/onboarding.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:timezone/data/latest_all.dart' as tz;
 import 'providers/auth_providers.dart';
 import 'package:rive/rive.dart' as rive;
 import 'screens/main_screens/homescreen.dart';
@@ -22,12 +24,15 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   rive.RiveFile.initialize();
 
+  tz.initializeTimeZones();
+
   await Supabase.initialize(
     url: 'https://moaiifmgrbbcmnubgxpm.supabase.co',
     anonKey:
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1vYWlpZm1ncmJiY21udWJneHBtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgyMzA0MjMsImV4cCI6MjA3MzgwNjQyM30.WLfpehs4MY8wTzBepr5qhTeV-DiZwIT2Imy_WuQxueU',
   );
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await NotificationService().initialize();
 
   runApp(const ProviderScope(child: MyApp()));
 }

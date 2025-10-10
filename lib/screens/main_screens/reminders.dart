@@ -5,6 +5,7 @@ import 'package:pet_care/models/reminder.dart';
 import 'package:pet_care/providers/auth_providers.dart';
 import 'package:pet_care/providers/offline_providers.dart';
 import 'package:pet_care/providers/pet_providers.dart';
+import 'package:pet_care/services/notification_service.dart';
 
 class RemindersScreen extends ConsumerStatefulWidget {
   const RemindersScreen({Key? key}) : super(key: key);
@@ -17,11 +18,18 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
     with TickerProviderStateMixin {
   late TabController _tabController;
   bool _isInitialSyncDone = false;
+  final _notificationService = NotificationService();
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
+    _initializeNotifications();
+  }
+
+  Future<void> _initializeNotifications() async {
+    await _notificationService.initialize();
+    await _notificationService.requestPermissions();
   }
 
   @override
@@ -39,8 +47,16 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
     if (user != null) {
       final syncService = ref.read(unifiedSyncServiceProvider);
       await syncService.fullSync(user.id);
+
       if (mounted) {
         _invalidateAllProviders();
+
+        // Reschedule all notifications after sync
+        final allReminders =
+            await ref.read(reminderDatabaseProvider).getAllReminders();
+        await _notificationService.rescheduleAllReminders(
+          allReminders.where((r) => !r.isCompleted).toList(),
+        );
       }
     }
   }
@@ -560,6 +576,11 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
       if (shouldCreateRecord == true) {
         await _createMedicalRecordFromReminder(reminder);
       }
+      await _notificationService.cancelNotification(reminder.id!);
+    } else {
+      final updatedReminder = reminder.copyWith(isCompleted: false);
+
+      await _notificationService.scheduleReminderNotification(updatedReminder);
     }
 
     await db.toggleCompletion(reminder.id!, !reminder.isCompleted);
@@ -661,6 +682,10 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
       final db = ref.read(reminderDatabaseProvider);
       await db.deleteReminder(id);
 
+      // Cancel notification
+      await _notificationService.cancelNotification(id);
+
+      // Delete from Supabase if online
       final syncService = ref.read(unifiedSyncServiceProvider);
       if (await syncService.hasInternetConnection()) {
         try {
@@ -1183,7 +1208,12 @@ class _AddReminderDialogState extends ConsumerState<_AddReminderDialog> {
     );
 
     final db = widget.parentRef.read(reminderDatabaseProvider);
-    await db.createReminder(reminder);
+    final reminderId = await db.createReminder(reminder);
+    final reminderWithId = reminder.copyWith(id: reminderId);
+    await NotificationService().scheduleReminderNotification(reminderWithId);
+
+    // Optional: Schedule early notification (15 mins before)
+    await NotificationService().scheduleEarlyNotification(reminderWithId);
 
     final syncService = widget.parentRef.read(unifiedSyncServiceProvider);
     await syncService.syncRemindersToSupabase();
