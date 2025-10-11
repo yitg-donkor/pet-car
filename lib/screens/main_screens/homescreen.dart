@@ -107,14 +107,6 @@ class Homescreen extends ConsumerStatefulWidget {
 }
 
 class _HomescreenState extends ConsumerState<Homescreen> {
-  Future<void> _handleLogout(WidgetRef ref, BuildContext context) async {
-    final authService = ref.read(authServiceProvider.notifier);
-    await authService.signOut();
-    if (context.mounted) {
-      Navigator.pushReplacementNamed(context, '/login');
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final petsAsync = ref.watch(petsOfflineProvider);
@@ -198,16 +190,6 @@ class _HomescreenState extends ConsumerState<Homescreen> {
                       const SizedBox(height: 20),
 
                       // Debug buttons
-                      ElevatedButton(
-                        onPressed: () => _handleLogout(ref, context),
-                        child: const Text("log out"),
-                      ),
-                      ElevatedButton(
-                        onPressed: () {
-                          Navigator.pushNamed(context, '/aichat');
-                        },
-                        child: Text("Go to AI Chat"),
-                      ),
                     ],
                   ),
                 ),
@@ -290,7 +272,9 @@ class _HomescreenState extends ConsumerState<Homescreen> {
             ),
             child: IconButton(
               onPressed: () {
-                Navigator.pushNamed(context, '/ai-dashboard');
+                // Navigator.pushNamed(context, '/ai-dashboard');
+                //TODO: change to ai dashboard
+                Navigator.pushNamed(context, '/settings');
               },
               icon: const Icon(Icons.auto_awesome, color: Colors.white),
             ),

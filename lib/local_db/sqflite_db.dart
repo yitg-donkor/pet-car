@@ -8,6 +8,7 @@ import 'package:pet_care/models/activity_log.dart';
 import 'package:pet_care/models/medical_record.dart';
 import 'package:pet_care/models/pet.dart';
 import 'package:pet_care/models/reminder.dart';
+import 'package:pet_care/models/user_profile.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:uuid/uuid.dart';
@@ -965,4 +966,147 @@ class ActivityLogLocalDB {
   }
 
   // Close database
+}
+
+class ProfileLocalDB {
+  final LocalDatabaseService _dbService = LocalDatabaseService.instance;
+
+  String _generateUuid() {
+    return const Uuid().v4();
+  }
+
+  // CREATE
+  Future<String> createProfile(UserProfile profile) async {
+    final db = await _dbService.database;
+    final id = profile.id.isEmpty ? _generateUuid() : profile.id;
+
+    await db.insert('profiles', {
+      'id': id,
+      'full_name': profile.fullName,
+      'username': profile.username,
+      'bio': profile.bio,
+      'phone_number': profile.phoneNumber,
+      'phone_verified': profile.phoneVerified ? 1 : 0,
+      'street_address': profile.streetAddress,
+      'apartment': profile.apartment,
+      'city': profile.city,
+      'state': profile.state,
+      'zip_code': profile.zipCode,
+      'country': profile.country,
+      'emergency_contact_name': profile.emergencyContactName,
+      'emergency_contact_phone': profile.emergencyContactPhone,
+      'notification_preferences': profile.notificationPreferences,
+      'avatar_url': profile.avatarUrl,
+      'is_active': profile.isActive ? 1 : 0,
+      'is_synced': 0,
+      'last_modified': DateTime.now().toIso8601String(),
+      'created_at': DateTime.now().toIso8601String(),
+      'updated_at': DateTime.now().toIso8601String(),
+    });
+
+    return id;
+  }
+
+  // READ - Get profile by ID
+  Future<UserProfile?> getProfileById(String id) async {
+    final db = await _dbService.database;
+    final result = await db.query('profiles', where: 'id = ?', whereArgs: [id]);
+
+    if (result.isEmpty) return null;
+    return UserProfile.fromJson(result.first);
+  }
+
+  // READ - Get all profiles
+  Future<List<UserProfile>> getAllProfiles() async {
+    final db = await _dbService.database;
+    final result = await db.query('profiles', orderBy: 'created_at DESC');
+    return result.map((map) => UserProfile.fromJson(map)).toList();
+  }
+
+  // READ - Get unsynced profiles
+  Future<List<UserProfile>> getUnsyncedProfiles() async {
+    final db = await _dbService.database;
+    final result = await db.query(
+      'profiles',
+      where: 'is_synced = ?',
+      whereArgs: [0],
+    );
+    return result.map((map) => UserProfile.fromJson(map)).toList();
+  }
+
+  // UPDATE
+  Future<int> updateProfile(UserProfile profile) async {
+    final db = await _dbService.database;
+    return db.update(
+      'profiles',
+      {
+        'full_name': profile.fullName,
+        'username': profile.username,
+        'bio': profile.bio,
+        'phone_number': profile.phoneNumber,
+        'phone_verified': profile.phoneVerified ? 1 : 0,
+        'street_address': profile.streetAddress,
+        'apartment': profile.apartment,
+        'city': profile.city,
+        'state': profile.state,
+        'zip_code': profile.zipCode,
+        'country': profile.country,
+        'emergency_contact_name': profile.emergencyContactName,
+        'emergency_contact_phone': profile.emergencyContactPhone,
+        'notification_preferences': profile.notificationPreferences,
+        'avatar_url': profile.avatarUrl,
+        'is_active': profile.isActive ? 1 : 0,
+        'is_synced': 0,
+        'last_modified': DateTime.now().toIso8601String(),
+        'updated_at': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [profile.id],
+    );
+  }
+
+  // UPSERT (for syncing from Supabase)
+  Future<void> upsertProfile(UserProfile profile) async {
+    final db = await _dbService.database;
+    await db.insert('profiles', {
+      'id': profile.id,
+      'full_name': profile.fullName,
+      'username': profile.username,
+      'bio': profile.bio,
+      'phone_number': profile.phoneNumber,
+      'phone_verified': profile.phoneVerified ? 1 : 0,
+      'street_address': profile.streetAddress,
+      'apartment': profile.apartment,
+      'city': profile.city,
+      'state': profile.state,
+      'zip_code': profile.zipCode,
+      'country': profile.country,
+      'emergency_contact_name': profile.emergencyContactName,
+      'emergency_contact_phone': profile.emergencyContactPhone,
+      'notification_preferences': profile.notificationPreferences,
+      'avatar_url': profile.avatarUrl,
+      'is_active': profile.isActive ? 1 : 0,
+      'is_synced': 1,
+      'last_modified': DateTime.now().toIso8601String(),
+      'created_at': profile.createdAt.toIso8601String(),
+      'updated_at': DateTime.now().toIso8601String(),
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  // DELETE
+  Future<int> deleteProfile(String id) async {
+    final db = await _dbService.database;
+    return db.delete('profiles', where: 'id = ?', whereArgs: [id]);
+  }
+
+  // Mark as synced
+  Future<void> markAsSynced(String id) async {
+    final db = await _dbService.database;
+    await db.update(
+      'profiles',
+      {'is_synced': 1},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
 }

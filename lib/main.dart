@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pet_care/firebase_options.dart';
 
 import 'package:pet_care/screens/main_screens/pet_info.dart';
+import 'package:pet_care/screens/main_screens/setting_screen.dart';
 import 'package:pet_care/screens/onboarding_screens/introduction.dart';
 import 'package:pet_care/screens/onboarding_screens/onboarding_flow_screen.dart';
 import 'package:pet_care/screens/onboarding_screens/profile_onboarding.dart';
@@ -60,6 +61,7 @@ class MyApp extends StatelessWidget {
         '/pet-details': (context) => const PetDetailsScreen(),
         '/add-pet': (context) => const AddPet(species: 'dog'),
         '/edit-pet': (context) => const Editpetscreen(),
+        '/settings': (context) => const SettingsScreen(),
         // Example route for AI chat screen
       },
       theme: ThemeData(primarySwatch: Colors.blue, useMaterial3: true),

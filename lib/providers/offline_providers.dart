@@ -1,4 +1,5 @@
 // providers/offline_providers.dart
+import 'package:pet_care/models/user_profile.dart';
 import 'package:pet_care/providers/activity_log_providers.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -42,6 +43,11 @@ ActivityLogLocalDB activityLogLocalDB(ActivityLogLocalDBRef ref) {
   return ActivityLogLocalDB();
 }
 
+@riverpod
+ProfileLocalDB profileLocalDB(ProfileLocalDBRef ref) {
+  return ProfileLocalDB();
+}
+
 // ============================================
 // UNIFIED SYNC SERVICE
 // ============================================
@@ -52,6 +58,7 @@ class UnifiedSyncService {
   final MedicalRecordLocalDB medicalRecordLocalDB;
   final ReminderDatabaseService reminderLocalDB;
   final ActivityLogLocalDB activityLogLocalDB;
+  final ProfileLocalDB profileLocalDB;
   final Connectivity connectivity = Connectivity();
 
   UnifiedSyncService({
@@ -60,11 +67,49 @@ class UnifiedSyncService {
     required this.medicalRecordLocalDB,
     required this.reminderLocalDB,
     required this.activityLogLocalDB,
+    required this.profileLocalDB,
   });
 
   Future<bool> hasInternetConnection() async {
     final connectivityResult = await connectivity.checkConnectivity();
     return connectivityResult != ConnectivityResult.none;
+  }
+
+  Future<void> syncProfilesToSupabase() async {
+    if (!await hasInternetConnection()) return;
+
+    try {
+      final unsyncedProfiles = await profileLocalDB.getUnsyncedProfiles();
+
+      for (var profile in unsyncedProfiles) {
+        try {
+          await supabase.from('profiles').upsert(profile.toJson());
+          await profileLocalDB.markAsSynced(profile.id);
+        } catch (e) {
+          print('Error syncing profile ${profile.id}: $e');
+        }
+      }
+
+      print('Synced ${unsyncedProfiles.length} profiles to Supabase');
+    } catch (e) {
+      print('Error syncing profiles to Supabase: $e');
+    }
+  }
+
+  Future<void> syncProfilesFromSupabase(String userId) async {
+    if (!await hasInternetConnection()) return;
+
+    try {
+      final response =
+          await supabase.from('profiles').select().eq('id', userId).single();
+
+      final profile = UserProfile.fromJson(response);
+      await profileLocalDB.upsertProfile(profile);
+
+      print('Synced profile from Supabase');
+    } catch (e) {
+      print('Error syncing profile from Supabase: $e');
+    }
   }
 
   // PETS SYNC
@@ -284,12 +329,14 @@ class UnifiedSyncService {
       await syncMedicalRecordsToSupabase();
       await syncRemindersToSupabase();
       await syncActivityLogsToSupabase();
+      await syncProfilesToSupabase();
 
       // Then download latest from Supabase
       await syncPetsFromSupabase(userId);
       await syncMedicalRecordsFromSupabase(userId);
       await syncRemindersFromSupabase(userId);
       await syncActivityLogsFromSupabase(userId);
+      await syncProfilesFromSupabase(userId);
 
       print('Full sync completed successfully');
     } catch (e) {
@@ -304,6 +351,8 @@ UnifiedSyncService unifiedSyncService(UnifiedSyncServiceRef ref) {
   final petLocalDB = ref.watch(petLocalDBProvider);
   final medicalRecordLocalDB = ref.watch(medicalRecordLocalDBProvider);
   final reminderLocalDB = ref.watch(reminderDatabaseProvider);
+  final profileLocalDB = ref.watch(profileLocalDBProvider);
+
   final activityLogLocalDB = ref.watch(activityLogLocalDBProvider);
 
   return UnifiedSyncService(
@@ -312,6 +361,7 @@ UnifiedSyncService unifiedSyncService(UnifiedSyncServiceRef ref) {
     medicalRecordLocalDB: medicalRecordLocalDB,
     reminderLocalDB: reminderLocalDB,
     activityLogLocalDB: activityLogLocalDB,
+    profileLocalDB: profileLocalDB,
   );
 }
 

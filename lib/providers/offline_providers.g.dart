@@ -80,8 +80,46 @@ final reminderDatabaseProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef ReminderDatabaseRef = AutoDisposeProviderRef<ReminderDatabaseService>;
+String _$activityLogLocalDBHash() =>
+    r'3620ba922c9c818bfd487bb1c7ec477ab2c8d321';
+
+/// See also [activityLogLocalDB].
+@ProviderFor(activityLogLocalDB)
+final activityLogLocalDBProvider =
+    AutoDisposeProvider<ActivityLogLocalDB>.internal(
+      activityLogLocalDB,
+      name: r'activityLogLocalDBProvider',
+      debugGetCreateSourceHash:
+          const bool.fromEnvironment('dart.vm.product')
+              ? null
+              : _$activityLogLocalDBHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef ActivityLogLocalDBRef = AutoDisposeProviderRef<ActivityLogLocalDB>;
+String _$profileLocalDBHash() => r'693d3bb2bcc5c9a03ab254bc39dc2bb9782a337e';
+
+/// See also [profileLocalDB].
+@ProviderFor(profileLocalDB)
+final profileLocalDBProvider = AutoDisposeProvider<ProfileLocalDB>.internal(
+  profileLocalDB,
+  name: r'profileLocalDBProvider',
+  debugGetCreateSourceHash:
+      const bool.fromEnvironment('dart.vm.product')
+          ? null
+          : _$profileLocalDBHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef ProfileLocalDBRef = AutoDisposeProviderRef<ProfileLocalDB>;
 String _$unifiedSyncServiceHash() =>
-    r'ef2946994d50f285bf50afc232ac176ab5c5025f';
+    r'6ba690bd1af526908c4c37223ceff07aacf59734';
 
 /// See also [unifiedSyncService].
 @ProviderFor(unifiedSyncService)
