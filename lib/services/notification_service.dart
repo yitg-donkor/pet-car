@@ -1,11 +1,11 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:pet_care/models/reminder.dart';
+import 'package:pet_care/models/user_profile.dart';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -16,6 +16,7 @@ class NotificationService {
       FlutterLocalNotificationsPlugin();
 
   bool _initialized = false;
+  NotificationPreferences? _preferences;
 
   // Initialize notification service
   Future<void> initialize() async {
@@ -23,7 +24,7 @@ class NotificationService {
 
     // Initialize timezone
     tz.initializeTimeZones();
-    tz.setLocalLocation(tz.getLocation('Africa/Accra')); // Set to your timezone
+    tz.setLocalLocation(tz.getLocation('Africa/Accra'));
 
     // Android initialization
     const androidSettings = AndroidInitializationSettings(
@@ -51,11 +52,15 @@ class NotificationService {
     print('✅ Notification service initialized');
   }
 
+  // Load preferences from UserProfile
+  void setPreferences(NotificationPreferences preferences) {
+    _preferences = preferences;
+    print('📝 Notification preferences updated');
+  }
+
   // Handle notification tap
   void _onNotificationTapped(NotificationResponse response) {
     print('Notification tapped: ${response.payload}');
-    // TODO: Navigate to specific screen based on payload
-    // You can pass reminder ID in payload and navigate to reminder details
   }
 
   // Request notification permissions
@@ -67,9 +72,64 @@ class NotificationService {
     return true;
   }
 
+  // Check if currently in quiet hours
+  bool get isQuietHours {
+    if (_preferences == null || !_preferences!.quietHoursEnabled) {
+      return false;
+    }
+
+    final now = DateTime.now();
+    final currentTime = now.hour * 60 + now.minute;
+
+    // Parse quiet hours (format: "21:00")
+    final startParts = _preferences!.quietHoursStart.split(':');
+    final endParts = _preferences!.quietHoursEnd.split(':');
+
+    final startMinutes =
+        int.parse(startParts[0]) * 60 + int.parse(startParts[1]);
+    final endMinutes = int.parse(endParts[0]) * 60 + int.parse(endParts[1]);
+
+    if (startMinutes < endMinutes) {
+      // e.g., 08:00 - 21:00 (same day)
+      return currentTime >= startMinutes && currentTime < endMinutes;
+    } else {
+      // e.g., 21:00 - 08:00 (crosses midnight)
+      return currentTime >= startMinutes || currentTime < endMinutes;
+    }
+  }
+
+  // Check if notifications should be sent
+  bool shouldSendNotification(String type) {
+    if (_preferences == null || !_preferences!.allNotificationsEnabled) {
+      print('🔇 All notifications disabled');
+      return false;
+    }
+
+    if (_preferences!.quietHoursEnabled && isQuietHours) {
+      print('🌙 Quiet hours active');
+      // Still send but silent
+      return true;
+    }
+
+    switch (type) {
+      case 'reminder':
+        return _preferences!.reminderNotifications;
+      case 'health':
+        return _preferences!.healthAlerts;
+      default:
+        return true;
+    }
+  }
+
   // Schedule notification for a reminder
   Future<void> scheduleReminderNotification(Reminder reminder) async {
     if (!_initialized) await initialize();
+
+    // Check if reminder notifications are enabled
+    if (!shouldSendNotification('reminder')) {
+      print('🔇 Reminder notifications disabled - skipping: ${reminder.title}');
+      return;
+    }
 
     final hasPermission = await requestPermissions();
     if (!hasPermission) {
@@ -99,8 +159,8 @@ class NotificationService {
         priority: Priority.high,
         icon: '@mipmap/ic_launcher',
         color: const Color(0xFF4CAF50),
-        playSound: true,
-        enableVibration: true,
+        playSound: !isQuietHours, // Mute during quiet hours
+        enableVibration: !isQuietHours,
         styleInformation: BigTextStyleInformation(
           reminder.description ?? 'Time to take care of your pet!',
           contentTitle: reminder.title,
@@ -109,7 +169,7 @@ class NotificationService {
       iOS: DarwinNotificationDetails(
         presentAlert: true,
         presentBadge: true,
-        presentSound: true,
+        presentSound: !isQuietHours,
         subtitle: reminder.description,
       ),
     );
@@ -163,7 +223,6 @@ class NotificationService {
     final now = tz.TZDateTime.now(tz.local);
     final time = reminder.reminderDate;
 
-    // Create first occurrence
     var scheduledDate = tz.TZDateTime(
       tz.local,
       now.year,
@@ -173,12 +232,10 @@ class NotificationService {
       time.minute,
     );
 
-    // If time has passed today, schedule for tomorrow
     if (scheduledDate.isBefore(now)) {
       scheduledDate = scheduledDate.add(const Duration(days: 1));
     }
 
-    // Schedule with daily repeat
     await _notifications.zonedSchedule(
       reminder.id.hashCode,
       reminder.title,
@@ -187,7 +244,7 @@ class NotificationService {
       details,
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
 
-      matchDateTimeComponents: DateTimeComponents.time, // Repeats daily
+      matchDateTimeComponents: DateTimeComponents.time,
       payload: 'reminder:${reminder.id}',
     );
   }
@@ -201,10 +258,8 @@ class NotificationService {
     final time = reminder.reminderDate;
     final targetWeekday = time.weekday;
 
-    // Calculate days until target weekday
     int daysUntilTarget = (targetWeekday - now.weekday) % 7;
     if (daysUntilTarget == 0) {
-      // It's the target day - check if time has passed
       final todayAtTime = tz.TZDateTime(
         tz.local,
         now.year,
@@ -214,7 +269,7 @@ class NotificationService {
         time.minute,
       );
       if (todayAtTime.isBefore(now)) {
-        daysUntilTarget = 7; // Schedule for next week
+        daysUntilTarget = 7;
       }
     }
 
@@ -235,8 +290,7 @@ class NotificationService {
       details,
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
 
-      matchDateTimeComponents:
-          DateTimeComponents.dayOfWeekAndTime, // Repeats weekly
+      matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
       payload: 'reminder:${reminder.id}',
     );
   }
@@ -250,7 +304,6 @@ class NotificationService {
     final time = reminder.reminderDate;
     final targetDay = time.day;
 
-    // Calculate next occurrence
     var scheduledDate = tz.TZDateTime(
       tz.local,
       now.year,
@@ -260,7 +313,6 @@ class NotificationService {
       time.minute,
     );
 
-    // If date has passed this month, schedule for next month
     if (scheduledDate.isBefore(now)) {
       scheduledDate = tz.TZDateTime(
         tz.local,
@@ -280,8 +332,7 @@ class NotificationService {
       details,
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
 
-      matchDateTimeComponents:
-          DateTimeComponents.dayOfMonthAndTime, // Repeats monthly
+      matchDateTimeComponents: DateTimeComponents.dayOfMonthAndTime,
       payload: 'reminder:${reminder.id}',
     );
   }
@@ -295,7 +346,6 @@ class NotificationService {
     );
     final now = DateTime.now();
 
-    // Don't schedule if time has passed
     if (scheduledDate.isBefore(now)) return;
 
     final notificationDetails = NotificationDetails(
@@ -307,11 +357,13 @@ class NotificationService {
         priority: Priority.defaultPriority,
         icon: '@mipmap/ic_launcher',
         color: const Color(0xFF4CAF50),
+        playSound: !isQuietHours,
+        enableVibration: !isQuietHours,
       ),
-      iOS: const DarwinNotificationDetails(
+      iOS: DarwinNotificationDetails(
         presentAlert: true,
         presentBadge: true,
-        presentSound: true,
+        presentSound: !isQuietHours,
       ),
     );
 
@@ -330,24 +382,26 @@ class NotificationService {
   }
 
   // Schedule daily summary notification
-  Future<void> scheduleDailySummary(
-    int hour,
-    int minute,
-    int pendingCount,
-  ) async {
+  Future<void> scheduleDailySummary(int pendingCount) async {
     if (!_initialized) await initialize();
 
+    if (_preferences == null || !_preferences!.allNotificationsEnabled) {
+      print('🔇 Daily summary disabled');
+      return;
+    }
+
     final now = tz.TZDateTime.now(tz.local);
+
+    // Default to 8:00 AM if not set
     var scheduledDate = tz.TZDateTime(
       tz.local,
       now.year,
       now.month,
       now.day,
-      hour,
-      minute,
+      8,
+      0,
     );
 
-    // If time has passed today, schedule for tomorrow
     if (scheduledDate.isBefore(now)) {
       scheduledDate = scheduledDate.add(const Duration(days: 1));
     }
@@ -361,15 +415,17 @@ class NotificationService {
         priority: Priority.high,
         icon: '@mipmap/ic_launcher',
         color: const Color(0xFF4CAF50),
+        playSound: !isQuietHours,
+        enableVibration: !isQuietHours,
         styleInformation: BigTextStyleInformation(
           'Tap to see your pet care tasks for today',
           contentTitle: '🐾 Daily Pet Care Summary',
         ),
       ),
-      iOS: const DarwinNotificationDetails(
+      iOS: DarwinNotificationDetails(
         presentAlert: true,
         presentBadge: true,
-        presentSound: true,
+        presentSound: !isQuietHours,
       ),
     );
 
@@ -381,11 +437,11 @@ class NotificationService {
       notificationDetails,
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
 
-      matchDateTimeComponents: DateTimeComponents.time, // Repeats daily
+      matchDateTimeComponents: DateTimeComponents.time,
       payload: 'summary',
     );
 
-    print('✅ Scheduled daily summary at $hour:$minute');
+    print('✅ Scheduled daily summary');
   }
 
   // Cancel notification for a reminder
@@ -401,12 +457,12 @@ class NotificationService {
     print('🗑️ Cancelled all notifications');
   }
 
-  // Get pending notifications (for debugging)
+  // Get pending notifications
   Future<List<PendingNotificationRequest>> getPendingNotifications() async {
     return await _notifications.pendingNotificationRequests();
   }
 
-  // Show immediate notification (for testing)
+  // Show immediate notification
   Future<void> showImmediateNotification({
     required String title,
     required String body,
@@ -440,7 +496,7 @@ class NotificationService {
     );
   }
 
-  // Reschedule all reminders (useful after app update or device restart)
+  // Reschedule all reminders
   Future<void> rescheduleAllReminders(List<Reminder> reminders) async {
     print('🔄 Rescheduling ${reminders.length} reminders...');
 

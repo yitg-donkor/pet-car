@@ -1208,9 +1208,15 @@ class _AddReminderDialogState extends ConsumerState<_AddReminderDialog> {
     );
 
     final db = widget.parentRef.read(reminderDatabaseProvider);
+    final userProfile = await ref.read(userProfileProviderProvider.future);
     final reminderId = await db.createReminder(reminder);
     final reminderWithId = reminder.copyWith(id: reminderId);
     await NotificationService().scheduleReminderNotification(reminderWithId);
+
+    if (userProfile != null) {
+      // Mark as not synced if user is logged in
+      NotificationService().setPreferences(userProfile.notificationPreferences);
+    }
 
     // Optional: Schedule early notification (15 mins before)
     await NotificationService().scheduleEarlyNotification(reminderWithId);

@@ -16,9 +16,12 @@ class PreferencesStep extends StatefulWidget {
 }
 
 class _PreferencesStepState extends State<PreferencesStep> {
-  bool _emailNotifications = true;
-  bool _smsNotifications = true;
-  bool _pushNotifications = true;
+  late bool _allNotificationsEnabled;
+  late bool _reminderNotifications;
+  late bool _healthAlerts;
+  late bool _marketingEmails;
+  late String _quietHoursStart;
+  late String _quietHoursEnd;
   bool _isCreating = false;
 
   @override
@@ -29,9 +32,19 @@ class _PreferencesStepState extends State<PreferencesStep> {
       final prefs =
           widget.initialData['notificationPreferences']
               as NotificationPreferences;
-      _emailNotifications = prefs.email;
-      _smsNotifications = prefs.sms;
-      _pushNotifications = prefs.push;
+      _allNotificationsEnabled = prefs.allNotificationsEnabled;
+      _reminderNotifications = prefs.reminderNotifications;
+      _healthAlerts = prefs.healthAlerts;
+      _marketingEmails = prefs.marketingEmails;
+      _quietHoursStart = prefs.quietHoursStart;
+      _quietHoursEnd = prefs.quietHoursEnd;
+    } else {
+      _allNotificationsEnabled = true;
+      _reminderNotifications = true;
+      _healthAlerts = true;
+      _marketingEmails = false;
+      _quietHoursStart = '21:00';
+      _quietHoursEnd = '08:00';
     }
   }
 
@@ -41,12 +54,41 @@ class _PreferencesStepState extends State<PreferencesStep> {
     });
 
     final preferences = NotificationPreferences(
-      email: _emailNotifications,
-      sms: _smsNotifications,
-      push: _pushNotifications,
+      allNotificationsEnabled: _allNotificationsEnabled,
+      reminderNotifications: _reminderNotifications,
+      healthAlerts: _healthAlerts,
+      marketingEmails: _marketingEmails,
+      quietHoursStart: _quietHoursStart,
+      quietHoursEnd: _quietHoursEnd,
     );
 
     widget.onComplete({'notificationPreferences': preferences});
+  }
+
+  Future<void> _selectTime(bool isStart) async {
+    final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(
+        hour: int.parse(
+          (isStart ? _quietHoursStart : _quietHoursEnd).split(':')[0],
+        ),
+        minute: int.parse(
+          (isStart ? _quietHoursStart : _quietHoursEnd).split(':')[1],
+        ),
+      ),
+    );
+
+    if (picked != null) {
+      setState(() {
+        final timeString =
+            '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
+        if (isStart) {
+          _quietHoursStart = timeString;
+        } else {
+          _quietHoursEnd = timeString;
+        }
+      });
+    }
   }
 
   @override
@@ -69,9 +111,7 @@ class _PreferencesStepState extends State<PreferencesStep> {
               color: Theme.of(context).primaryColor,
             ),
           ),
-
           const SizedBox(height: 24),
-
           Text(
             'Notification Preferences',
             style: Theme.of(
@@ -85,58 +125,217 @@ class _PreferencesStepState extends State<PreferencesStep> {
               context,
             ).textTheme.bodyLarge?.copyWith(color: Colors.grey[600]),
           ),
-
           const SizedBox(height: 32),
 
+          // Main Notifications Toggle
           Card(
             elevation: 0,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
               side: BorderSide(color: Colors.grey[300]!),
             ),
-            child: Column(
-              children: [
-                SwitchListTile(
-                  value: _emailNotifications,
-                  onChanged: (value) {
-                    setState(() {
-                      _emailNotifications = value;
-                    });
-                  },
-                  title: const Text('Email Notifications'),
-                  subtitle: const Text('Appointment reminders and updates'),
-                  secondary: const Icon(Icons.email_outlined),
-                ),
-                Divider(height: 1, color: Colors.grey[300]),
-                SwitchListTile(
-                  value: _smsNotifications,
-                  onChanged: (value) {
-                    setState(() {
-                      _smsNotifications = value;
-                    });
-                  },
-                  title: const Text('SMS Notifications'),
-                  subtitle: const Text('Text message alerts'),
-                  secondary: const Icon(Icons.sms_outlined),
-                ),
-                Divider(height: 1, color: Colors.grey[300]),
-                SwitchListTile(
-                  value: _pushNotifications,
-                  onChanged: (value) {
-                    setState(() {
-                      _pushNotifications = value;
-                    });
-                  },
-                  title: const Text('Push Notifications'),
-                  subtitle: const Text('In-app notifications'),
-                  secondary: const Icon(Icons.notifications_active_outlined),
-                ),
-              ],
+            child: SwitchListTile(
+              value: _allNotificationsEnabled,
+              onChanged: (value) {
+                setState(() {
+                  _allNotificationsEnabled = value;
+                });
+              },
+              title: const Text('All Notifications'),
+              subtitle: const Text('Enable or disable all notifications'),
+              secondary: const Icon(Icons.notifications_outlined),
             ),
           ),
 
-          const SizedBox(height: 32),
+          const SizedBox(height: 16),
 
+          // Conditional notification types
+          if (_allNotificationsEnabled) ...[
+            Card(
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: Colors.grey[300]!),
+              ),
+              child: Column(
+                children: [
+                  SwitchListTile(
+                    value: _reminderNotifications,
+                    onChanged: (value) {
+                      setState(() {
+                        _reminderNotifications = value;
+                      });
+                    },
+                    title: const Text('Reminder Notifications'),
+                    subtitle: const Text(
+                      'Appointment and medication reminders',
+                    ),
+                    secondary: const Icon(Icons.alarm_outlined),
+                  ),
+                  Divider(height: 1, color: Colors.grey[300]),
+                  SwitchListTile(
+                    value: _healthAlerts,
+                    onChanged: (value) {
+                      setState(() {
+                        _healthAlerts = value;
+                      });
+                    },
+                    title: const Text('Health Alerts'),
+                    subtitle: const Text('Important pet health updates'),
+                    secondary: const Icon(Icons.health_and_safety_outlined),
+                  ),
+                  Divider(height: 1, color: Colors.grey[300]),
+                  SwitchListTile(
+                    value: _marketingEmails,
+                    onChanged: (value) {
+                      setState(() {
+                        _marketingEmails = value;
+                      });
+                    },
+                    title: const Text('Marketing Emails'),
+                    subtitle: const Text('News, tips, and special offers'),
+                    secondary: const Icon(Icons.mail_outlined),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Quiet Hours Section
+            Text(
+              'Quiet Hours',
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'No notifications during these hours',
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
+            ),
+            const SizedBox(height: 16),
+
+            Card(
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: Colors.grey[300]!),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Start Time',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[600],
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              GestureDetector(
+                                onTap: () => _selectTime(true),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 12,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(
+                                      color: Colors.grey[300]!,
+                                    ),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.access_time,
+                                        size: 18,
+                                        color: Colors.grey[600],
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        _quietHoursStart,
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'End Time',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[600],
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              GestureDetector(
+                                onTap: () => _selectTime(false),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 12,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(
+                                      color: Colors.grey[300]!,
+                                    ),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.access_time,
+                                        size: 18,
+                                        color: Colors.grey[600],
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        _quietHoursEnd,
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+
+          // Profile Summary
           Text(
             'Profile Summary',
             style: Theme.of(
@@ -144,7 +343,6 @@ class _PreferencesStepState extends State<PreferencesStep> {
             ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 16),
-
           Card(
             elevation: 0,
             shape: RoundedRectangleBorder(
@@ -186,9 +384,9 @@ class _PreferencesStepState extends State<PreferencesStep> {
               ),
             ),
           ),
-
           const SizedBox(height: 32),
 
+          // Complete Button
           SizedBox(
             width: double.infinity,
             height: 50,
@@ -212,9 +410,9 @@ class _PreferencesStepState extends State<PreferencesStep> {
                       ),
             ),
           ),
-
           const SizedBox(height: 16),
 
+          // Terms Text
           Text(
             'By completing your profile, you agree to our Terms of Service and Privacy Policy.',
             style: Theme.of(

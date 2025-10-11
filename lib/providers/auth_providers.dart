@@ -31,21 +31,16 @@ Session? currentSession(CurrentSessionRef ref) {
 // Fixed current user provider - simplified and safer
 @riverpod
 User? currentUser(CurrentUserRef ref) {
-  // Just watch the current session directly
   final session = ref.watch(currentSessionProvider);
-
-  // Return the user if session exists and is not expired
   if (session != null && !session.isExpired) {
     return session.user;
   }
-
   return null;
 }
 
 // Alternative: If you need to watch auth state changes, use this async version
 @riverpod
 Future<User?> currentUserAsync(CurrentUserAsyncRef ref) async {
-  // Watch the auth state stream
   final authStateAsync = ref.watch(authStateProvider);
 
   return authStateAsync.when(
@@ -57,7 +52,6 @@ Future<User?> currentUserAsync(CurrentUserAsyncRef ref) async {
       return null;
     },
     loading: () {
-      // While loading, check current session
       final currentSession = ref.watch(currentSessionProvider);
       return currentSession?.user;
     },
@@ -65,11 +59,11 @@ Future<User?> currentUserAsync(CurrentUserAsyncRef ref) async {
   );
 }
 
-// User profile provider
+// User profile provider - NOW RETURNS UserProfile? NOT Future<UserProfile?>
 @riverpod
 class UserProfileProvider extends _$UserProfileProvider {
   @override
-  Future<UserProfile?> build() async {
+  FutureOr<UserProfile?> build() async {
     final user = ref.watch(currentUserProvider);
     if (user == null) return null;
 
@@ -86,13 +80,10 @@ class UserProfileProvider extends _$UserProfileProvider {
       if (response == null) return null;
       return UserProfile.fromJson(response);
     } catch (e) {
-      // Handle error gracefully - user might not have a profile yet
       print('Error fetching user profile: $e');
       return null;
     }
   }
-
-  // Add these methods to your UserProfileProvider class:
 
   // Avatar upload service instance
   AvatarUploadService get _avatarService =>
@@ -107,16 +98,13 @@ class UserProfileProvider extends _$UserProfileProvider {
     if (user == null) throw Exception('No user logged in');
 
     try {
-      // Upload image to storage
       final avatarUrl = await _avatarService.uploadAvatar(
         userId: user.id,
         imageFile: imageFile,
         onProgress: onProgress,
       );
 
-      // Update profile with new avatar URL
       await updateProfile(avatarUrl: avatarUrl);
-
       return avatarUrl;
     } catch (e) {
       throw Exception('Failed to upload avatar: $e');
@@ -129,11 +117,9 @@ class UserProfileProvider extends _$UserProfileProvider {
     Function(double)? onProgress,
   }) async {
     try {
-      // Pick image
       final imageFile = await _avatarService.pickImage(source: source);
       if (imageFile == null) return null;
 
-      // Upload image
       return await uploadAvatar(imageFile: imageFile, onProgress: onProgress);
     } catch (e) {
       throw Exception('Failed to pick and upload avatar: $e');
@@ -146,11 +132,9 @@ class UserProfileProvider extends _$UserProfileProvider {
     Function(double)? onProgress,
   }) async {
     try {
-      // Show image source dialog
       final imageFile = await _avatarService.showImageSourceDialog(context);
       if (imageFile == null) return null;
 
-      // Upload image
       return await uploadAvatar(imageFile: imageFile, onProgress: onProgress);
     } catch (e) {
       throw Exception('Failed to upload avatar: $e');
@@ -163,13 +147,9 @@ class UserProfileProvider extends _$UserProfileProvider {
     if (user == null) throw Exception('No user logged in');
 
     try {
-      // Get current profile to find avatar URL
       final currentProfile = await future;
       if (currentProfile?.avatarUrl != null) {
-        // Delete from storage
         await _avatarService.deleteAvatar(currentProfile!.avatarUrl!);
-
-        // Update profile to remove avatar URL
         await updateProfile(avatarUrl: null);
       }
     } catch (e) {
@@ -177,7 +157,7 @@ class UserProfileProvider extends _$UserProfileProvider {
     }
   }
 
-  // Enhanced createProfile method with all new fields
+  /// Enhanced createProfile method with all new fields
   Future<void> createProfile({
     required String fullName,
     required String username,
@@ -192,6 +172,7 @@ class UserProfileProvider extends _$UserProfileProvider {
     String? emergencyContactName,
     String? emergencyContactPhone,
     NotificationPreferences? notificationPreferences,
+    AppSettings? appSettings,
   }) async {
     final user = ref.read(currentUserProvider);
     if (user == null) throw Exception('No user logged in');
@@ -210,13 +191,11 @@ class UserProfileProvider extends _$UserProfileProvider {
       'city': city,
       'state': state,
       'zip_code': zipCode,
-
       'emergency_contact_name': emergencyContactName,
       'emergency_contact_phone': emergencyContactPhone,
       'notification_preferences':
-          (notificationPreferences ??
-                  NotificationPreferences(email: true, sms: true, push: true))
-              .toJson(),
+          (notificationPreferences ?? NotificationPreferences()).toJson(),
+      'app_settings': (appSettings ?? AppSettings()).toJson(),
       'phone_verified': false,
       'is_active': true,
       'created_at': DateTime.now().toIso8601String(),
@@ -227,12 +206,7 @@ class UserProfileProvider extends _$UserProfileProvider {
     ref.invalidateSelf();
   }
 
-  // Keep the old simple createProfile for backward compatibility
-  Future<void> createSimpleProfile(String fullName, String username) async {
-    await createProfile(fullName: fullName, username: username);
-  }
-
-  // Enhanced updateProfile method
+  /// Enhanced updateProfile method - now includes AppSettings
   Future<void> updateProfile({
     String? fullName,
     String? username,
@@ -247,6 +221,7 @@ class UserProfileProvider extends _$UserProfileProvider {
     String? emergencyContactName,
     String? emergencyContactPhone,
     NotificationPreferences? notificationPreferences,
+    AppSettings? appSettings,
     String? avatarUrl,
   }) async {
     final user = ref.read(currentUserProvider);
@@ -254,7 +229,6 @@ class UserProfileProvider extends _$UserProfileProvider {
 
     final supabase = ref.read(supabaseProvider);
 
-    // Build update data - only include non-null values
     final updateData = <String, dynamic>{
       'updated_at': DateTime.now().toIso8601String(),
     };
@@ -277,17 +251,27 @@ class UserProfileProvider extends _$UserProfileProvider {
     if (notificationPreferences != null) {
       updateData['notification_preferences'] = notificationPreferences.toJson();
     }
+    if (appSettings != null) {
+      updateData['app_settings'] = appSettings.toJson();
+    }
 
     await supabase.from('profiles').update(updateData).eq('id', user.id);
     ref.invalidateSelf();
   }
 
-  // Keep the old simple updateProfile for backward compatibility
-  Future<void> updateSimpleProfile(String fullName, String username) async {
-    await updateProfile(fullName: fullName, username: username);
+  /// Update notification preferences
+  Future<void> updateNotificationPreferences(
+    NotificationPreferences preferences,
+  ) async {
+    await updateProfile(notificationPreferences: preferences);
   }
 
-  // New method: Update just contact info
+  /// Update app settings (theme, language, etc.)
+  Future<void> updateAppSettings(AppSettings settings) async {
+    await updateProfile(appSettings: settings);
+  }
+
+  /// Update just contact info
   Future<void> updateContactInfo({
     required String phoneNumber,
     String? emergencyContactName,
@@ -300,7 +284,7 @@ class UserProfileProvider extends _$UserProfileProvider {
     );
   }
 
-  // New method: Update just address
+  /// Update just address
   Future<void> updateAddress({
     required String country,
     required String streetAddress,
@@ -319,14 +303,7 @@ class UserProfileProvider extends _$UserProfileProvider {
     );
   }
 
-  // New method: Update notification preferences
-  Future<void> updateNotificationPreferences(
-    NotificationPreferences preferences,
-  ) async {
-    await updateProfile(notificationPreferences: preferences);
-  }
-
-  // New method: Verify phone number (you'd implement SMS verification)
+  /// Mark phone as verified
   Future<void> markPhoneAsVerified() async {
     final user = ref.read(currentUserProvider);
     if (user == null) throw Exception('No user logged in');
@@ -344,17 +321,16 @@ class UserProfileProvider extends _$UserProfileProvider {
     ref.invalidateSelf();
   }
 
-  // New method: Check if profile is complete
+  /// Check if profile is complete
   Future<bool> isProfileComplete() async {
     final profileAsync = await future;
     final profile = profileAsync;
 
     if (profile == null) return false;
-
     return profile.hasCompleteProfile;
   }
 
-  // New method: Get profile completion percentage
+  /// Get profile completion percentage
   Future<double> getProfileCompletionPercentage() async {
     final profileAsync = await future;
     final profile = profileAsync;
@@ -362,7 +338,7 @@ class UserProfileProvider extends _$UserProfileProvider {
     if (profile == null) return 0.0;
 
     int completedFields = 0;
-    int totalEssentialFields = 6; // fullName, username, phone, address fields
+    const int totalEssentialFields = 6;
 
     if (profile.fullName.isNotEmpty) completedFields++;
     if (profile.username.isNotEmpty) completedFields++;
@@ -373,10 +349,9 @@ class UserProfileProvider extends _$UserProfileProvider {
       completedFields++;
     }
     if (profile.city != null && profile.city!.isNotEmpty) completedFields++;
-
-    if (profile.country != null && profile.country!.isNotEmpty)
+    if (profile.country != null && profile.country!.isNotEmpty) {
       completedFields++;
-    if (profile.state != null && profile.state!.isNotEmpty) completedFields++;
+    }
 
     return completedFields / totalEssentialFields;
   }
@@ -403,7 +378,6 @@ class AuthService extends _$AuthService {
 
       state = const AsyncValue.data(null);
 
-      // Invalidate relevant providers to refresh state
       ref.invalidate(currentSessionProvider);
       ref.invalidate(currentUserProvider);
       ref.invalidate(userProfileProviderProvider);
@@ -430,7 +404,6 @@ class AuthService extends _$AuthService {
 
       state = const AsyncValue.data(null);
 
-      // Invalidate relevant providers to refresh state
       ref.invalidate(currentSessionProvider);
       ref.invalidate(currentUserProvider);
       ref.invalidate(userProfileProviderProvider);
@@ -450,7 +423,6 @@ class AuthService extends _$AuthService {
 
       state = const AsyncValue.data(null);
 
-      // Invalidate relevant providers to clear state
       ref.invalidate(currentSessionProvider);
       ref.invalidate(currentUserProvider);
       ref.invalidate(userProfileProviderProvider);

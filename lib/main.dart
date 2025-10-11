@@ -62,6 +62,7 @@ class MyApp extends StatelessWidget {
         '/add-pet': (context) => const AddPet(species: 'dog'),
         '/edit-pet': (context) => const Editpetscreen(),
         '/settings': (context) => const SettingsScreen(),
+
         // Example route for AI chat screen
       },
       theme: ThemeData(primarySwatch: Colors.blue, useMaterial3: true),

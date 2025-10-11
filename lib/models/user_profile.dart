@@ -12,7 +12,6 @@ class UserProfile {
   final bool phoneVerified;
 
   // Address Information
-
   final String? streetAddress;
   final String? apartment;
   final String? city;
@@ -26,6 +25,7 @@ class UserProfile {
 
   // Preferences
   final NotificationPreferences notificationPreferences;
+  final AppSettings appSettings;
 
   // Profile
   final String? avatarUrl;
@@ -41,6 +41,7 @@ class UserProfile {
     required this.username,
     required this.phoneVerified,
     required this.notificationPreferences,
+    required this.appSettings,
     required this.isActive,
     required this.createdAt,
     required this.updatedAt,
@@ -77,6 +78,9 @@ class UserProfile {
       notificationPreferences: NotificationPreferences.fromJson(
         json['notification_preferences'] as Map<String, dynamic>? ?? {},
       ),
+      appSettings: AppSettings.fromJson(
+        json['app_settings'] as Map<String, dynamic>? ?? {},
+      ),
       avatarUrl: json['avatar_url'] as String?,
       isActive: json['is_active'] as bool? ?? true,
       createdAt: DateTime.parse(json['created_at'] as String),
@@ -102,6 +106,7 @@ class UserProfile {
       'emergency_contact_name': emergencyContactName,
       'emergency_contact_phone': emergencyContactPhone,
       'notification_preferences': notificationPreferences.toJson(),
+      'app_settings': appSettings.toJson(),
       'avatar_url': avatarUrl,
       'is_active': isActive,
       'created_at': createdAt.toIso8601String(),
@@ -150,6 +155,7 @@ class UserProfile {
     String? emergencyContactName,
     String? emergencyContactPhone,
     NotificationPreferences? notificationPreferences,
+    AppSettings? appSettings,
     String? avatarUrl,
     bool? isActive,
     DateTime? updatedAt,
@@ -172,6 +178,7 @@ class UserProfile {
           emergencyContactPhone ?? this.emergencyContactPhone,
       notificationPreferences:
           notificationPreferences ?? this.notificationPreferences,
+      appSettings: appSettings ?? this.appSettings,
       avatarUrl: avatarUrl ?? this.avatarUrl,
       isActive: isActive ?? this.isActive,
       createdAt: createdAt,
@@ -185,99 +192,130 @@ class UserProfile {
 // ============================================
 
 class NotificationPreferences {
-  final bool email;
-  final bool sms;
-  final bool push;
+  final bool allNotificationsEnabled;
+  final bool reminderNotifications;
+  final bool healthAlerts;
+  final bool marketingEmails;
+  final bool quietHoursEnabled;
+  final String quietHoursStart;
+  final String quietHoursEnd;
 
   NotificationPreferences({
-    required this.email,
-    required this.sms,
-    required this.push,
+    this.allNotificationsEnabled = true,
+    this.reminderNotifications = true,
+    this.healthAlerts = true,
+    this.marketingEmails = false,
+    this.quietHoursEnabled = false,
+    this.quietHoursStart = '21:00',
+    this.quietHoursEnd = '08:00',
   });
 
   factory NotificationPreferences.fromJson(Map<String, dynamic> json) {
     return NotificationPreferences(
-      email: json['email'] as bool? ?? true,
-      sms: json['sms'] as bool? ?? true,
-      push: json['push'] as bool? ?? true,
+      allNotificationsEnabled:
+          json['all_notifications_enabled'] as bool? ?? true,
+      reminderNotifications: json['reminder_notifications'] as bool? ?? true,
+      healthAlerts: json['health_alerts'] as bool? ?? true,
+      marketingEmails: json['marketing_emails'] as bool? ?? false,
+      quietHoursEnabled: json['quiet_hours_enabled'] as bool? ?? false,
+      quietHoursStart: json['quiet_hours_start'] as String? ?? '21:00',
+      quietHoursEnd: json['quiet_hours_end'] as String? ?? '08:00',
     );
   }
 
   Map<String, dynamic> toJson() {
-    return {'email': email, 'sms': sms, 'push': push};
+    return {
+      'all_notifications_enabled': allNotificationsEnabled,
+      'reminder_notifications': reminderNotifications,
+      'health_alerts': healthAlerts,
+      'marketing_emails': marketingEmails,
+      'quiet_hours_enabled': quietHoursEnabled,
+      'quiet_hours_start': quietHoursStart,
+      'quiet_hours_end': quietHoursEnd,
+    };
   }
 
-  NotificationPreferences copyWith({bool? email, bool? sms, bool? push}) {
+  NotificationPreferences copyWith({
+    bool? allNotificationsEnabled,
+    bool? reminderNotifications,
+    bool? healthAlerts,
+    bool? marketingEmails,
+    bool? quietHoursEnabled,
+    String? quietHoursStart,
+    String? quietHoursEnd,
+  }) {
     return NotificationPreferences(
-      email: email ?? this.email,
-      sms: sms ?? this.sms,
-      push: push ?? this.push,
+      allNotificationsEnabled:
+          allNotificationsEnabled ?? this.allNotificationsEnabled,
+      reminderNotifications:
+          reminderNotifications ?? this.reminderNotifications,
+      healthAlerts: healthAlerts ?? this.healthAlerts,
+      marketingEmails: marketingEmails ?? this.marketingEmails,
+      quietHoursEnabled: quietHoursEnabled ?? this.quietHoursEnabled,
+      quietHoursStart: quietHoursStart ?? this.quietHoursStart,
+      quietHoursEnd: quietHoursEnd ?? this.quietHoursEnd,
     );
   }
 }
 
 // ============================================
-// EXAMPLE USAGE IN YOUR PROVIDER
+// APP SETTINGS MODEL
 // ============================================
 
-/*
-// Update your existing UserProfileProvider methods:
+class AppSettings {
+  final String theme;
+  final String language;
+  final String textSize;
+  final bool syncOnCellular;
+  final bool offlineMode;
+  final bool biometricLockEnabled;
 
-Future<void> createProfile({
-  required String fullName,
-  required String username,
-  String? bio,
-  String? phoneNumber,
-  String? streetAddress,
-  String? apartment,
-  String? city,
-  String? state,
-  String? zipCode,
-  String? emergencyContactName,
-  String? emergencyContactPhone,
-  NotificationPreferences? notificationPreferences,
-}) async {
-  final user = ref.read(currentUserProvider);
-  if (user == null) throw Exception('No user logged in');
+  AppSettings({
+    this.theme = 'Light',
+    this.language = 'English',
+    this.textSize = 'Normal',
+    this.syncOnCellular = false,
+    this.offlineMode = true,
+    this.biometricLockEnabled = false,
+  });
 
-  final supabase = ref.read(supabaseProvider);
-  
-  final profileData = {
-    'id': user.id,
-    'full_name': fullName,
-    'username': username.toLowerCase(),
-    'bio': bio,
-    'phone_number': phoneNumber,
-    'street_address': streetAddress,
-    'apartment': apartment,
-    'city': city,
-    'state': state,
-    'zip_code': zipCode,
-    'country': 'US',
-    'emergency_contact_name': emergencyContactName,
-    'emergency_contact_phone': emergencyContactPhone,
-    'notification_preferences': (notificationPreferences ?? 
-      NotificationPreferences(email: true, sms: true, push: true)).toJson(),
-    'phone_verified': false,
-    'is_active': true,
-    'created_at': DateTime.now().toIso8601String(),
-    'updated_at': DateTime.now().toIso8601String(),
-  };
+  factory AppSettings.fromJson(Map<String, dynamic> json) {
+    return AppSettings(
+      theme: json['theme'] as String? ?? 'Light',
+      language: json['language'] as String? ?? 'English',
+      textSize: json['text_size'] as String? ?? 'Normal',
+      syncOnCellular: json['sync_on_cellular'] as bool? ?? false,
+      offlineMode: json['offline_mode'] as bool? ?? true,
+      biometricLockEnabled: json['biometric_lock_enabled'] as bool? ?? false,
+    );
+  }
 
-  await supabase.from('profiles').upsert(profileData);
-  ref.invalidateSelf();
+  Map<String, dynamic> toJson() {
+    return {
+      'theme': theme,
+      'language': language,
+      'text_size': textSize,
+      'sync_on_cellular': syncOnCellular,
+      'offline_mode': offlineMode,
+      'biometric_lock_enabled': biometricLockEnabled,
+    };
+  }
+
+  AppSettings copyWith({
+    String? theme,
+    String? language,
+    String? textSize,
+    bool? syncOnCellular,
+    bool? offlineMode,
+    bool? biometricLockEnabled,
+  }) {
+    return AppSettings(
+      theme: theme ?? this.theme,
+      language: language ?? this.language,
+      textSize: textSize ?? this.textSize,
+      syncOnCellular: syncOnCellular ?? this.syncOnCellular,
+      offlineMode: offlineMode ?? this.offlineMode,
+      biometricLockEnabled: biometricLockEnabled ?? this.biometricLockEnabled,
+    );
+  }
 }
-
-Future<void> updateProfile(UserProfile updatedProfile) async {
-  final user = ref.read(currentUserProvider);
-  if (user == null) throw Exception('No user logged in');
-
-  final supabase = ref.read(supabaseProvider);
-  
-  final profileData = updatedProfile.toJson();
-  profileData['updated_at'] = DateTime.now().toIso8601String();
-  
-  await supabase.from('profiles').update(profileData).eq('id', user.id);
-  ref.invalidateSelf();
-}
-*/

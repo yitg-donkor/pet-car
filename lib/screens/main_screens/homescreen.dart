@@ -10,6 +10,7 @@ import 'package:pet_care/screens/main_screens/log.dart';
 import 'package:pet_care/screens/main_screens/reminders.dart';
 import 'package:pet_care/screens/main_screens/resources.dart';
 import 'package:pet_care/providers/pet_providers.dart';
+import 'package:pet_care/services/notification_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 
@@ -108,6 +109,20 @@ class Homescreen extends ConsumerStatefulWidget {
 
 class _HomescreenState extends ConsumerState<Homescreen> {
   @override
+  void initState() {
+    super.initState();
+    _initializeNotifications();
+  }
+
+  Future<void> _initializeNotifications() async {
+    final notificationService = NotificationService();
+    await notificationService.initialize();
+    final userProfile = await ref.read(userProfileProviderProvider.future);
+    if (userProfile != null) {
+      notificationService.setPreferences(userProfile.notificationPreferences);
+    }
+  }
+
   Widget build(BuildContext context) {
     final petsAsync = ref.watch(petsOfflineProvider);
     final todayRemindersAsync = ref.watch(todayRemindersProvider);

@@ -130,6 +130,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                 : _emergencyPhoneController.text,
         notificationPreferences: widget.profile.notificationPreferences,
         avatarUrl: _avatarPath,
+        appSettings: widget.profile.appSettings,
         isActive: widget.profile.isActive,
         createdAt: widget.profile.createdAt,
         updatedAt: widget.profile.updatedAt,

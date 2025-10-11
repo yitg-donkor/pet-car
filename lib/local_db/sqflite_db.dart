@@ -32,7 +32,7 @@ class LocalDatabaseService {
     // Change version from 1 to 2
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
@@ -59,6 +59,12 @@ class LocalDatabaseService {
     FOREIGN KEY (pet_id) REFERENCES pets (id) ON DELETE CASCADE
   )
 ''');
+    }
+
+    if (oldVersion < 3) {
+      await db.execute('''
+      ALTER TABLE profiles ADD COLUMN app_settings TEXT DEFAULT '{"theme":"Light","language":"English","text_size":"Normal","sync_on_cellular":false,"offline_mode":true,"biometric_lock_enabled":false}'
+    ''');
     }
   }
 
@@ -138,29 +144,30 @@ class LocalDatabaseService {
 
     // User profiles table
     await db.execute('''
-      CREATE TABLE profiles (
-        id TEXT PRIMARY KEY,
-        full_name TEXT NOT NULL,
-        username TEXT NOT NULL,
-        bio TEXT,
-        phone_number TEXT,
-        phone_verified INTEGER NOT NULL DEFAULT 0,
-        street_address TEXT,
-        apartment TEXT,
-        city TEXT,
-        state TEXT,
-        zip_code TEXT,
-        country TEXT,
-        emergency_contact_name TEXT,
-        emergency_contact_phone TEXT,
-        notification_preferences TEXT,
-        avatar_url TEXT,
-        is_active INTEGER NOT NULL DEFAULT 1,
-        is_synced INTEGER NOT NULL DEFAULT 0,
-        last_modified TEXT NOT NULL,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-      )
+       CREATE TABLE profiles (
+      id TEXT PRIMARY KEY,
+      full_name TEXT NOT NULL,
+      username TEXT NOT NULL,
+      bio TEXT,
+      phone_number TEXT,
+      phone_verified INTEGER NOT NULL DEFAULT 0,
+      street_address TEXT,
+      apartment TEXT,
+      city TEXT,
+      state TEXT,
+      zip_code TEXT,
+      country TEXT,
+      emergency_contact_name TEXT,
+      emergency_contact_phone TEXT,
+      notification_preferences TEXT,
+      app_settings TEXT,
+      avatar_url TEXT,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      is_synced INTEGER NOT NULL DEFAULT 0,
+      last_modified TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
     ''');
 
     // Sync queue table for tracking failed syncs
@@ -995,7 +1002,12 @@ class ProfileLocalDB {
       'country': profile.country,
       'emergency_contact_name': profile.emergencyContactName,
       'emergency_contact_phone': profile.emergencyContactPhone,
-      'notification_preferences': profile.notificationPreferences,
+      // Serialize notification preferences to JSON string
+      'notification_preferences': jsonEncode(
+        profile.notificationPreferences.toJson(),
+      ),
+      // Serialize app settings to JSON string
+      'app_settings': jsonEncode(profile.appSettings.toJson()),
       'avatar_url': profile.avatarUrl,
       'is_active': profile.isActive ? 1 : 0,
       'is_synced': 0,
@@ -1013,14 +1025,14 @@ class ProfileLocalDB {
     final result = await db.query('profiles', where: 'id = ?', whereArgs: [id]);
 
     if (result.isEmpty) return null;
-    return UserProfile.fromJson(result.first);
+    return _parseProfile(result.first);
   }
 
   // READ - Get all profiles
   Future<List<UserProfile>> getAllProfiles() async {
     final db = await _dbService.database;
     final result = await db.query('profiles', orderBy: 'created_at DESC');
-    return result.map((map) => UserProfile.fromJson(map)).toList();
+    return result.map(_parseProfile).toList();
   }
 
   // READ - Get unsynced profiles
@@ -1031,7 +1043,63 @@ class ProfileLocalDB {
       where: 'is_synced = ?',
       whereArgs: [0],
     );
-    return result.map((map) => UserProfile.fromJson(map)).toList();
+    return result.map(_parseProfile).toList();
+  }
+
+  // Helper method to parse profile from database map
+  UserProfile _parseProfile(Map<String, dynamic> map) {
+    // Parse notification preferences from JSON string
+    NotificationPreferences notificationPreferences;
+    if (map['notification_preferences'] != null &&
+        map['notification_preferences'].toString().isNotEmpty) {
+      try {
+        final jsonData = jsonDecode(map['notification_preferences'] as String);
+        notificationPreferences = NotificationPreferences.fromJson(jsonData);
+      } catch (e) {
+        print('Error parsing notification preferences: $e');
+        notificationPreferences = NotificationPreferences();
+      }
+    } else {
+      notificationPreferences = NotificationPreferences();
+    }
+
+    // Parse app settings from JSON string
+    AppSettings appSettings;
+    if (map['app_settings'] != null &&
+        map['app_settings'].toString().isNotEmpty) {
+      try {
+        final jsonData = jsonDecode(map['app_settings'] as String);
+        appSettings = AppSettings.fromJson(jsonData);
+      } catch (e) {
+        print('Error parsing app settings: $e');
+        appSettings = AppSettings();
+      }
+    } else {
+      appSettings = AppSettings();
+    }
+
+    return UserProfile(
+      id: map['id'] as String,
+      fullName: map['full_name'] as String,
+      username: map['username'] as String,
+      bio: map['bio'] as String?,
+      phoneNumber: map['phone_number'] as String?,
+      phoneVerified: (map['phone_verified'] as int?) == 1,
+      streetAddress: map['street_address'] as String?,
+      apartment: map['apartment'] as String?,
+      city: map['city'] as String?,
+      state: map['state'] as String?,
+      zipCode: map['zip_code'] as String?,
+      country: map['country'] as String?,
+      emergencyContactName: map['emergency_contact_name'] as String?,
+      emergencyContactPhone: map['emergency_contact_phone'] as String?,
+      notificationPreferences: notificationPreferences,
+      appSettings: appSettings,
+      avatarUrl: map['avatar_url'] as String?,
+      isActive: (map['is_active'] as int?) == 1,
+      createdAt: DateTime.parse(map['created_at'] as String),
+      updatedAt: DateTime.parse(map['updated_at'] as String),
+    );
   }
 
   // UPDATE
@@ -1053,7 +1121,12 @@ class ProfileLocalDB {
         'country': profile.country,
         'emergency_contact_name': profile.emergencyContactName,
         'emergency_contact_phone': profile.emergencyContactPhone,
-        'notification_preferences': profile.notificationPreferences,
+        // Serialize notification preferences to JSON string
+        'notification_preferences': jsonEncode(
+          profile.notificationPreferences.toJson(),
+        ),
+        // Serialize app settings to JSON string
+        'app_settings': jsonEncode(profile.appSettings.toJson()),
         'avatar_url': profile.avatarUrl,
         'is_active': profile.isActive ? 1 : 0,
         'is_synced': 0,
@@ -1083,7 +1156,12 @@ class ProfileLocalDB {
       'country': profile.country,
       'emergency_contact_name': profile.emergencyContactName,
       'emergency_contact_phone': profile.emergencyContactPhone,
-      'notification_preferences': profile.notificationPreferences,
+      // Serialize notification preferences to JSON string
+      'notification_preferences': jsonEncode(
+        profile.notificationPreferences.toJson(),
+      ),
+      // Serialize app settings to JSON string
+      'app_settings': jsonEncode(profile.appSettings.toJson()),
       'avatar_url': profile.avatarUrl,
       'is_active': profile.isActive ? 1 : 0,
       'is_synced': 1,
