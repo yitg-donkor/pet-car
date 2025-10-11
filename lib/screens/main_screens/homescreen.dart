@@ -41,12 +41,13 @@ class _MainNavigationState extends ConsumerState<MainNavigation> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
       body: _screens[_currentIndex],
       bottomNavigationBar: Container(
         height: 80,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: theme.colorScheme.surface,
           boxShadow: [
             BoxShadow(
               color: Colors.grey.withOpacity(0.2),
@@ -72,6 +73,7 @@ class _MainNavigationState extends ConsumerState<MainNavigation> {
   }
 
   Widget _buildNavItem(IconData icon, String label, int index) {
+    final theme = Theme.of(context);
     bool isSelected = _currentIndex == index;
 
     return GestureDetector(
@@ -81,14 +83,16 @@ class _MainNavigationState extends ConsumerState<MainNavigation> {
         children: [
           Icon(
             icon,
-            color: isSelected ? const Color(0xFF4CAF50) : Colors.grey,
+            color:
+                isSelected ? theme.colorScheme.primaryContainer : Colors.grey,
             size: 24,
           ),
           const SizedBox(height: 4),
           Text(
             label,
             style: TextStyle(
-              color: isSelected ? const Color(0xFF4CAF50) : Colors.grey,
+              color:
+                  isSelected ? theme.colorScheme.primaryContainer : Colors.grey,
               fontSize: 12,
               fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
             ),
@@ -99,7 +103,6 @@ class _MainNavigationState extends ConsumerState<MainNavigation> {
   }
 }
 
-// Updated Homescreen without bottom navigation (since it's handled by MainNavigation)
 class Homescreen extends ConsumerStatefulWidget {
   const Homescreen({super.key});
 
@@ -123,27 +126,24 @@ class _HomescreenState extends ConsumerState<Homescreen> {
     }
   }
 
+  @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final petsAsync = ref.watch(petsOfflineProvider);
     final todayRemindersAsync = ref.watch(todayRemindersProvider);
     final currentUser = ref.watch(currentUserProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
       body: SafeArea(
         child: Column(
           children: [
-            // Dynamic Header
-            _buildHeader(petsAsync, currentUser),
-
-            // Main Content
+            _buildHeader(theme, petsAsync, currentUser),
             Expanded(
               child: RefreshIndicator(
                 onRefresh: () async {
                   ref.invalidate(petsOfflineProvider);
                   ref.invalidate(todayRemindersProvider);
 
-                  // Sync reminders
                   final user = ref.read(currentUserProvider);
                   if (user != null) {
                     final syncService = ref.read(unifiedSyncServiceProvider);
@@ -155,56 +155,49 @@ class _HomescreenState extends ConsumerState<Homescreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Welcome Message
-                      _buildWelcomeSection(currentUser, petsAsync),
-
+                      _buildWelcomeSection(theme, currentUser, petsAsync),
                       const SizedBox(height: 25),
-
-                      // Quick Stats
                       petsAsync.when(
                         data:
-                            (pets) =>
-                                _buildQuickStats(pets, todayRemindersAsync),
-                        loading: () => SizedBox.shrink(),
-                        error: (_, __) => SizedBox.shrink(),
+                            (pets) => _buildQuickStats(
+                              theme,
+                              pets,
+                              todayRemindersAsync,
+                            ),
+                        loading: () => const SizedBox.shrink(),
+                        error: (_, __) => const SizedBox.shrink(),
                       ),
-
                       const SizedBox(height: 25),
-
-                      // Today's Reminders Section
-                      _buildSectionHeader('Today\'s Reminders', Icons.alarm),
+                      _buildSectionHeader(
+                        theme,
+                        'Today\'s Reminders',
+                        Icons.alarm,
+                      ),
                       const SizedBox(height: 15),
-
                       todayRemindersAsync.when(
-                        data: (reminders) => _buildRemindersSection(reminders),
-                        loading: () => _buildLoadingShimmer(),
+                        data:
+                            (reminders) =>
+                                _buildRemindersSection(theme, reminders),
+                        loading: () => _buildLoadingShimmer(theme),
                         error:
-                            (error, _) =>
-                                _buildErrorState('Failed to load reminders'),
+                            (error, _) => _buildErrorState(
+                              theme,
+                              'Failed to load reminders',
+                            ),
                       ),
-
                       const SizedBox(height: 30),
-
-                      // Your Pets Section
-                      _buildSectionHeader('Your Pets', Icons.pets),
+                      _buildSectionHeader(theme, 'Your Pets', Icons.pets),
                       const SizedBox(height: 15),
-
                       petsAsync.when(
-                        data: (pets) => _buildPetsSection(pets),
-                        loading: () => _buildLoadingShimmer(),
+                        data: (pets) => _buildPetsSection(theme, pets),
+                        loading: () => _buildLoadingShimmer(theme),
                         error:
                             (error, _) =>
-                                _buildErrorState('Failed to load pets'),
+                                _buildErrorState(theme, 'Failed to load pets'),
                       ),
-
                       const SizedBox(height: 30),
-
-                      // Quick Actions
-                      _buildQuickActions(),
-
+                      _buildQuickActions(theme),
                       const SizedBox(height: 20),
-
-                      // Debug buttons
                     ],
                   ),
                 ),
@@ -216,12 +209,16 @@ class _HomescreenState extends ConsumerState<Homescreen> {
     );
   }
 
-  Widget _buildHeader(AsyncValue<List<Pet>> petsAsync, User? currentUser) {
+  Widget _buildHeader(
+    ThemeData theme,
+    AsyncValue<List<Pet>> petsAsync,
+    User? currentUser,
+  ) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [Colors.blue.shade400, Colors.blue.shade600],
+          colors: [theme.colorScheme.primary, theme.colorScheme.secondary],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -231,24 +228,23 @@ class _HomescreenState extends ConsumerState<Homescreen> {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.blue.withOpacity(0.3),
+            color: theme.colorScheme.primary.withOpacity(0.3),
             blurRadius: 10,
-            offset: Offset(0, 5),
+            offset: const Offset(0, 5),
           ),
         ],
       ),
       child: Row(
         children: [
-          // Pet Profile Picture
           petsAsync.when(
             data: (pets) {
               if (pets.isEmpty) {
-                return _buildDefaultAvatar();
+                return _buildDefaultAvatar(theme);
               }
               return _buildPetAvatar(pets[0].photoUrl);
             },
-            loading: () => _buildDefaultAvatar(),
-            error: (_, __) => _buildDefaultAvatar(),
+            loading: () => _buildDefaultAvatar(theme),
+            error: (_, __) => _buildDefaultAvatar(theme),
           ),
           const SizedBox(width: 15),
           Expanded(
@@ -271,9 +267,7 @@ class _HomescreenState extends ConsumerState<Homescreen> {
                 const SizedBox(height: 2),
                 Text(
                   'Home Dashboard',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
+                  style: theme.textTheme.headlineLarge?.copyWith(
                     color: Colors.white,
                   ),
                 ),
@@ -287,8 +281,6 @@ class _HomescreenState extends ConsumerState<Homescreen> {
             ),
             child: IconButton(
               onPressed: () {
-                // Navigator.pushNamed(context, '/ai-dashboard');
-                //TODO: change to ai dashboard
                 Navigator.pushNamed(context, '/settings');
               },
               icon: const Icon(Icons.auto_awesome, color: Colors.white),
@@ -310,7 +302,7 @@ class _HomescreenState extends ConsumerState<Homescreen> {
           BoxShadow(
             color: Colors.black.withOpacity(0.2),
             blurRadius: 8,
-            offset: Offset(0, 2),
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -328,7 +320,7 @@ class _HomescreenState extends ConsumerState<Homescreen> {
     );
   }
 
-  Widget _buildDefaultAvatar() {
+  Widget _buildDefaultAvatar(ThemeData theme) {
     return Container(
       width: 50,
       height: 50,
@@ -346,6 +338,7 @@ class _HomescreenState extends ConsumerState<Homescreen> {
   }
 
   Widget _buildWelcomeSection(
+    ThemeData theme,
     User? currentUser,
     AsyncValue<List<Pet>> petsAsync,
   ) {
@@ -362,45 +355,41 @@ class _HomescreenState extends ConsumerState<Homescreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(greeting, style: TextStyle(fontSize: 16, color: Colors.grey[600])),
+        Text(
+          greeting,
+          style: theme.textTheme.bodyLarge?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
         const SizedBox(height: 4),
         petsAsync.when(
           data: (pets) {
             if (pets.isEmpty) {
               return Text(
                 'Start by adding your first pet!',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
+                style: theme.textTheme.headlineMedium,
               );
             }
             return Text(
               'You have ${pets.length} ${pets.length == 1 ? 'pet' : 'pets'} to care for today',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.black,
-              ),
+              style: theme.textTheme.headlineSmall,
             );
           },
           loading:
               () => Text(
                 'Loading your pets...',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                style: theme.textTheme.headlineSmall,
               ),
           error:
-              (_, __) => Text(
-                'Welcome back!',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
+              (_, __) =>
+                  Text('Welcome back!', style: theme.textTheme.headlineSmall),
         ),
       ],
     );
   }
 
   Widget _buildQuickStats(
+    ThemeData theme,
     List<Pet> pets,
     AsyncValue<List<Reminder>> remindersAsync,
   ) {
@@ -420,28 +409,31 @@ class _HomescreenState extends ConsumerState<Homescreen> {
       children: [
         Expanded(
           child: _buildStatCard(
+            theme: theme,
             icon: Icons.pets,
             count: pets.length.toString(),
             label: 'Pets',
-            color: Colors.blue,
+            color: theme.colorScheme.primary,
           ),
         ),
         const SizedBox(width: 12),
         Expanded(
           child: _buildStatCard(
+            theme: theme,
             icon: Icons.check_circle,
             count: completedCount.toString(),
             label: 'Completed',
-            color: Colors.green,
+            color: Color(0xFF4CAF50),
           ),
         ),
         const SizedBox(width: 12),
         Expanded(
           child: _buildStatCard(
+            theme: theme,
             icon: Icons.pending_actions,
             count: (totalCount - completedCount).toString(),
             label: 'Pending',
-            color: Colors.orange,
+            color: Color(0xFFFF9800),
           ),
         ),
       ],
@@ -449,6 +441,7 @@ class _HomescreenState extends ConsumerState<Homescreen> {
   }
 
   Widget _buildStatCard({
+    required ThemeData theme,
     required IconData icon,
     required String count,
     required String label,
@@ -457,13 +450,13 @@ class _HomescreenState extends ConsumerState<Homescreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
             color: Colors.grey.withOpacity(0.1),
             blurRadius: 10,
-            offset: Offset(0, 4),
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -473,50 +466,39 @@ class _HomescreenState extends ConsumerState<Homescreen> {
           const SizedBox(height: 8),
           Text(
             count,
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
+            style: theme.textTheme.headlineMedium?.copyWith(color: color),
           ),
           const SizedBox(height: 2),
-          Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+          Text(label, style: theme.textTheme.bodySmall),
         ],
       ),
     );
   }
 
-  Widget _buildSectionHeader(String title, IconData icon) {
+  Widget _buildSectionHeader(ThemeData theme, String title, IconData icon) {
     return Row(
       children: [
         Container(
-          padding: EdgeInsets.all(8),
+          padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: Colors.blue.withOpacity(0.1),
+            color: theme.colorScheme.primaryContainer,
             borderRadius: BorderRadius.circular(10),
           ),
-          child: Icon(icon, color: Colors.blue, size: 20),
+          child: Icon(icon, color: theme.colorScheme.primary, size: 20),
         ),
         const SizedBox(width: 10),
-        Text(
-          title,
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            color: Colors.black,
-          ),
-        ),
+        Text(title, style: theme.textTheme.headlineLarge),
       ],
     );
   }
 
-  Widget _buildRemindersSection(List<Reminder> reminders) {
+  Widget _buildRemindersSection(ThemeData theme, List<Reminder> reminders) {
     final activeReminders = reminders.where((r) => !r.isCompleted).toList();
     if (activeReminders.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(40),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Column(
@@ -524,35 +506,25 @@ class _HomescreenState extends ConsumerState<Homescreen> {
             Icon(
               Icons.check_circle_outline,
               size: 60,
-              color: Colors.green[300],
+              color: const Color(0xFF4CAF50),
             ),
             const SizedBox(height: 16),
-            Text(
-              'No reminders for today!',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey[800],
-              ),
-            ),
+            Text('No reminders for today!', style: theme.textTheme.titleLarge),
             const SizedBox(height: 8),
-            Text(
-              'Enjoy your free time',
-              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-            ),
+            Text('Enjoy your free time', style: theme.textTheme.bodySmall),
           ],
         ),
       );
     }
 
-    // Show max 3 reminders on home screen
     final displayReminders = activeReminders.take(3).toList();
-
     final remainingCount = activeReminders.length - 3;
 
     return Column(
       children: [
-        ...displayReminders.map((reminder) => _buildReminderCard(reminder)),
+        ...displayReminders.map(
+          (reminder) => _buildReminderCard(theme, reminder),
+        ),
         if (remainingCount > 0) ...[
           const SizedBox(height: 12),
           GestureDetector(
@@ -560,26 +532,26 @@ class _HomescreenState extends ConsumerState<Homescreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 12),
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.blue.shade300),
+                border: Border.all(
+                  color: theme.colorScheme.primary.withOpacity(0.5),
+                ),
                 borderRadius: BorderRadius.circular(25),
-                color: Colors.white,
+                color: theme.colorScheme.surface,
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                     'View $remainingCount More',
-                    style: TextStyle(
-                      color: Colors.blue.shade700,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: theme.colorScheme.primary,
                     ),
                   ),
                   const SizedBox(width: 8),
                   Icon(
                     Icons.arrow_forward,
                     size: 16,
-                    color: Colors.blue.shade700,
+                    color: theme.colorScheme.primary,
                   ),
                 ],
               ),
@@ -590,24 +562,21 @@ class _HomescreenState extends ConsumerState<Homescreen> {
     );
   }
 
-  Widget _buildReminderCard(Reminder reminder) {
+  Widget _buildReminderCard(ThemeData theme, Reminder reminder) {
     final gradientColors = _getGradientForReminder(reminder);
     final icon = _getIconForReminder(reminder.title);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: gradientColors,
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-        ),
+        color: theme.colorScheme.surface,
+
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: gradientColors[0].withOpacity(0.3),
+            color: theme.colorScheme.outline,
             blurRadius: 8,
-            offset: Offset(0, 4),
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -621,7 +590,7 @@ class _HomescreenState extends ConsumerState<Homescreen> {
             child: Row(
               children: [
                 Container(
-                  padding: EdgeInsets.all(10),
+                  padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(12),
@@ -635,10 +604,16 @@ class _HomescreenState extends ConsumerState<Homescreen> {
                     children: [
                       Text(
                         reminder.title,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
+                        // style: TextStyle(
+                        //   color: Colors.white,
+                        //   fontSize: 16,
+                        //   fontWeight: FontWeight.w600,
+                        //   decoration:
+                        //       reminder.isCompleted
+                        //           ? TextDecoration.lineThrough
+                        //           : null,
+                        // ),
+                        style: theme.textTheme.titleMedium?.copyWith(
                           decoration:
                               reminder.isCompleted
                                   ? TextDecoration.lineThrough
@@ -648,10 +623,11 @@ class _HomescreenState extends ConsumerState<Homescreen> {
                       const SizedBox(height: 2),
                       Text(
                         DateFormat('h:mm a').format(reminder.reminderDate),
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.9),
-                          fontSize: 14,
-                        ),
+                        // style: TextStyle(
+                        //   color: Colors.white.withOpacity(0.9),
+                        //   fontSize: 14,
+                        // ),
+                        style: theme.textTheme.bodyMedium,
                       ),
                     ],
                   ),
@@ -664,7 +640,7 @@ class _HomescreenState extends ConsumerState<Homescreen> {
                       ref.invalidate(todayRemindersProvider);
 
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
+                        const SnackBar(
                           content: Text('Marked as complete!'),
                           duration: Duration(seconds: 2),
                         ),
@@ -676,21 +652,22 @@ class _HomescreenState extends ConsumerState<Homescreen> {
                         vertical: 8,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+                        color: theme.colorScheme.outline,
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
                         'Complete',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
+                        // style: TextStyle(
+                        //   color: Colors.white,
+                        //   fontSize: 12,
+                        //   fontWeight: FontWeight.w600,
+                        // ),
+                        style: theme.textTheme.bodySmall,
                       ),
                     ),
                   ),
                 if (reminder.isCompleted)
-                  Icon(Icons.check_circle, color: Colors.white, size: 32),
+                  const Icon(Icons.check_circle, color: Colors.white, size: 32),
               ],
             ),
           ),
@@ -702,17 +679,17 @@ class _HomescreenState extends ConsumerState<Homescreen> {
   List<Color> _getGradientForReminder(Reminder reminder) {
     final title = reminder.title.toLowerCase();
     if (title.contains('walk')) {
-      return [Color(0xFF4CAF50), Color(0xFF81C784)];
+      return [const Color(0xFF4CAF50), const Color(0xFF81C784)];
     } else if (title.contains('feed') || title.contains('food')) {
-      return [Color(0xFF2196F3), Color(0xFF64B5F6)];
+      return [const Color(0xFF2196F3), const Color(0xFF64B5F6)];
     } else if (title.contains('medication') || title.contains('medicine')) {
-      return [Color(0xFFE53E3E), Color(0xFF9C27B0)];
+      return [const Color(0xFFE53E3E), const Color(0xFF9C27B0)];
     } else if (title.contains('vet')) {
-      return [Color(0xFFFF5722), Color(0xFFFF7043)];
+      return [const Color(0xFFFF5722), const Color(0xFFFF7043)];
     } else if (title.contains('groom')) {
-      return [Color(0xFF9C27B0), Color(0xFFBA68C8)];
+      return [const Color(0xFF9C27B0), const Color(0xFFBA68C8)];
     }
-    return [Color(0xFF3F51B5), Color(0xFF5C6BC0)];
+    return [const Color(0xFF3F51B5), const Color(0xFF5C6BC0)];
   }
 
   IconData _getIconForReminder(String title) {
@@ -730,34 +707,31 @@ class _HomescreenState extends ConsumerState<Homescreen> {
     return Icons.notifications;
   }
 
-  Widget _buildPetsSection(List<Pet> pets) {
+  Widget _buildPetsSection(ThemeData theme, List<Pet> pets) {
     if (pets.isEmpty) {
       return GestureDetector(
         onTap: () => Navigator.pushNamed(context, '/add-pet'),
         child: Container(
           padding: const EdgeInsets.all(30),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: theme.colorScheme.surface,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.blue.shade200, width: 2),
+            border: Border.all(
+              color: theme.colorScheme.primary.withOpacity(0.5),
+              width: 2,
+            ),
           ),
           child: Column(
             children: [
-              Icon(Icons.add_circle_outline, size: 60, color: Colors.blue[400]),
+              Icon(
+                Icons.add_circle_outline,
+                size: 60,
+                color: theme.colorScheme.primary,
+              ),
               const SizedBox(height: 16),
-              Text(
-                'Add Your First Pet',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey[800],
-                ),
-              ),
+              Text('Add Your First Pet', style: theme.textTheme.titleLarge),
               const SizedBox(height: 8),
-              Text(
-                'Tap to get started',
-                style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-              ),
+              Text('Tap to get started', style: theme.textTheme.bodySmall),
             ],
           ),
         ),
@@ -771,30 +745,29 @@ class _HomescreenState extends ConsumerState<Homescreen> {
         itemCount: pets.length,
         itemBuilder: (context, index) {
           final pet = pets[index];
-          return _buildPetCard(pet);
+          return _buildPetCard(theme, pet);
         },
       ),
     );
   }
 
-  Widget _buildPetCard(Pet pet) {
+  Widget _buildPetCard(ThemeData theme, Pet pet) {
     return GestureDetector(
       onTap: () {
         ref.read(selectedPetProvider.notifier).selectPet(pet);
-        print('Selected pet: ${pet.name}'); // Debug print
         Navigator.pushNamed(context, '/pet-details', arguments: pet);
       },
       child: Container(
         width: 120,
         margin: const EdgeInsets.only(right: 12),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
               color: Colors.grey.withOpacity(0.1),
               blurRadius: 10,
-              offset: Offset(0, 4),
+              offset: const Offset(0, 4),
             ),
           ],
         ),
@@ -806,7 +779,10 @@ class _HomescreenState extends ConsumerState<Homescreen> {
               height: 70,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                border: Border.all(color: Colors.blue.shade200, width: 2),
+                border: Border.all(
+                  color: theme.colorScheme.primary.withOpacity(0.5),
+                  width: 2,
+                ),
               ),
               child: ClipOval(
                 child:
@@ -818,10 +794,14 @@ class _HomescreenState extends ConsumerState<Homescreen> {
                               (_, __, ___) => Icon(
                                 Icons.pets,
                                 size: 40,
-                                color: Colors.blue[300],
+                                color: theme.colorScheme.primary,
                               ),
                         )
-                        : Icon(Icons.pets, size: 40, color: Colors.blue[300]),
+                        : Icon(
+                          Icons.pets,
+                          size: 40,
+                          color: theme.colorScheme.primary,
+                        ),
               ),
             ),
             const SizedBox(height: 12),
@@ -829,49 +809,44 @@ class _HomescreenState extends ConsumerState<Homescreen> {
               padding: const EdgeInsets.symmetric(horizontal: 8),
               child: Text(
                 pet.name,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black,
-                ),
+                style: theme.textTheme.labelLarge,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
               ),
             ),
             const SizedBox(height: 2),
-            Text(
-              pet.species,
-              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-            ),
+            Text(pet.species, style: theme.textTheme.bodySmall),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildQuickActions() {
+  Widget _buildQuickActions(ThemeData theme) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionHeader('Quick Actions', Icons.flash_on),
+        _buildSectionHeader(theme, 'Quick Actions', Icons.flash_on),
         const SizedBox(height: 15),
         Row(
           children: [
             Expanded(
               child: _buildActionButton(
+                theme: theme,
                 icon: Icons.add,
                 label: 'Add Reminder',
-                color: Colors.blue,
+                color: theme.colorScheme.secondary,
                 onTap: () => Navigator.pushNamed(context, '/reminders'),
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: _buildActionButton(
+                theme: theme,
                 icon: Icons.pets,
                 label: 'Add Pet',
-                color: Colors.green,
+                color: theme.colorScheme.primary,
                 onTap: () => Navigator.pushNamed(context, '/add-pet'),
               ),
             ),
@@ -882,6 +857,7 @@ class _HomescreenState extends ConsumerState<Homescreen> {
   }
 
   Widget _buildActionButton({
+    required ThemeData theme,
     required IconData icon,
     required String label,
     required Color color,
@@ -902,7 +878,7 @@ class _HomescreenState extends ConsumerState<Homescreen> {
             BoxShadow(
               color: color.withOpacity(0.3),
               blurRadius: 8,
-              offset: Offset(0, 4),
+              offset: const Offset(0, 4),
             ),
           ],
         ),
@@ -912,11 +888,7 @@ class _HomescreenState extends ConsumerState<Homescreen> {
             const SizedBox(height: 8),
             Text(
               label,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
+              style: theme.textTheme.labelLarge?.copyWith(color: Colors.white),
             ),
           ],
         ),
@@ -924,7 +896,7 @@ class _HomescreenState extends ConsumerState<Homescreen> {
     );
   }
 
-  Widget _buildLoadingShimmer() {
+  Widget _buildLoadingShimmer(ThemeData theme) {
     return Column(
       children: List.generate(
         2,
@@ -932,7 +904,7 @@ class _HomescreenState extends ConsumerState<Homescreen> {
           margin: const EdgeInsets.only(bottom: 12),
           height: 80,
           decoration: BoxDecoration(
-            color: Colors.grey[300],
+            color: theme.colorScheme.surfaceVariant,
             borderRadius: BorderRadius.circular(20),
           ),
         ),
@@ -940,19 +912,24 @@ class _HomescreenState extends ConsumerState<Homescreen> {
     );
   }
 
-  Widget _buildErrorState(String message) {
+  Widget _buildErrorState(ThemeData theme, String message) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.red[50],
+        color: theme.colorScheme.errorContainer,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
         children: [
-          Icon(Icons.error_outline, color: Colors.red[400]),
+          Icon(Icons.error_outline, color: theme.colorScheme.error),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(message, style: TextStyle(color: Colors.red[700])),
+            child: Text(
+              message,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.error,
+              ),
+            ),
           ),
         ],
       ),

@@ -5,6 +5,7 @@ import 'package:pet_care/providers/offline_providers.dart';
 
 import 'package:pet_care/screens/settingsscreens/profile_edit_screen.dart';
 import 'package:pet_care/services/notification_service.dart';
+import 'package:pet_care/theme/theme_manager.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:pet_care/models/user_profile.dart';
 
@@ -30,6 +31,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   void initState() {
     super.initState();
+
+    // Initialize theme from database
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final userProfile = ref.read(userProfileProviderProvider).value;
+      if (userProfile != null) {
+        _initializeThemeFromProfile(userProfile);
+      }
+    });
+  }
+
+  void _initializeThemeFromProfile(UserProfile? userProfile) {
+    if (userProfile != null) {
+      final themeMode = AppThemeModeExtension.fromString(
+        userProfile.appSettings.theme,
+      );
+      ref.read(themeProvider.notifier).setTheme(themeMode);
+    }
   }
 
   void _initializeSettingsFromProfile(UserProfile? userProfile) {
@@ -200,39 +218,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 const SizedBox(height: 24),
 
                 // Display Section
-                _buildSectionHeader('Display & Theme'),
-                _buildSettingCard(
-                  icon: Icons.palette,
-                  title: 'App Theme',
-                  subtitle: 'Current: $_selectedTheme',
-                  onTap: () => _showThemeOptions(),
-                  trailing: Text(
-                    _selectedTheme,
-                    style: const TextStyle(
-                      color: Color(0xFF4CAF50),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                _buildSettingCard(
-                  icon: Icons.language,
-                  title: 'Language',
-                  subtitle: 'Current: $_selectedLanguage',
-                  onTap: () => _showLanguageOptions(),
-                  trailing: Text(
-                    _selectedLanguage,
-                    style: const TextStyle(
-                      color: Color(0xFF4CAF50),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                _buildSettingCard(
-                  icon: Icons.text_fields,
-                  title: 'Text Size',
-                  subtitle: 'Adjust text size for readability',
-                  onTap: () => _navigateTo('text_size'),
-                ),
+                _buildDisplaySection(userProfile),
                 const SizedBox(height: 24),
 
                 // Data & Sync Section
@@ -557,6 +543,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   void _showThemeOptions() {
+    final currentTheme = ref.read(themeProvider);
+
     showDialog(
       context: context,
       builder:
@@ -564,38 +552,90 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
-            title: const Text('Select Theme'),
+            title: const Row(
+              children: [
+                Icon(Icons.palette, color: Color(0xFF4CAF50)),
+                SizedBox(width: 8),
+                Text('Select Theme'),
+              ],
+            ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                RadioListTile(
-                  title: const Text('Light'),
-                  value: 'Light',
-                  groupValue: _selectedTheme,
-                  onChanged: (value) {
-                    setState(() => _selectedTheme = value!);
-                    _saveSettingsToProfile();
-                    Navigator.pop(context);
+                RadioListTile<AppThemeMode>(
+                  title: const Row(
+                    children: [
+                      Icon(Icons.light_mode, size: 20),
+                      SizedBox(width: 8),
+                      Text('Light'),
+                    ],
+                  ),
+                  value: AppThemeMode.light,
+                  groupValue: currentTheme,
+                  activeColor: const Color(0xFF4CAF50),
+                  onChanged: (value) async {
+                    if (value != null) {
+                      // Update theme provider
+                      ref.read(themeProvider.notifier).setTheme(value);
+
+                      // Update database
+                      setState(() => _selectedTheme = 'Light');
+                      await _saveSettingsToProfile();
+
+                      Navigator.pop(context);
+                    }
                   },
                 ),
-                RadioListTile(
-                  title: const Text('Dark'),
-                  value: 'Dark',
-                  groupValue: _selectedTheme,
-                  onChanged: (value) {
-                    setState(() => _selectedTheme = value!);
-                    _saveSettingsToProfile();
-                    Navigator.pop(context);
+                RadioListTile<AppThemeMode>(
+                  title: const Row(
+                    children: [
+                      Icon(Icons.dark_mode, size: 20),
+                      SizedBox(width: 8),
+                      Text('Dark'),
+                    ],
+                  ),
+                  value: AppThemeMode.dark,
+                  groupValue: currentTheme,
+                  activeColor: const Color(0xFF4CAF50),
+                  onChanged: (value) async {
+                    if (value != null) {
+                      // Update theme provider
+                      ref.read(themeProvider.notifier).setTheme(value);
+
+                      // Update database
+                      setState(() => _selectedTheme = 'Dark');
+                      await _saveSettingsToProfile();
+
+                      Navigator.pop(context);
+                    }
                   },
                 ),
-                RadioListTile(
-                  title: const Text('System'),
-                  value: 'System',
-                  groupValue: _selectedTheme,
-                  onChanged: (value) {
-                    setState(() => _selectedTheme = value!);
-                    _saveSettingsToProfile();
-                    Navigator.pop(context);
+                RadioListTile<AppThemeMode>(
+                  title: const Row(
+                    children: [
+                      Icon(Icons.brightness_auto, size: 20),
+                      SizedBox(width: 8),
+                      Text('System'),
+                    ],
+                  ),
+                  subtitle: const Text(
+                    'Follow system theme',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                  value: AppThemeMode.system,
+                  groupValue: currentTheme,
+                  activeColor: const Color(0xFF4CAF50),
+                  onChanged: (value) async {
+                    if (value != null) {
+                      // Update theme provider
+                      ref.read(themeProvider.notifier).setTheme(value);
+
+                      // Update database
+                      setState(() => _selectedTheme = 'System');
+                      await _saveSettingsToProfile();
+
+                      Navigator.pop(context);
+                    }
                   },
                 ),
               ],
@@ -1371,5 +1411,188 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
+  }
+
+  Widget _buildDisplaySection(UserProfile? userProfile) {
+    if (userProfile == null) return const SizedBox.shrink();
+
+    final isDark = ref.watch(isDarkModeProvider);
+
+    return Column(
+      children: [
+        const SizedBox(height: 24),
+        _buildSectionHeader('Display & Theme'),
+
+        // Theme Card with Preview
+        Card(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          elevation: 1,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            children: [
+              ListTile(
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF4CAF50).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    isDark ? Icons.dark_mode : Icons.light_mode,
+                    color: const Color(0xFF4CAF50),
+                  ),
+                ),
+                title: const Text(
+                  'App Theme',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                ),
+                subtitle: Text(
+                  'Current: $_selectedTheme',
+                  style: const TextStyle(fontSize: 12),
+                ),
+                trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+                onTap: () => _showThemeOptions(),
+              ),
+
+              // Theme Preview
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _buildThemePreview(
+                        'Light',
+                        AppThemeMode.light,
+                        Colors.white,
+                        Colors.black,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _buildThemePreview(
+                        'Dark',
+                        AppThemeMode.dark,
+                        const Color(0xFF1E1E1E),
+                        Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        _buildSettingCard(
+          icon: Icons.language,
+          title: 'Language',
+          subtitle: 'Current: $_selectedLanguage',
+          onTap: () => _showLanguageOptions(),
+          trailing: Text(
+            _selectedLanguage,
+            style: const TextStyle(
+              color: Color(0xFF4CAF50),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+
+        _buildSettingCard(
+          icon: Icons.text_fields,
+          title: 'Text Size',
+          subtitle: 'Adjust text size for readability',
+          onTap: () => _navigateTo('text_size'),
+        ),
+      ],
+    );
+  }
+
+  // ADD Theme Preview Widget:
+
+  Widget _buildThemePreview(
+    String label,
+    AppThemeMode mode,
+    Color bgColor,
+    Color textColor,
+  ) {
+    final currentTheme = ref.watch(themeProvider);
+    final isSelected = currentTheme == mode;
+
+    return GestureDetector(
+      onTap: () {
+        ref.read(themeProvider.notifier).setTheme(mode);
+        setState(() {
+          _selectedTheme = mode.name;
+        });
+        _saveSettingsToProfile();
+      },
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF4CAF50) : Colors.grey.shade300,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF4CAF50),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: textColor.withOpacity(0.3),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Container(
+              height: 30,
+              decoration: BoxDecoration(
+                color: textColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: TextStyle(
+                color: textColor,
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+            if (isSelected) ...[
+              const SizedBox(height: 4),
+              Icon(
+                Icons.check_circle,
+                size: 16,
+                color: const Color(0xFF4CAF50),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 }

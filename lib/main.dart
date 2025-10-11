@@ -13,6 +13,8 @@ import 'package:pet_care/screens/pet_selection_screens/editpetscreen.dart';
 import 'package:pet_care/screens/pet_selection_screens/pet_selection.dart';
 import 'package:pet_care/screens/onboarding_screens/signupscreen.dart';
 import 'package:pet_care/services/notification_service.dart';
+import 'package:pet_care/theme/app_theme.dart';
+import 'package:pet_care/theme/theme_manager.dart';
 import 'package:pet_care/widgets/onboarding.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
@@ -38,12 +40,18 @@ Future<void> main() async {
   runApp(const ProviderScope(child: MyApp()));
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends ConsumerWidget {
   const MyApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeMode = ref.watch(themeProvider);
     return MaterialApp(
+      // Theme Configuration
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: themeMode.themeMode,
+
       debugShowCheckedModeBanner: false,
       title: 'Pet Care App',
       initialRoute: '/', // Start with AuthWrapper
@@ -65,7 +73,7 @@ class MyApp extends StatelessWidget {
 
         // Example route for AI chat screen
       },
-      theme: ThemeData(primarySwatch: Colors.blue, useMaterial3: true),
+
       // Remove the home parameter completely
     );
   }

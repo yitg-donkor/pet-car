@@ -61,11 +61,11 @@ class LocalDatabaseService {
 ''');
     }
 
-    if (oldVersion < 3) {
-      await db.execute('''
-      ALTER TABLE profiles ADD COLUMN app_settings TEXT DEFAULT '{"theme":"Light","language":"English","text_size":"Normal","sync_on_cellular":false,"offline_mode":true,"biometric_lock_enabled":false}'
-    ''');
-    }
+    // if (oldVersion < 3) {
+    //   await db.execute('''
+    //   ALTER TABLE profiles ADD COLUMN app_settings TEXT DEFAULT '{"theme":"Light","language":"English","text_size":"Normal","sync_on_cellular":false,"offline_mode":true,"biometric_lock_enabled":false}'
+    // ''');
+    // }
   }
 
   Future<void> _createDB(Database db, int version) async {

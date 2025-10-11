@@ -254,11 +254,7 @@ class _AIDashboardScreenState extends ConsumerState<AIDashboardScreen> {
   Widget _buildSectionTitle(String title) {
     return Text(
       title,
-      style: TextStyle(
-        fontSize: 20,
-        fontWeight: FontWeight.bold,
-        color: Colors.grey[800],
-      ),
+      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
     );
   }
 
