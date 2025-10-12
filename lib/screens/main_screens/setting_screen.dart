@@ -16,7 +16,6 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  // Initialize with default values instead of late
   bool _notificationsEnabled = true;
   bool _reminderNotifications = true;
   bool _healthAlerts = true;
@@ -28,13 +27,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   UserProfile? _currentProfile;
   bool _initialized = false;
+  bool _isOffline = false;
+  bool _notificationSound = true;
+  bool _notificationVibration = true;
 
   final _notificationService = NotificationService();
 
   @override
   void initState() {
     super.initState();
-    // Mark as initialized to prevent double initialization
     _initialized = true;
   }
 
@@ -53,8 +54,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _selectedTheme = userProfile.appSettings.theme;
       _initialized = true;
     } else if (userProfile != null && _initialized && _currentProfile == null) {
-      // Update profile reference if it was null before
       _currentProfile = userProfile;
+    }
+  }
+
+  Future<UserProfile?> _loadProfileFromOfflineDB(String userId) async {
+    try {
+      final profileLocalDB = ref.read(profileLocalDBProvider);
+      final profile = await profileLocalDB.getProfileById(userId);
+      return profile;
+    } catch (e) {
+      print('Error loading profile from offline DB: $e');
+      return null;
     }
   }
 
@@ -86,23 +97,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ),
       );
 
-      // Update via provider
-      await ref
-          .read(userProfileProviderProvider.notifier)
-          .updateNotificationPreferences(
-            updatedProfile.notificationPreferences,
-          );
+      // Always save to offline DB first
+      final profileLocalDB = ref.read(profileLocalDBProvider);
+      await profileLocalDB.upsertProfile(updatedProfile);
 
-      await ref
-          .read(userProfileProviderProvider.notifier)
-          .updateAppSettings(updatedProfile.appSettings);
+      // Only try remote sync if online
+      if (!_isOffline) {
+        try {
+          await ref
+              .read(userProfileProviderProvider.notifier)
+              .updateNotificationPreferences(
+                updatedProfile.notificationPreferences,
+              );
 
-      // Update notification service with new preferences
+          await ref
+              .read(userProfileProviderProvider.notifier)
+              .updateAppSettings(updatedProfile.appSettings);
+        } catch (e) {
+          print('Remote sync failed: $e');
+          // Continue anyway - data is saved locally
+        }
+      }
+
       _notificationService.setPreferences(
         updatedProfile.notificationPreferences,
       );
 
-      // Handle notification rescheduling based on changes
       if (_notificationsEnabled) {
         final reminderDB = ref.read(reminderDatabaseProvider);
         final reminders = await reminderDB.getAllReminders();
@@ -114,9 +134,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Settings saved successfully!')),
-        );
+        final message =
+            _isOffline
+                ? 'Settings saved offline. Will sync when online.'
+                : 'Settings saved successfully!';
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(message)));
       }
     } catch (e) {
       if (mounted) {
@@ -131,259 +155,345 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final userProfileAsync = ref.watch(userProfileProviderProvider);
+    final connectivityAsync = ref.watch(connectivityStatusProvider);
+    final authStateAsync = ref.watch(authStateProvider);
 
-    return userProfileAsync.when(
-      data: (userProfile) {
-        if (userProfile != null && _currentProfile == null) {
-          _initializeSettingsFromProfile(userProfile);
-          _notificationService.setPreferences(
-            userProfile.notificationPreferences,
-          );
-        }
+    return connectivityAsync.when(
+      data: (isOnline) {
+        _isOffline = !isOnline;
 
-        return Scaffold(
-          appBar: AppBar(
-            elevation: 0,
-            title: Text('Settings', style: theme.appBarTheme.titleTextStyle),
-            leading: IconButton(
-              icon: Icon(Icons.arrow_back, color: theme.colorScheme.onSurface),
-              onPressed: () => Navigator.pop(context),
-            ),
-          ),
-          body: SingleChildScrollView(
-            child: Column(
-              children: [
-                // Account Section
-                _buildSectionHeader('Account'),
-                _buildSettingCard(
-                  icon: Icons.person,
-                  title: 'Profile Information',
-                  subtitle: 'View and edit your profile',
-                  onTap: () async {
-                    if (userProfile != null) {
-                      final result = await Navigator.push<UserProfile>(
-                        context,
-                        MaterialPageRoute(
-                          builder:
-                              (context) =>
-                                  ProfileEditScreen(profile: userProfile),
-                        ),
-                      );
-                      if (result != null && mounted) {
-                        setState(() {
-                          _initializeSettingsFromProfile(result);
-                        });
-                      }
-                    }
-                  },
-                ),
-                _buildSettingCard(
-                  icon: Icons.email,
-                  title: 'Email & Password',
-                  subtitle: 'Change your email or password',
-                  onTap: () => _navigateTo('email_password'),
-                ),
+        return userProfileAsync.when(
+          data: (userProfile) {
+            if (userProfile == null) {
+              return authStateAsync.when(
+                data: (authState) {
+                  final userId = authState.session?.user.id;
+                  if (userId != null) {
+                    return FutureBuilder<UserProfile?>(
+                      future: _loadProfileFromOfflineDB(userId),
+                      builder: (context, snapshot) {
+                        if (snapshot.hasData && snapshot.data != null) {
+                          final offlineProfile = snapshot.data!;
+                          if (_currentProfile == null) {
+                            _initializeSettingsFromProfile(offlineProfile);
+                            _notificationService.setPreferences(
+                              offlineProfile.notificationPreferences,
+                            );
+                          }
+                          return _buildMainSettings(
+                            context,
+                            theme,
+                            offlineProfile,
+                          );
+                        } else if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return _buildLoadingScaffold(context, theme);
+                        }
+                        return _buildErrorScaffold(
+                          context,
+                          theme,
+                          'Could not load offline profile',
+                        );
+                      },
+                    );
+                  }
+                  return _buildErrorScaffold(context, theme, 'No user session');
+                },
+                loading: () => _buildLoadingScaffold(context, theme),
+                error:
+                    (e, st) =>
+                        _buildErrorScaffold(context, theme, 'Auth error: $e'),
+              );
+            }
 
-                const SizedBox(height: 24),
+            if (_currentProfile == null) {
+              _initializeSettingsFromProfile(userProfile);
+              _notificationService.setPreferences(
+                userProfile.notificationPreferences,
+              );
+            }
 
-                // Notifications Section
-                _buildNotificationsSection(userProfile),
-
-                const SizedBox(height: 24),
-
-                // Display Section
-                _buildDisplaySection(userProfile),
-                const SizedBox(height: 24),
-
-                // Data & Sync Section
-                _buildSectionHeader('Data & Sync'),
-                _buildSwitchCard(
-                  icon: Icons.cloud_sync,
-                  title: 'Automatic Sync',
-                  subtitle: 'Automatically sync with cloud',
-                  value: true,
-                  onChanged: (_) {},
-                ),
-                _buildSwitchCard(
-                  icon: Icons.sim_card,
-                  title: 'Sync on Cellular',
-                  subtitle: 'Allow syncing over mobile data',
-                  value: _syncOnCellular,
-                  onChanged: (value) {
-                    setState(() => _syncOnCellular = value);
-                    _saveSettingsToProfile();
-                  },
-                ),
-                _buildSwitchCard(
-                  icon: Icons.offline_bolt,
-                  title: 'Offline Mode',
-                  subtitle: 'Continue using app offline',
-                  value: _offlineMode,
-                  onChanged: (value) {
-                    setState(() => _offlineMode = value);
-                    _saveSettingsToProfile();
-                  },
-                ),
-                _buildSettingCard(
-                  icon: Icons.storage,
-                  title: 'Storage & Cache',
-                  subtitle: 'Manage app storage (256 MB)',
-                  onTap: () => _showStorageOptions(),
-                ),
-                _buildSettingCard(
-                  icon: Icons.backup,
-                  title: 'Backup & Restore',
-                  subtitle: 'Backup your data to cloud',
-                  onTap: () => _navigateTo('backup'),
-                ),
-                const SizedBox(height: 24),
-
-                // Privacy & Security Section
-                _buildSectionHeader('Privacy & Security'),
-                _buildSettingCard(
-                  icon: Icons.lock,
-                  title: 'Biometric Lock',
-                  subtitle: 'Use fingerprint to unlock app',
-                  onTap: () => _navigateTo('biometric'),
-                ),
-                _buildSettingCard(
-                  icon: Icons.security,
-                  title: 'Privacy Policy',
-                  subtitle: 'Read our privacy policy',
-                  onTap: () => _launchUrl('https://example.com/privacy'),
-                ),
-                _buildSettingCard(
-                  icon: Icons.description,
-                  title: 'Terms of Service',
-                  subtitle: 'View terms and conditions',
-                  onTap: () => _launchUrl('https://example.com/terms'),
-                ),
-                _buildSettingCard(
-                  icon: Icons.visibility,
-                  title: 'Data Permissions',
-                  subtitle: 'Control what data we access',
-                  onTap: () => _navigateTo('permissions'),
-                ),
-                const SizedBox(height: 24),
-
-                // Pet Settings Section
-                _buildSectionHeader('Pet Settings'),
-                _buildSettingCard(
-                  icon: Icons.pets,
-                  title: 'Pet Profile Templates',
-                  subtitle: 'Quick setup for new pets',
-                  onTap: () => _navigateTo('pet_templates'),
-                ),
-                _buildSettingCard(
-                  icon: Icons.medical_services,
-                  title: 'Medical Record Settings',
-                  subtitle: 'Default units and categories',
-                  onTap: () => _navigateTo('medical_settings'),
-                ),
-                _buildSettingCard(
-                  icon: Icons.calendar_today,
-                  title: 'Reminder Defaults',
-                  subtitle: 'Set default reminder times',
-                  onTap: () => _navigateTo('reminder_defaults'),
-                ),
-                const SizedBox(height: 24),
-
-                // Support & About Section
-                _buildSectionHeader('Support & About'),
-                _buildSettingCard(
-                  icon: Icons.help,
-                  title: 'Help & Support',
-                  subtitle: 'Get help with the app',
-                  onTap: () => _navigateTo('help'),
-                ),
-                _buildSettingCard(
-                  icon: Icons.feedback,
-                  title: 'Send Feedback',
-                  subtitle: 'Tell us what you think',
-                  onTap: () => _showFeedbackDialog(),
-                ),
-                _buildSettingCard(
-                  icon: Icons.bug_report,
-                  title: 'Report a Bug',
-                  subtitle: 'Report technical issues',
-                  onTap: () => _showBugReportDialog(),
-                ),
-                _buildSettingCard(
-                  icon: Icons.info,
-                  title: 'About Pet Care',
-                  subtitle: 'Version 1.0.0 • Build 1001',
-                  onTap: () => _showAboutDialog(),
-                ),
-                const SizedBox(height: 24),
-
-                // Danger Zone Section
-                _buildSectionHeader('Danger Zone', isDanger: true),
-                _buildDangerCard(
-                  icon: Icons.download,
-                  title: 'Download My Data',
-                  subtitle: 'Export all your data',
-                  onTap: () => _showDownloadDataDialog(),
-                ),
-                _buildDangerCard(
-                  icon: Icons.delete_outline,
-                  title: 'Delete Account',
-                  subtitle: 'Permanently delete your account',
-                  onTap: () => _showDeleteAccountDialog(),
-                ),
-                _buildDangerCard(
-                  icon: Icons.logout,
-                  title: 'Logout',
-                  subtitle: 'Sign out of your account',
-                  onTap: () => _showLogoutDialog(),
-                ),
-                const SizedBox(height: 32),
-              ],
-            ),
-          ),
+            return _buildMainSettings(context, theme, userProfile);
+          },
+          loading: () => _buildLoadingScaffold(context, theme),
+          error:
+              (error, stack) =>
+                  _buildErrorScaffold(context, theme, 'Error: $error'),
         );
       },
-      loading:
-          () => Scaffold(
-            backgroundColor: theme.colorScheme.background,
-            appBar: AppBar(
-              backgroundColor: theme.colorScheme.surface,
-              elevation: 0,
-              title: Text('Settings', style: theme.appBarTheme.titleTextStyle),
-              leading: IconButton(
-                icon: Icon(
-                  Icons.arrow_back,
-                  color: theme.colorScheme.onSurface,
-                ),
-                onPressed: () => Navigator.pop(context),
-              ),
-            ),
-            body: Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation(theme.colorScheme.primary),
-              ),
-            ),
-          ),
+      loading: () => _buildLoadingScaffold(context, theme),
       error:
-          (error, stack) => Scaffold(
-            backgroundColor: theme.colorScheme.background,
-            appBar: AppBar(
-              backgroundColor: theme.colorScheme.surface,
-              elevation: 0,
-              title: Text('Settings', style: theme.appBarTheme.titleTextStyle),
-              leading: IconButton(
-                icon: Icon(
-                  Icons.arrow_back,
-                  color: theme.colorScheme.onSurface,
-                ),
-                onPressed: () => Navigator.pop(context),
-              ),
-            ),
-            body: Center(child: Text('Error loading settings: $error')),
-          ),
+          (e, st) => _buildErrorScaffold(context, theme, 'Connectivity error'),
     );
   }
 
-  // Helper methods (abbreviated for space)
+  Widget _buildMainSettings(
+    BuildContext context,
+    ThemeData theme,
+    UserProfile userProfile,
+  ) {
+    return Scaffold(
+      appBar: AppBar(
+        elevation: 0,
+        title: Text('Settings', style: theme.appBarTheme.titleTextStyle),
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: theme.colorScheme.onSurface),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            _buildSectionHeader('Account'),
+            _buildSettingCard(
+              icon: Icons.person,
+              title: 'Profile Information',
+              subtitle: 'View and edit your profile',
+              onTap: () async {
+                final result = await Navigator.push<UserProfile>(
+                  context,
+                  MaterialPageRoute(
+                    builder:
+                        (context) => ProfileEditScreen(profile: userProfile),
+                  ),
+                );
+                if (result != null && mounted) {
+                  setState(() {
+                    _initializeSettingsFromProfile(result);
+                  });
+                }
+              },
+            ),
+            _buildSettingCard(
+              icon: Icons.email,
+              title: 'Email & Password',
+              subtitle: 'Change your email or password',
+              onTap: () => _navigateTo('email_password'),
+            ),
+            const SizedBox(height: 24),
+            _buildNotificationsSection(userProfile),
+            _buildtestNotificationsSection(userProfile),
+
+            // Add this after the All Notifications switch in _buildNotificationsSection
+            _buildSwitchCard(
+              icon: Icons.volume_up,
+              title: 'Sound',
+              subtitle: 'Play sound for notifications',
+              value: _notificationSound, // Add this bool to your state
+              onChanged: (value) {
+                setState(() => _notificationSound = value);
+                _saveSettingsToProfile();
+              },
+              indent: true,
+            ),
+
+            _buildSwitchCard(
+              icon: Icons.vibration,
+              title: 'Vibration',
+              subtitle: 'Vibrate for notifications',
+              value: _notificationVibration, // Add this bool to your state
+              onChanged: (value) {
+                setState(() => _notificationVibration = value);
+                _saveSettingsToProfile();
+              },
+              indent: true,
+            ),
+
+            const SizedBox(height: 24),
+            _buildDisplaySection(userProfile),
+            const SizedBox(height: 24),
+            _buildSectionHeader('Data & Sync'),
+            _buildSwitchCard(
+              icon: Icons.cloud_sync,
+              title: 'Automatic Sync',
+              subtitle: 'Automatically sync with cloud',
+              value: true,
+              onChanged: (_) {},
+            ),
+            _buildSwitchCard(
+              icon: Icons.sim_card,
+              title: 'Sync on Cellular',
+              subtitle: 'Allow syncing over mobile data',
+              value: _syncOnCellular,
+              onChanged: (value) {
+                setState(() => _syncOnCellular = value);
+                _saveSettingsToProfile();
+              },
+            ),
+            _buildSwitchCard(
+              icon: Icons.offline_bolt,
+              title: 'Offline Mode',
+              subtitle: 'Continue using app offline',
+              value: _offlineMode,
+              onChanged: (value) {
+                setState(() => _offlineMode = value);
+                _saveSettingsToProfile();
+              },
+            ),
+            _buildSettingCard(
+              icon: Icons.storage,
+              title: 'Storage & Cache',
+              subtitle: 'Manage app storage (256 MB)',
+              onTap: () => _showStorageOptions(),
+            ),
+            _buildSettingCard(
+              icon: Icons.backup,
+              title: 'Backup & Restore',
+              subtitle: 'Backup your data to cloud',
+              onTap: () => _navigateTo('backup'),
+            ),
+            const SizedBox(height: 24),
+            _buildSectionHeader('Privacy & Security'),
+            _buildSettingCard(
+              icon: Icons.lock,
+              title: 'Biometric Lock',
+              subtitle: 'Use fingerprint to unlock app',
+              onTap: () => _navigateTo('biometric'),
+            ),
+            _buildSettingCard(
+              icon: Icons.security,
+              title: 'Privacy Policy',
+              subtitle: 'Read our privacy policy',
+              onTap: () => _launchUrl('https://example.com/privacy'),
+            ),
+            _buildSettingCard(
+              icon: Icons.description,
+              title: 'Terms of Service',
+              subtitle: 'View terms and conditions',
+              onTap: () => _launchUrl('https://example.com/terms'),
+            ),
+            _buildSettingCard(
+              icon: Icons.visibility,
+              title: 'Data Permissions',
+              subtitle: 'Control what data we access',
+              onTap: () => _navigateTo('permissions'),
+            ),
+            const SizedBox(height: 24),
+            _buildSectionHeader('Pet Settings'),
+            _buildSettingCard(
+              icon: Icons.pets,
+              title: 'Pet Profile Templates',
+              subtitle: 'Quick setup for new pets',
+              onTap: () => _navigateTo('pet_templates'),
+            ),
+            _buildSettingCard(
+              icon: Icons.medical_services,
+              title: 'Medical Record Settings',
+              subtitle: 'Default units and categories',
+              onTap: () => _navigateTo('medical_settings'),
+            ),
+            _buildSettingCard(
+              icon: Icons.calendar_today,
+              title: 'Reminder Defaults',
+              subtitle: 'Set default reminder times',
+              onTap: () => _navigateTo('reminder_defaults'),
+            ),
+            const SizedBox(height: 24),
+            _buildSectionHeader('Support & About'),
+            _buildSettingCard(
+              icon: Icons.help,
+              title: 'Help & Support',
+              subtitle: 'Get help with the app',
+              onTap: () => _navigateTo('help'),
+            ),
+            _buildSettingCard(
+              icon: Icons.feedback,
+              title: 'Send Feedback',
+              subtitle: 'Tell us what you think',
+              onTap: () => _showFeedbackDialog(),
+            ),
+            _buildSettingCard(
+              icon: Icons.bug_report,
+              title: 'Report a Bug',
+              subtitle: 'Report technical issues',
+              onTap: () => _showBugReportDialog(),
+            ),
+            _buildSettingCard(
+              icon: Icons.info,
+              title: 'About Pet Care',
+              subtitle: 'Version 1.0.0 • Build 1001',
+              onTap: () => _showAboutDialog(),
+            ),
+            const SizedBox(height: 24),
+            _buildSectionHeader('Danger Zone', isDanger: true),
+            _buildDangerCard(
+              icon: Icons.download,
+              title: 'Download My Data',
+              subtitle: 'Export all your data',
+              onTap: () => _showDownloadDataDialog(),
+            ),
+            _buildDangerCard(
+              icon: Icons.delete_outline,
+              title: 'Delete Account',
+              subtitle: 'Permanently delete your account',
+              onTap: () => _showDeleteAccountDialog(),
+            ),
+            _buildDangerCard(
+              icon: Icons.logout,
+              title: 'Logout',
+              subtitle: 'Sign out of your account',
+              onTap: () => _showLogoutDialog(),
+            ),
+            const SizedBox(height: 32),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoadingScaffold(BuildContext context, ThemeData theme) {
+    return Scaffold(
+      backgroundColor: theme.colorScheme.background,
+      appBar: AppBar(
+        backgroundColor: theme.colorScheme.surface,
+        elevation: 0,
+        title: Text('Settings', style: theme.appBarTheme.titleTextStyle),
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: theme.colorScheme.onSurface),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation(theme.colorScheme.primary),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorScaffold(
+    BuildContext context,
+    ThemeData theme,
+    String errorMessage,
+  ) {
+    return Scaffold(
+      backgroundColor: theme.colorScheme.background,
+      appBar: AppBar(
+        backgroundColor: theme.colorScheme.surface,
+        elevation: 0,
+        title: Text('Settings', style: theme.appBarTheme.titleTextStyle),
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: theme.colorScheme.onSurface),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, color: Colors.red, size: 48),
+            const SizedBox(height: 16),
+            Text(
+              errorMessage,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildSectionHeader(String title, {bool isDanger = false}) {
     final theme = Theme.of(context);
     return Padding(
@@ -513,7 +623,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   void _showThemeOptions() {
     final currentTheme = ref.watch(themeProvider);
-
     showDialog(
       context: context,
       builder:
@@ -849,10 +958,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  Widget _buildNotificationsSection(UserProfile? userProfile) {
-    if (userProfile == null) return const SizedBox.shrink();
-    final notifPrefs = userProfile.notificationPreferences;
-
+  Widget _buildNotificationsSection(UserProfile userProfile) {
     return Column(
       children: [
         const SizedBox(height: 24),
@@ -904,6 +1010,73 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final uri = Uri.parse(urlString);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  Widget _buildtestNotificationsSection(UserProfile userProfile) {
+    return Column(
+      children: [
+        const SizedBox(height: 24),
+        _buildSectionHeader('Notifications & Reminders'),
+        _buildSwitchCard(
+          icon: Icons.notifications,
+          title: 'All Notifications',
+          subtitle: 'Turn on/off all notifications',
+          value: _notificationsEnabled,
+          onChanged: (value) async {
+            setState(() => _notificationsEnabled = value);
+            await _saveSettingsToProfile();
+          },
+        ),
+        // ADD TEST NOTIFICATION BUTTON HERE
+        _buildSettingCard(
+          icon: Icons.send,
+          title: 'Send Test Notification',
+          subtitle: 'Test if notifications are working',
+          onTap: () => _sendTestNotification(),
+        ),
+      ],
+    );
+  }
+
+  // Add this method to your _SettingsScreenState class
+  Future<void> _sendTestNotification() async {
+    if (!_notificationsEnabled) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enable notifications first'),
+          backgroundColor: Colors.orange,
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    try {
+      await _notificationService.showImmediateNotification(
+        title: '🐾 Pet Care Test',
+        body: 'Notifications are working perfectly!',
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Test notification sent!'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error sending notification: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
     }
   }
 }

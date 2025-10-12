@@ -191,6 +191,7 @@ class UserProfile {
 // NOTIFICATION PREFERENCES MODEL
 // ============================================
 
+// Add this to your NotificationPreferences model in user_profile.dart
 class NotificationPreferences {
   final bool allNotificationsEnabled;
   final bool reminderNotifications;
@@ -199,6 +200,8 @@ class NotificationPreferences {
   final bool quietHoursEnabled;
   final String quietHoursStart;
   final String quietHoursEnd;
+  final bool soundEnabled; // NEW
+  final bool vibrationEnabled; // NEW
 
   NotificationPreferences({
     this.allNotificationsEnabled = true,
@@ -208,6 +211,8 @@ class NotificationPreferences {
     this.quietHoursEnabled = false,
     this.quietHoursStart = '21:00',
     this.quietHoursEnd = '08:00',
+    this.soundEnabled = true, // NEW
+    this.vibrationEnabled = true, // NEW
   });
 
   factory NotificationPreferences.fromJson(Map<String, dynamic> json) {
@@ -220,6 +225,8 @@ class NotificationPreferences {
       quietHoursEnabled: json['quiet_hours_enabled'] as bool? ?? false,
       quietHoursStart: json['quiet_hours_start'] as String? ?? '21:00',
       quietHoursEnd: json['quiet_hours_end'] as String? ?? '08:00',
+      soundEnabled: json['sound_enabled'] as bool? ?? true, // NEW
+      vibrationEnabled: json['vibration_enabled'] as bool? ?? true, // NEW
     );
   }
 
@@ -232,6 +239,8 @@ class NotificationPreferences {
       'quiet_hours_enabled': quietHoursEnabled,
       'quiet_hours_start': quietHoursStart,
       'quiet_hours_end': quietHoursEnd,
+      'sound_enabled': soundEnabled, // NEW
+      'vibration_enabled': vibrationEnabled, // NEW
     };
   }
 
@@ -243,6 +252,8 @@ class NotificationPreferences {
     bool? quietHoursEnabled,
     String? quietHoursStart,
     String? quietHoursEnd,
+    bool? soundEnabled, // NEW
+    bool? vibrationEnabled, // NEW
   }) {
     return NotificationPreferences(
       allNotificationsEnabled:
@@ -254,6 +265,8 @@ class NotificationPreferences {
       quietHoursEnabled: quietHoursEnabled ?? this.quietHoursEnabled,
       quietHoursStart: quietHoursStart ?? this.quietHoursStart,
       quietHoursEnd: quietHoursEnd ?? this.quietHoursEnd,
+      soundEnabled: soundEnabled ?? this.soundEnabled, // NEW
+      vibrationEnabled: vibrationEnabled ?? this.vibrationEnabled, // NEW
     );
   }
 }
