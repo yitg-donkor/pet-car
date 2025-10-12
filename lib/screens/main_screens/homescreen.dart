@@ -592,10 +592,13 @@ class _HomescreenState extends ConsumerState<Homescreen> {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(icon, color: Colors.white, size: 24),
+                  child: Icon(
+                    icon,
+                    color: theme.colorScheme.onSurface,
+                    size: 24,
+                  ),
                 ),
                 const SizedBox(width: 15),
                 Expanded(
@@ -695,16 +698,18 @@ class _HomescreenState extends ConsumerState<Homescreen> {
   IconData _getIconForReminder(String title) {
     final titleLower = title.toLowerCase();
     if (titleLower.contains('walk')) return Icons.pets;
-    if (titleLower.contains('feed') || titleLower.contains('food')) {
-      return Icons.restaurant;
+    if (titleLower.contains('feed') ||
+        titleLower.contains('food') ||
+        titleLower.contains('feeding')) {
+      return Icons.restaurant_outlined;
     }
     if (titleLower.contains('medication') || titleLower.contains('medicine')) {
       return Icons.medication;
     }
-    if (titleLower.contains('vet')) return Icons.local_hospital;
-    if (titleLower.contains('groom')) return Icons.content_cut;
+    if (titleLower.contains('vet')) return Icons.local_hospital_outlined;
+    if (titleLower.contains('groom')) return Icons.content_cut_outlined;
     if (titleLower.contains('clean')) return Icons.cleaning_services;
-    return Icons.notifications;
+    return Icons.notifications_outlined;
   }
 
   Widget _buildPetsSection(ThemeData theme, List<Pet> pets) {

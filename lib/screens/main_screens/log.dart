@@ -33,23 +33,23 @@ class _LogScreenState extends ConsumerState<LogScreen>
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
-        backgroundColor: Colors.white,
         elevation: 0,
-        title: const Text(
+        title: Text(
           'Activity Log',
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-          ),
+          // style: TextStyle(
+          //   color: Colors.black,
+          //   fontSize: 22,
+          //   fontWeight: FontWeight.bold,
+          // ),
+          style: theme.textTheme.headlineLarge,
         ),
         actions: [
           IconButton(
             onPressed: () => _showAddLogDialog(context),
-            icon: const Icon(Icons.add, color: Colors.black),
+            icon: Icon(Icons.add, color: theme.colorScheme.onSurface),
           ),
         ],
         bottom: TabBar(
@@ -151,6 +151,7 @@ class _LogScreenState extends ConsumerState<LogScreen>
   }
 
   Widget _buildAllTab() {
+    final theme = Theme.of(context);
     final allLogsAsync = ref.watch(activityLogsOfflineProvider);
 
     return allLogsAsync.when(
@@ -192,7 +193,7 @@ class _LogScreenState extends ConsumerState<LogScreen>
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 15),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: theme.colorScheme.surface,
                       borderRadius: BorderRadius.circular(25),
                       boxShadow: [
                         BoxShadow(
@@ -222,7 +223,7 @@ class _LogScreenState extends ConsumerState<LogScreen>
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: theme.colorScheme.surface,
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
@@ -290,20 +291,15 @@ class _LogScreenState extends ConsumerState<LogScreen>
   }
 
   Widget _buildDateHeader(String date) {
+    final theme = Theme.of(context);
     return Container(
       margin: const EdgeInsets.only(bottom: 15),
-      child: Text(
-        date,
-        style: const TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.bold,
-          color: Colors.black,
-        ),
-      ),
+      child: Text(date, style: theme.textTheme.titleLarge),
     );
   }
 
   Widget _buildLogEntryFromData(ActivityLog log) {
+    final theme = Theme.of(context);
     final activityType = ActivityType.fromString(log.activityType);
 
     // Get pet name from pet ID
@@ -321,7 +317,7 @@ class _LogScreenState extends ConsumerState<LogScreen>
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(15),
         border:
             log.isHealthRelated
@@ -355,14 +351,7 @@ class _LogScreenState extends ConsumerState<LogScreen>
               children: [
                 Row(
                   children: [
-                    Text(
-                      log.title,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black,
-                      ),
-                    ),
+                    Text(log.title, style: theme.textTheme.titleLarge),
                     const Spacer(),
                     Text(
                       _formatTime(log.timestamp),
@@ -384,14 +373,11 @@ class _LogScreenState extends ConsumerState<LogScreen>
                 const SizedBox(height: 3),
                 Text(
                   '$petName${log.duration != null ? ' • ${log.duration} min' : ''}${log.amount != null ? ' • ${log.amount}' : ''}',
-                  style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                  style: theme.textTheme.bodyMedium,
                 ),
                 if (log.details != null && log.details!.isNotEmpty) ...[
                   const SizedBox(height: 5),
-                  Text(
-                    log.details!,
-                    style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
-                  ),
+                  Text(log.details!, style: theme.textTheme.bodyMedium),
                 ],
               ],
             ),
@@ -650,6 +636,5 @@ class _LogScreenState extends ConsumerState<LogScreen>
         );
       },
     );
-    ;
   }
 }

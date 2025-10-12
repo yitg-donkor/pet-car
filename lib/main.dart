@@ -2,7 +2,6 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pet_care/firebase_options.dart';
-
 import 'package:pet_care/screens/main_screens/pet_info.dart';
 import 'package:pet_care/screens/main_screens/setting_screen.dart';
 import 'package:pet_care/screens/onboarding_screens/introduction.dart';
@@ -45,18 +44,24 @@ class MyApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Initialize theme from user profile
+    ref.watch(initializeThemeProvider);
+
+    // Watch current theme
     final themeMode = ref.watch(themeProvider);
+    final themeData = ref.watch(currentThemeProvider);
+
     return MaterialApp(
       // Theme Configuration
-      theme: AppTheme.lightTheme,
+      theme: themeData,
       darkTheme: AppTheme.darkTheme,
       themeMode: themeMode.themeMode,
 
       debugShowCheckedModeBanner: false,
       title: 'Pet Care App',
-      initialRoute: '/', // Start with AuthWrapper
+      initialRoute: '/',
       routes: {
-        '/': (context) => const AuthWrapper(), // Move AuthWrapper to routes
+        '/': (context) => const AuthWrapper(),
         '/login': (context) => const LoginScreen(),
         '/signup': (context) => const Signupscreen(),
         '/nada': (context) => Homescreen(),
@@ -70,11 +75,7 @@ class MyApp extends ConsumerWidget {
         '/add-pet': (context) => const AddPet(species: 'dog'),
         '/edit-pet': (context) => const Editpetscreen(),
         '/settings': (context) => const SettingsScreen(),
-
-        // Example route for AI chat screen
       },
-
-      // Remove the home parameter completely
     );
   }
 }
@@ -94,7 +95,6 @@ class AuthWrapper extends ConsumerWidget {
         if (hasSession) {
           return MainNavigation(initialIndex: 0);
         } else {
-          // Show onboarding if not seen, otherwise go to login
           return hasSeenOnboarding
               ? const LoginScreen()
               : const IntroductionScreen();

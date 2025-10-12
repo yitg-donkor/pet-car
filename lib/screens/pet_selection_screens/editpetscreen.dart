@@ -280,6 +280,7 @@ class _EditpetscreenState extends ConsumerState<Editpetscreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     if (_displayPet == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('Edit Pet')),
@@ -288,13 +289,7 @@ class _EditpetscreenState extends ConsumerState<Editpetscreen> {
     }
 
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: Text('Edit ${_displayPet!.name}'),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        foregroundColor: Colors.black,
-      ),
+      appBar: AppBar(title: Text('Edit ${_displayPet!.name}'), elevation: 0),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
@@ -309,7 +304,7 @@ class _EditpetscreenState extends ConsumerState<Editpetscreen> {
                     width: 80,
                     height: 80,
                     decoration: BoxDecoration(
-                      color: Theme.of(context).primaryColor.withOpacity(0.1),
+                      color: theme.colorScheme.surfaceVariant,
                       shape: BoxShape.circle,
                     ),
                     child: Center(
@@ -423,7 +418,7 @@ class _EditpetscreenState extends ConsumerState<Editpetscreen> {
                 Center(
                   child: Text(
                     'Tap to change photo',
-                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                    style: theme.textTheme.bodySmall,
                   ),
                 ),
 
@@ -480,20 +475,27 @@ class _EditpetscreenState extends ConsumerState<Editpetscreen> {
                           _birthDate != null
                               ? '${_birthDate!.day}/${_birthDate!.month}/${_birthDate!.year}'
                               : 'Select birth date',
-                          style: TextStyle(
+                          //   style: TextStyle(
+                          //     color:
+                          //         _birthDate != null
+                          //             ? Colors.black
+                          //             : Colors.grey[600],
+                          //   ),
+                          style: theme.textTheme.bodyMedium?.copyWith(
                             color:
                                 _birthDate != null
-                                    ? Colors.black
-                                    : Colors.grey[600],
+                                    ? theme.textTheme.bodyMedium?.color
+                                    : theme.hintColor,
                           ),
                         ),
                         if (_birthDate != null)
                           Text(
                             '${_calculateAge()} ${_calculateAge() == 1 ? "year" : "years"} old',
-                            style: TextStyle(
-                              color: Theme.of(context).primaryColor,
-                              fontWeight: FontWeight.w500,
-                            ),
+                            // style: TextStyle(
+                            //   color: Theme.of(context).primaryColor,
+                            //   fontWeight: FontWeight.w500,
+                            // ),
+                            style: theme.textTheme.bodySmall,
                           ),
                       ],
                     ),

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pet_care/theme/app_theme.dart';
+import 'package:pet_care/models/user_profile.dart';
+import 'package:pet_care/providers/auth_providers.dart';
 
 // ============================================
 // THEME MODE ENUM
@@ -45,11 +47,11 @@ extension AppThemeModeExtension on AppThemeMode {
 }
 
 // ============================================
-// THEME NOTIFIER
+// THEME NOTIFIER WITH PERSISTENCE
 // ============================================
 
 class ThemeNotifier extends StateNotifier<AppThemeMode> {
-  ThemeNotifier() : super(AppThemeMode.system);
+  ThemeNotifier(AppThemeMode initialTheme) : super(initialTheme);
 
   void setTheme(AppThemeMode themeMode) {
     state = themeMode;
@@ -62,11 +64,62 @@ class ThemeNotifier extends StateNotifier<AppThemeMode> {
 }
 
 // ============================================
-// THEME PROVIDER
+// LOAD SAVED THEME FROM USER PROFILE
+// ============================================
+
+Future<AppThemeMode> _loadSavedThemeFromProfile(
+  UserProfile? userProfile,
+) async {
+  if (userProfile != null) {
+    try {
+      final savedTheme = AppThemeModeExtension.fromString(
+        userProfile.appSettings.theme,
+      );
+      return savedTheme;
+    } catch (e) {
+      print('Error parsing theme: $e');
+    }
+  }
+  return AppThemeMode.system;
+}
+
+// ============================================
+// THEME PROVIDER (UPDATED)
 // ============================================
 
 final themeProvider = StateNotifierProvider<ThemeNotifier, AppThemeMode>((ref) {
-  return ThemeNotifier();
+  return ThemeNotifier(AppThemeMode.system);
+});
+
+// ============================================
+// INITIALIZE THEME FROM USER PROFILE
+// ============================================
+
+final initializeThemeProvider = FutureProvider<void>((ref) async {
+  try {
+    // Watch user profile provider
+    final userProfileAsync = ref.watch(userProfileProviderProvider);
+
+    // Wait for user profile data
+    final userProfile = await userProfileAsync.when(
+      data: (profile) async => profile,
+      loading: () async {
+        // Wait a bit for profile to load
+        await Future.delayed(const Duration(milliseconds: 500));
+        return null;
+      },
+      error: (e, st) async {
+        print('Error loading user profile: $e');
+        return null;
+      },
+    );
+
+    // Load saved theme
+    final savedTheme = await _loadSavedThemeFromProfile(userProfile);
+    ref.read(themeProvider.notifier).setTheme(savedTheme);
+  } catch (e) {
+    print('Error in initializeThemeProvider: $e');
+  }
 });
 
 // ============================================

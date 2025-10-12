@@ -76,27 +76,27 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
-        backgroundColor: Colors.white,
         elevation: 0,
-        title: const Text(
+        title: Text(
           'Reminders',
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-          ),
+          // style: TextStyle(
+          //   color: Colors.black,
+          //   fontSize: 22,
+          //   fontWeight: FontWeight.bold,
+          // ),
+          style: theme.appBarTheme.titleTextStyle,
         ),
         actions: [
           IconButton(
             onPressed: _manualSync,
-            icon: const Icon(Icons.sync, color: Colors.black),
+            icon: Icon(Icons.sync, color: theme.colorScheme.onSurface),
           ),
           IconButton(
             onPressed: () => _showAddReminderDialog(context),
-            icon: const Icon(Icons.add, color: Colors.black),
+            icon: Icon(Icons.add, color: theme.colorScheme.onSurface),
           ),
         ],
         bottom: TabBar(
@@ -338,15 +338,16 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
   }
 
   Widget _buildSectionHeader(String title) {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Text(
         title,
-        style: const TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.bold,
-          color: Colors.black,
-        ),
+        // style: const TextStyle(
+        //   fontSize: 18,
+        //   fontWeight: FontWeight.bold,
+        //   color: Colors.black,
+        style: theme.textTheme.titleLarge,
       ),
     );
   }
@@ -375,6 +376,7 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
   }) {
     final icon = _getIconForReminder(reminder.title);
     final color = _getColorForImportance(reminder.importanceLevel);
+    final theme = Theme.of(context);
 
     return Dismissible(
       key: key ?? Key(reminder.id!),
@@ -397,7 +399,7 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
         margin: const EdgeInsets.only(bottom: 15),
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(15),
           boxShadow: [
             BoxShadow(
@@ -429,10 +431,16 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
                       Expanded(
                         child: Text(
                           reminder.title,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.black,
+                          // style: TextStyle(
+                          //   fontSize: 16,
+                          //   fontWeight: FontWeight.w600,
+                          //   color: Colors.black,
+                          //   decoration:
+                          //       reminder.isCompleted
+                          //           ? TextDecoration.lineThrough
+                          //           : null,
+                          // ),
+                          style: theme.textTheme.titleMedium?.copyWith(
                             decoration:
                                 reminder.isCompleted
                                     ? TextDecoration.lineThrough
