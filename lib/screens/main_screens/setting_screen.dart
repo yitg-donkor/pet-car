@@ -36,7 +36,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   void initState() {
     super.initState();
-    _initialized = true;
   }
 
   void _initializeSettingsFromProfile(UserProfile? userProfile) {
@@ -52,7 +51,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _offlineMode = userProfile.appSettings.offlineMode;
       _selectedLanguage = userProfile.appSettings.language;
       _selectedTheme = userProfile.appSettings.theme;
+      _notificationSound = userProfile.notificationPreferences.soundEnabled;
+      _notificationVibration =
+          userProfile.notificationPreferences.vibrationEnabled;
       _initialized = true;
+
+      print(
+        '✅ Initialized settings from profile: sound=$_notificationSound, vibration=$_notificationVibration',
+      );
     } else if (userProfile != null && _initialized && _currentProfile == null) {
       _currentProfile = userProfile;
     }
@@ -78,7 +84,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _saveSettingsToProfile() async {
-    if (_currentProfile == null) return;
+    if (_currentProfile == null) {
+      print('❌ Cannot save: _currentProfile is null');
+      return;
+    }
+
+    print('💾 Saving settings:');
+    print('   Sound: $_notificationSound');
+    print('   Vibration: $_notificationVibration');
+    print('   All notifications: $_notificationsEnabled');
 
     try {
       final updatedProfile = _currentProfile!.copyWith(
@@ -88,6 +102,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               reminderNotifications: _reminderNotifications,
               healthAlerts: _healthAlerts,
               marketingEmails: _marketingEmails,
+              soundEnabled: _notificationSound,
+              vibrationEnabled: _notificationVibration,
             ),
         appSettings: _currentProfile!.appSettings.copyWith(
           syncOnCellular: _syncOnCellular,
@@ -97,9 +113,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ),
       );
 
+      print('📦 Updated profile notification preferences:');
+      print('   Sound: ${updatedProfile.notificationPreferences.soundEnabled}');
+      print(
+        '   Vibration: ${updatedProfile.notificationPreferences.vibrationEnabled}',
+      );
+
       // Always save to offline DB first
       final profileLocalDB = ref.read(profileLocalDBProvider);
       await profileLocalDB.upsertProfile(updatedProfile);
+      print('✅ Saved to local DB');
 
       // Only try remote sync if online
       if (!_isOffline) {
@@ -113,12 +136,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           await ref
               .read(userProfileProviderProvider.notifier)
               .updateAppSettings(updatedProfile.appSettings);
+          print('✅ Synced to remote');
         } catch (e) {
-          print('Remote sync failed: $e');
+          print('⚠️ Remote sync failed: $e');
           // Continue anyway - data is saved locally
         }
       }
 
+      // THIS IS THE KEY PART - Update notification service with new preferences
       _notificationService.setPreferences(
         updatedProfile.notificationPreferences,
       );
@@ -143,6 +168,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ).showSnackBar(SnackBar(content: Text(message)));
       }
     } catch (e) {
+      print('❌ Error saving settings: $e');
       if (mounted) {
         ScaffoldMessenger.of(
           context,
@@ -272,33 +298,31 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
             const SizedBox(height: 24),
             _buildNotificationsSection(userProfile),
-            _buildtestNotificationsSection(userProfile),
 
             // Add this after the All Notifications switch in _buildNotificationsSection
-            _buildSwitchCard(
-              icon: Icons.volume_up,
-              title: 'Sound',
-              subtitle: 'Play sound for notifications',
-              value: _notificationSound, // Add this bool to your state
-              onChanged: (value) {
-                setState(() => _notificationSound = value);
-                _saveSettingsToProfile();
-              },
-              indent: true,
-            ),
+            // _buildSwitchCard(
+            //   icon: Icons.volume_up,
+            //   title: 'Sound',
+            //   subtitle: 'Play sound for notifications',
+            //   value: _notificationSound, // Add this bool to your state
+            //   onChanged: (value) {
+            //     setState(() => _notificationSound = value);
+            //     _saveSettingsToProfile();
+            //   },
+            //   indent: true,
+            // ),
 
-            _buildSwitchCard(
-              icon: Icons.vibration,
-              title: 'Vibration',
-              subtitle: 'Vibrate for notifications',
-              value: _notificationVibration, // Add this bool to your state
-              onChanged: (value) {
-                setState(() => _notificationVibration = value);
-                _saveSettingsToProfile();
-              },
-              indent: true,
-            ),
-
+            // _buildSwitchCard(
+            //   icon: Icons.vibration,
+            //   title: 'Vibration',
+            //   subtitle: 'Vibrate for notifications',
+            //   value: _notificationVibration, // Add this bool to your state
+            //   onChanged: (value) {
+            //     setState(() => _notificationVibration = value);
+            //     _saveSettingsToProfile();
+            //   },
+            //   indent: true,
+            // ),
             const SizedBox(height: 24),
             _buildDisplaySection(userProfile),
             const SizedBox(height: 24),
@@ -973,6 +997,34 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             await _saveSettingsToProfile();
           },
         ),
+        _buildSwitchCard(
+          icon: Icons.volume_up,
+          title: 'Sound',
+          subtitle: 'Play sound for notifications',
+          value: _notificationSound,
+          onChanged: (value) {
+            setState(() => _notificationSound = value);
+            _saveSettingsToProfile();
+          },
+          indent: true,
+        ),
+        _buildSwitchCard(
+          icon: Icons.vibration,
+          title: 'Vibration',
+          subtitle: 'Vibrate for notifications',
+          value: _notificationVibration,
+          onChanged: (value) {
+            setState(() => _notificationVibration = value);
+            _saveSettingsToProfile();
+          },
+          indent: true,
+        ),
+        _buildSettingCard(
+          icon: Icons.send,
+          title: 'Send Test Notification',
+          subtitle: 'Test if notifications are working',
+          onTap: () => _sendTestNotification(),
+        ),
       ],
     );
   }
@@ -1052,26 +1104,47 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       return;
     }
 
+    print('=== TEST NOTIFICATION DEBUG ===');
+    print('UI State:');
+    print('  _notificationSound: $_notificationSound');
+    print('  _notificationVibration: $_notificationVibration');
+    print('  _notificationsEnabled: $_notificationsEnabled');
+    print('Current Profile Preferences:');
+    if (_currentProfile != null) {
+      print(
+        '  soundEnabled: ${_currentProfile!.notificationPreferences.soundEnabled}',
+      );
+      print(
+        '  vibrationEnabled: ${_currentProfile!.notificationPreferences.vibrationEnabled}',
+      );
+    } else {
+      print('  _currentProfile is NULL!');
+    }
+    print('================================');
+
     try {
       await _notificationService.showImmediateNotification(
         title: '🐾 Pet Care Test',
-        body: 'Notifications are working perfectly!',
+        body: 'Sound: $_notificationSound, Vibration: $_notificationVibration',
       );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Test notification sent!'),
+            content: Text(
+              'Test notification sent! Check your notification bar.',
+            ),
             backgroundColor: Colors.green,
             duration: Duration(seconds: 2),
           ),
         );
       }
     } catch (e) {
+      print('❌ Error sending test notification: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error sending notification: $e'),
+            content: Text('Error: $e'),
             backgroundColor: Colors.red,
             duration: const Duration(seconds: 3),
           ),

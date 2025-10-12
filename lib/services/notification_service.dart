@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -17,6 +18,19 @@ class NotificationService {
 
   bool _initialized = false;
   NotificationPreferences? _preferences;
+
+  // Channel IDs - use dynamic IDs based on settings
+  String get _reminderChannelId {
+    final sound = _preferences?.soundEnabled ?? true;
+    final vibration = _preferences?.vibrationEnabled ?? true;
+    return 'pet_reminders_s${sound ? 1 : 0}_v${vibration ? 1 : 0}';
+  }
+
+  String get _testChannelId {
+    final sound = _preferences?.soundEnabled ?? true;
+    final vibration = _preferences?.vibrationEnabled ?? true;
+    return 'test_channel_s${sound ? 1 : 0}_v${vibration ? 1 : 0}';
+  }
 
   Future<void> initialize() async {
     if (_initialized) return;
@@ -45,12 +59,119 @@ class NotificationService {
     );
 
     _initialized = true;
+
+    // Create initial channels
+    await _createOrUpdateChannels();
+
     print('✅ Notification service initialized');
   }
 
+  Future<void> _createOrUpdateChannels() async {
+    final androidPlugin =
+        _notifications
+            .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin
+            >();
+
+    if (androidPlugin == null) return;
+
+    final sound = _preferences?.soundEnabled ?? true;
+    final vibration = _preferences?.vibrationEnabled ?? true;
+    final quietHours = isQuietHours;
+
+    // Delete old channels with fixed IDs (cleanup)
+    await androidPlugin.deleteNotificationChannel('pet_reminders');
+    await androidPlugin.deleteNotificationChannel('test_channel');
+    await androidPlugin.deleteNotificationChannel('pet_reminders_early');
+    await androidPlugin.deleteNotificationChannel('daily_summary');
+
+    // Create reminder channel with current settings
+    final reminderChannel = AndroidNotificationChannel(
+      _reminderChannelId,
+      'Pet Care Reminders',
+      description: 'Notifications for pet care tasks and reminders',
+      importance: Importance.high,
+      playSound: sound && !quietHours,
+      enableVibration: vibration && !quietHours,
+      sound:
+          sound && !quietHours
+              ? const RawResourceAndroidNotificationSound('notification')
+              : null,
+      vibrationPattern:
+          (vibration && !quietHours)
+              ? Int64List.fromList([0, 1000, 500, 1000])
+              : null,
+    );
+
+    // Create test channel with current settings
+    final testChannel = AndroidNotificationChannel(
+      _testChannelId,
+      'Test Notifications',
+      description: 'Test notifications',
+      importance: Importance.high,
+      playSound: sound && !quietHours,
+      enableVibration: vibration && !quietHours,
+      sound:
+          sound && !quietHours
+              ? const RawResourceAndroidNotificationSound('notification')
+              : null,
+      vibrationPattern:
+          (vibration && !quietHours)
+              ? Int64List.fromList([0, 1000, 500, 1000])
+              : null,
+    );
+
+    // Create early reminder channel
+    final earlyChannel = AndroidNotificationChannel(
+      'early_${_reminderChannelId}',
+      'Early Reminders',
+      description: 'Early notifications 15 minutes before tasks',
+      importance: Importance.defaultImportance,
+      playSound: sound && !quietHours,
+      enableVibration: vibration && !quietHours,
+      vibrationPattern:
+          (vibration && !quietHours)
+              ? Int64List.fromList([0, 500, 250, 500])
+              : null,
+    );
+
+    // Create daily summary channel
+    final summaryChannel = AndroidNotificationChannel(
+      'summary_${_reminderChannelId}',
+      'Daily Summary',
+      description: 'Daily summary of pet care tasks',
+      importance: Importance.high,
+      playSound: sound && !quietHours,
+      enableVibration: vibration && !quietHours,
+      vibrationPattern:
+          (vibration && !quietHours)
+              ? Int64List.fromList([0, 1000, 500, 1000])
+              : null,
+    );
+
+    await androidPlugin.createNotificationChannel(reminderChannel);
+    await androidPlugin.createNotificationChannel(testChannel);
+    await androidPlugin.createNotificationChannel(earlyChannel);
+    await androidPlugin.createNotificationChannel(summaryChannel);
+
+    print(
+      '📢 Created/Updated notification channels with sound=$sound, vibration=$vibration',
+    );
+  }
+
   void setPreferences(NotificationPreferences preferences) {
+    final oldPrefs = _preferences;
     _preferences = preferences;
-    print('📝 Notification preferences updated');
+
+    // Recreate channels if sound/vibration settings changed
+    if (oldPrefs?.soundEnabled != preferences.soundEnabled ||
+        oldPrefs?.vibrationEnabled != preferences.vibrationEnabled) {
+      _createOrUpdateChannels();
+    }
+
+    print(
+      '📝 Notification preferences updated: Sound=${preferences.soundEnabled}, Vibration=${preferences.vibrationEnabled}',
+    );
   }
 
   void _onNotificationTapped(NotificationResponse response) {
@@ -94,8 +215,8 @@ class NotificationService {
     }
 
     if (_preferences!.quietHoursEnabled && isQuietHours) {
-      print('🌙 Quiet hours active');
-      return true;
+      print('🌙 Quiet hours active - skipping notification');
+      return false;
     }
 
     switch (type) {
@@ -109,11 +230,23 @@ class NotificationService {
   }
 
   bool get _shouldPlaySound {
-    return (_preferences?.soundEnabled ?? true) && !isQuietHours;
+    if (_preferences == null) return true;
+    if (isQuietHours) return false;
+    final result = _preferences!.soundEnabled;
+    print(
+      '🔊 Should play sound: $result (soundEnabled=${_preferences!.soundEnabled}, quietHours=$isQuietHours)',
+    );
+    return result;
   }
 
   bool get _shouldVibrate {
-    return (_preferences?.vibrationEnabled ?? true) && !isQuietHours;
+    if (_preferences == null) return true;
+    if (isQuietHours) return false;
+    final result = _preferences!.vibrationEnabled;
+    print(
+      '📳 Should vibrate: $result (vibrationEnabled=${_preferences!.vibrationEnabled}, quietHours=$isQuietHours)',
+    );
+    return result;
   }
 
   Future<void> scheduleReminderNotification(Reminder reminder) async {
@@ -140,28 +273,43 @@ class NotificationService {
       return;
     }
 
+    final shouldPlaySound = _shouldPlaySound;
+    final shouldVibrate = _shouldVibrate;
+
+    print(
+      'Creating notification with: sound=$shouldPlaySound, vibration=$shouldVibrate, channel=$_reminderChannelId',
+    );
+
     final notificationDetails = NotificationDetails(
       android: AndroidNotificationDetails(
-        'pet_reminders',
+        _reminderChannelId, // Use dynamic channel ID
         'Pet Care Reminders',
         channelDescription: 'Notifications for pet care tasks and reminders',
         importance: Importance.high,
         priority: Priority.high,
         icon: '@mipmap/ic_launcher',
         color: const Color(0xFF4CAF50),
-        playSound: _shouldPlaySound,
-        enableVibration: _shouldVibrate,
-        sound: const RawResourceAndroidNotificationSound('dog_bark'),
+        playSound: shouldPlaySound,
+        enableVibration: shouldVibrate,
+        sound:
+            shouldPlaySound
+                ? const RawResourceAndroidNotificationSound('notification')
+                : null,
+        vibrationPattern:
+            shouldVibrate ? Int64List.fromList([0, 1000, 500, 1000]) : null,
         styleInformation: BigTextStyleInformation(
           reminder.description ?? 'Time to take care of your pet!',
           contentTitle: reminder.title,
         ),
+        enableLights: true,
+        ledColor: const Color(0xFF4CAF50),
+        ledOnMs: 1000,
+        ledOffMs: 500,
       ),
       iOS: DarwinNotificationDetails(
         presentAlert: true,
         presentBadge: true,
-        presentSound: _shouldPlaySound,
-        sound: 'dog_bark.wav',
+        presentSound: shouldPlaySound,
         subtitle: reminder.description,
       ),
     );
@@ -183,7 +331,7 @@ class NotificationService {
     }
 
     print(
-      '✅ Scheduled ${reminder.reminderType} notification: ${reminder.title}',
+      '✅ Scheduled ${reminder.reminderType} notification: ${reminder.title} (sound=$shouldPlaySound, vibration=$shouldVibrate)',
     );
   }
 
@@ -200,6 +348,7 @@ class NotificationService {
       scheduledDate,
       details,
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+
       payload: 'reminder:${reminder.id}',
     );
   }
@@ -231,6 +380,7 @@ class NotificationService {
       scheduledDate,
       details,
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+
       matchDateTimeComponents: DateTimeComponents.time,
       payload: 'reminder:${reminder.id}',
     );
@@ -275,6 +425,7 @@ class NotificationService {
       scheduledDate,
       details,
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+
       matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
       payload: 'reminder:${reminder.id}',
     );
@@ -315,6 +466,7 @@ class NotificationService {
       scheduledDate,
       details,
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+
       matchDateTimeComponents: DateTimeComponents.dayOfMonthAndTime,
       payload: 'reminder:${reminder.id}',
     );
@@ -330,24 +482,31 @@ class NotificationService {
 
     if (scheduledDate.isBefore(now)) return;
 
+    final shouldPlaySound = _shouldPlaySound;
+    final shouldVibrate = _shouldVibrate;
+
     final notificationDetails = NotificationDetails(
       android: AndroidNotificationDetails(
-        'pet_reminders_early',
+        'early_${_reminderChannelId}', // Use dynamic channel ID
         'Early Reminders',
         channelDescription: 'Early notifications 15 minutes before tasks',
         importance: Importance.defaultImportance,
         priority: Priority.defaultPriority,
         icon: '@mipmap/ic_launcher',
         color: const Color(0xFF4CAF50),
-        playSound: _shouldPlaySound,
-        enableVibration: _shouldVibrate,
-        sound: const RawResourceAndroidNotificationSound('notification_sound'),
+        playSound: shouldPlaySound,
+        enableVibration: shouldVibrate,
+        sound:
+            shouldPlaySound
+                ? const RawResourceAndroidNotificationSound('notification')
+                : null,
+        vibrationPattern:
+            shouldVibrate ? Int64List.fromList([0, 500, 250, 500]) : null,
       ),
       iOS: DarwinNotificationDetails(
         presentAlert: true,
         presentBadge: true,
-        presentSound: _shouldPlaySound,
-        sound: 'notification_sound.wav',
+        presentSound: shouldPlaySound,
       ),
     );
 
@@ -358,6 +517,7 @@ class NotificationService {
       tz.TZDateTime.from(scheduledDate, tz.local),
       notificationDetails,
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+
       payload: 'reminder:${reminder.id}',
     );
 
@@ -387,18 +547,26 @@ class NotificationService {
       scheduledDate = scheduledDate.add(const Duration(days: 1));
     }
 
+    final shouldPlaySound = _shouldPlaySound;
+    final shouldVibrate = _shouldVibrate;
+
     final notificationDetails = NotificationDetails(
       android: AndroidNotificationDetails(
-        'daily_summary',
+        'summary_${_reminderChannelId}', // Use dynamic channel ID
         'Daily Summary',
         channelDescription: 'Daily summary of pet care tasks',
         importance: Importance.high,
         priority: Priority.high,
         icon: '@mipmap/ic_launcher',
         color: const Color(0xFF4CAF50),
-        playSound: _shouldPlaySound,
-        enableVibration: _shouldVibrate,
-        sound: const RawResourceAndroidNotificationSound('notification_sound'),
+        playSound: shouldPlaySound,
+        enableVibration: shouldVibrate,
+        sound:
+            shouldPlaySound
+                ? const RawResourceAndroidNotificationSound('notification')
+                : null,
+        vibrationPattern:
+            shouldVibrate ? Int64List.fromList([0, 1000, 500, 1000]) : null,
         styleInformation: BigTextStyleInformation(
           'Tap to see your pet care tasks for today',
           contentTitle: 'Daily Pet Care Summary',
@@ -407,8 +575,7 @@ class NotificationService {
       iOS: DarwinNotificationDetails(
         presentAlert: true,
         presentBadge: true,
-        presentSound: _shouldPlaySound,
-        sound: 'notification_sound.wav',
+        presentSound: shouldPlaySound,
       ),
     );
 
@@ -419,6 +586,7 @@ class NotificationService {
       scheduledDate,
       notificationDetails,
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+
       matchDateTimeComponents: DateTimeComponents.time,
       payload: 'summary',
     );
@@ -448,24 +616,42 @@ class NotificationService {
   }) async {
     if (!_initialized) await initialize();
 
-    const notificationDetails = NotificationDetails(
+    // Ensure channels are up-to-date
+    await _createOrUpdateChannels();
+
+    final shouldPlaySound = _shouldPlaySound;
+    final shouldVibrate = _shouldVibrate;
+
+    print(
+      'Test notification: sound=$shouldPlaySound, vibration=$shouldVibrate, channel=$_testChannelId',
+    );
+
+    final notificationDetails = NotificationDetails(
       android: AndroidNotificationDetails(
-        'test_channel',
+        _testChannelId, // Use dynamic channel ID
         'Test Notifications',
         channelDescription: 'Test notifications',
         importance: Importance.high,
         priority: Priority.high,
         icon: '@mipmap/ic_launcher',
-        color: Color(0xFF4CAF50),
-        playSound: true,
-        enableVibration: true,
-        sound: RawResourceAndroidNotificationSound('dog_bark'),
+        color: const Color(0xFF4CAF50),
+        playSound: shouldPlaySound,
+        enableVibration: shouldVibrate,
+        sound:
+            shouldPlaySound
+                ? const RawResourceAndroidNotificationSound('notification')
+                : null,
+        vibrationPattern:
+            shouldVibrate ? Int64List.fromList([0, 1000, 500, 1000]) : null,
+        enableLights: true,
+        ledColor: const Color(0xFF4CAF50),
+        ledOnMs: 1000,
+        ledOffMs: 500,
       ),
       iOS: DarwinNotificationDetails(
         presentAlert: true,
         presentBadge: true,
-        presentSound: true,
-        sound: 'dog_bark.wav',
+        presentSound: shouldPlaySound,
       ),
     );
 
@@ -481,6 +667,9 @@ class NotificationService {
   Future<void> rescheduleAllReminders(List<Reminder> reminders) async {
     print('Rescheduling ${reminders.length} reminders...');
 
+    // Recreate channels with current preferences
+    await _createOrUpdateChannels();
+
     await cancelAllNotifications();
 
     for (var reminder in reminders) {
@@ -489,6 +678,6 @@ class NotificationService {
       }
     }
 
-    print('Rescheduled all reminders');
+    print('✅ Rescheduled all reminders with current preferences');
   }
 }
