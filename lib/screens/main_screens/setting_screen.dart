@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pet_care/providers/auth_providers.dart';
@@ -30,6 +32,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _isOffline = false;
   bool _notificationSound = true;
   bool _notificationVibration = true;
+  Timer? _saveDebounceTimer;
 
   final _notificationService = NotificationService();
 
@@ -83,18 +86,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
+  void _debouncedSave() {
+    _saveDebounceTimer?.cancel();
+    _saveDebounceTimer = Timer(const Duration(milliseconds: 500), () {
+      if (mounted) _saveSettingsToProfile();
+    });
+  }
+
+  @override
+  void dispose() {
+    _saveDebounceTimer?.cancel();
+    super.dispose();
+  }
+
   Future<void> _saveSettingsToProfile() async {
     if (_currentProfile == null) {
-      print('❌ Cannot save: _currentProfile is null');
+      debugPrint('❌ Cannot save: _currentProfile is null');
       return;
     }
 
-    print('💾 Saving settings:');
-    print('   Sound: $_notificationSound');
-    print('   Vibration: $_notificationVibration');
-    print('   All notifications: $_notificationsEnabled');
+    debugPrint('💾 Saving settings:');
+    debugPrint('   Sound: $_notificationSound');
+    debugPrint('   Vibration: $_notificationVibration');
+    debugPrint('   All notifications: $_notificationsEnabled');
 
     try {
+      // Create updated profile
       final updatedProfile = _currentProfile!.copyWith(
         notificationPreferences: _currentProfile!.notificationPreferences
             .copyWith(
@@ -113,62 +130,83 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ),
       );
 
-      print('📦 Updated profile notification preferences:');
-      print('   Sound: ${updatedProfile.notificationPreferences.soundEnabled}');
-      print(
+      debugPrint('📦 Updated profile notification preferences:');
+      debugPrint(
+        '   Sound: ${updatedProfile.notificationPreferences.soundEnabled}',
+      );
+      debugPrint(
         '   Vibration: ${updatedProfile.notificationPreferences.vibrationEnabled}',
       );
 
-      // Always save to offline DB first
-      final profileLocalDB = ref.read(profileLocalDBProvider);
-      await profileLocalDB.upsertProfile(updatedProfile);
-      print('✅ Saved to local DB');
-
-      // Only try remote sync if online
-      if (!_isOffline) {
-        try {
-          await ref
-              .read(userProfileProviderProvider.notifier)
-              .updateNotificationPreferences(
-                updatedProfile.notificationPreferences,
-              );
-
-          await ref
-              .read(userProfileProviderProvider.notifier)
-              .updateAppSettings(updatedProfile.appSettings);
-          print('✅ Synced to remote');
-        } catch (e) {
-          print('⚠️ Remote sync failed: $e');
-          // Continue anyway - data is saved locally
-        }
-      }
-
-      // THIS IS THE KEY PART - Update notification service with new preferences
+      // Update notification service immediately (synchronous)
       _notificationService.setPreferences(
         updatedProfile.notificationPreferences,
       );
 
-      if (_notificationsEnabled) {
-        final reminderDB = ref.read(reminderDatabaseProvider);
-        final reminders = await reminderDB.getAllReminders();
-        await _notificationService.rescheduleAllReminders(
-          reminders.where((r) => !r.isCompleted).toList(),
+      // Save to local DB in the background
+      unawaited(
+        Future(() async {
+          try {
+            final profileLocalDB = ref.read(profileLocalDBProvider);
+            await profileLocalDB.upsertProfile(updatedProfile);
+            debugPrint('✅ Saved to local DB');
+          } catch (e) {
+            debugPrint('❌ Error saving to local DB: $e');
+          }
+        }),
+      );
+
+      // Handle remote sync in the background if online
+      if (!_isOffline) {
+        unawaited(
+          Future(() async {
+            try {
+              await ref
+                  .read(userProfileProviderProvider.notifier)
+                  .updateNotificationPreferences(
+                    updatedProfile.notificationPreferences,
+                  );
+              await ref
+                  .read(userProfileProviderProvider.notifier)
+                  .updateAppSettings(updatedProfile.appSettings);
+              debugPrint('✅ Synced to remote');
+            } catch (e) {
+              debugPrint('⚠️ Remote sync failed: $e');
+            }
+          }),
         );
-      } else {
-        await _notificationService.cancelAllNotifications();
       }
 
+      // Update reminders in the background if needed
+      if (_notificationsEnabled) {
+        unawaited(
+          Future(() async {
+            try {
+              final reminderDB = ref.read(reminderDatabaseProvider);
+              final reminders = await reminderDB.getAllReminders();
+              await _notificationService.rescheduleAllReminders(
+                reminders.where((r) => !r.isCompleted).toList(),
+              );
+            } catch (e) {
+              debugPrint('⚠️ Error rescheduling reminders: $e');
+            }
+          }),
+        );
+      }
+
+      // Show feedback to user
       if (mounted) {
         final message =
             _isOffline
                 ? 'Settings saved offline. Will sync when online.'
-                : 'Settings saved successfully!';
+                : 'Settings updated!';
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(message)));
       }
-    } catch (e) {
-      print('❌ Error saving settings: $e');
+    } catch (e, stackTrace) {
+      debugPrint('❌ Error saving settings: $e');
+      debugPrint('Stack trace: $stackTrace');
       if (mounted) {
         ScaffoldMessenger.of(
           context,
@@ -341,7 +379,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               value: _syncOnCellular,
               onChanged: (value) {
                 setState(() => _syncOnCellular = value);
-                _saveSettingsToProfile();
+                _debouncedSave();
               },
             ),
             _buildSwitchCard(
@@ -351,7 +389,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               value: _offlineMode,
               onChanged: (value) {
                 setState(() => _offlineMode = value);
-                _saveSettingsToProfile();
+                _debouncedSave();
               },
             ),
             _buildSettingCard(
@@ -664,6 +702,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                // ✅ LIGHT THEME - Already correct
                 RadioListTile<AppThemeMode>(
                   title: const Row(
                     children: [
@@ -675,15 +714,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   value: AppThemeMode.light,
                   groupValue: currentTheme,
                   activeColor: const Color(0xFF4CAF50),
-                  onChanged: (value) async {
+                  onChanged: (value) {
                     if (value != null) {
-                      setState(() => _selectedTheme = 'Light');
-                      await _saveSettingsToProfile();
                       ref.read(themeProvider.notifier).setTheme(value);
+                      setState(() => _selectedTheme = 'Light');
+                      _debouncedSave();
                       Navigator.pop(context);
                     }
                   },
                 ),
+
+                // ✅ DARK THEME - REMOVE 'async'
                 RadioListTile<AppThemeMode>(
                   title: const Row(
                     children: [
@@ -695,15 +736,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   value: AppThemeMode.dark,
                   groupValue: currentTheme,
                   activeColor: const Color(0xFF4CAF50),
-                  onChanged: (value) async {
+                  onChanged: (value) {
+                    // ✅ NO 'async' HERE
                     if (value != null) {
-                      setState(() => _selectedTheme = 'Dark');
-                      await _saveSettingsToProfile();
                       ref.read(themeProvider.notifier).setTheme(value);
+                      setState(() => _selectedTheme = 'Dark');
+                      _debouncedSave(); // ✅ NO 'await' HERE
                       Navigator.pop(context);
                     }
                   },
                 ),
+
+                // ✅ SYSTEM THEME - REMOVE 'async'
                 RadioListTile<AppThemeMode>(
                   title: const Row(
                     children: [
@@ -719,11 +763,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   value: AppThemeMode.system,
                   groupValue: currentTheme,
                   activeColor: const Color(0xFF4CAF50),
-                  onChanged: (value) async {
+                  onChanged: (value) {
+                    // ✅ NO 'async' HERE
                     if (value != null) {
-                      setState(() => _selectedTheme = 'System');
-                      await _saveSettingsToProfile();
                       ref.read(themeProvider.notifier).setTheme(value);
+                      setState(() => _selectedTheme = 'System');
+                      _debouncedSave(); // ✅ NO 'await' HERE
                       Navigator.pop(context);
                     }
                   },
@@ -752,7 +797,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   groupValue: _selectedLanguage,
                   onChanged: (value) {
                     setState(() => _selectedLanguage = value!);
-                    _saveSettingsToProfile();
+                    _debouncedSave();
                     Navigator.pop(context);
                   },
                 ),
@@ -762,7 +807,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   groupValue: _selectedLanguage,
                   onChanged: (value) {
                     setState(() => _selectedLanguage = value!);
-                    _saveSettingsToProfile();
+                    _debouncedSave();
                     Navigator.pop(context);
                   },
                 ),
@@ -992,9 +1037,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           title: 'All Notifications',
           subtitle: 'Turn on/off all notifications',
           value: _notificationsEnabled,
-          onChanged: (value) async {
+          onChanged: (value) {
             setState(() => _notificationsEnabled = value);
-            await _saveSettingsToProfile();
+            _debouncedSave();
           },
         ),
         _buildSwitchCard(
@@ -1003,8 +1048,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           subtitle: 'Play sound for notifications',
           value: _notificationSound,
           onChanged: (value) {
+            // ✅ Simple and clean
             setState(() => _notificationSound = value);
-            _saveSettingsToProfile();
+            _debouncedSave();
           },
           indent: true,
         ),
@@ -1015,7 +1061,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           value: _notificationVibration,
           onChanged: (value) {
             setState(() => _notificationVibration = value);
-            _saveSettingsToProfile();
+            _debouncedSave();
           },
           indent: true,
         ),
@@ -1075,9 +1121,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           title: 'All Notifications',
           subtitle: 'Turn on/off all notifications',
           value: _notificationsEnabled,
-          onChanged: (value) async {
+          onChanged: (value) {
             setState(() => _notificationsEnabled = value);
-            await _saveSettingsToProfile();
+            _debouncedSave();
           },
         ),
         // ADD TEST NOTIFICATION BUTTON HERE

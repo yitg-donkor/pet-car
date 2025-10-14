@@ -3,8 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pet_care/models/pet.dart';
 
-import 'package:pet_care/providers/pet_providers.dart';
 import 'package:pet_care/providers/auth_providers.dart';
+import 'package:pet_care/providers/offline_providers.dart';
 import 'package:pet_care/services/avatar_upload_service.dart';
 
 class Editpetscreen extends ConsumerStatefulWidget {

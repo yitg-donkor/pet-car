@@ -4,7 +4,6 @@ import 'package:pet_care/models/medical_record.dart';
 import 'package:pet_care/models/pet.dart';
 import 'package:pet_care/providers/auth_providers.dart';
 import 'package:pet_care/providers/offline_providers.dart';
-import 'package:pet_care/providers/pet_providers.dart';
 
 class MedicalRecordsScreen extends ConsumerStatefulWidget {
   const MedicalRecordsScreen({Key? key}) : super(key: key);

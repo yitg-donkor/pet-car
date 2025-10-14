@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
-import 'package:pet_care/providers/pet_providers.dart';
+import 'package:pet_care/providers/offline_providers.dart';
 
 class PetsScreen extends ConsumerWidget {
   const PetsScreen({super.key});

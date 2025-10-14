@@ -301,6 +301,14 @@ class PetLocalDB {
       whereArgs: [petId],
     );
   }
+
+  Future<Pet?> getPetById(String petId) async {
+    final db = await _dbService.database;
+    final result = await db.query('pets', where: 'id = ?', whereArgs: [petId]);
+
+    if (result.isEmpty) return null;
+    return Pet.fromJson(result.first);
+  }
 }
 
 // ============================================

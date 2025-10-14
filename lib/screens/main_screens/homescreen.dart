@@ -9,7 +9,7 @@ import 'package:pet_care/screens/ai_features/ai_navigation_screen.dart';
 import 'package:pet_care/screens/main_screens/log.dart';
 import 'package:pet_care/screens/main_screens/reminders.dart';
 import 'package:pet_care/screens/main_screens/resources.dart';
-import 'package:pet_care/providers/pet_providers.dart';
+
 import 'package:pet_care/services/notification_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
@@ -126,12 +126,34 @@ class _HomescreenState extends ConsumerState<Homescreen> {
     }
   }
 
+  Future<void> _loadInitialData() async {
+    final user = ref.read(currentUserProvider);
+    if (user != null) {
+      // Force a refresh of pets from local DB
+      ref.invalidate(petsOfflineProvider);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final petsAsync = ref.watch(petsOfflineProvider);
     final todayRemindersAsync = ref.watch(todayRemindersProvider);
     final currentUser = ref.watch(currentUserProvider);
+
+    ref.listen<AsyncValue<List<Pet>>>(petsOfflineProvider, (previous, next) {
+      next.whenOrNull(
+        error: (error, stack) {
+          print('Error loading pets: $error');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error loading pets: $error'),
+              backgroundColor: theme.colorScheme.error,
+            ),
+          );
+        },
+      );
+    });
 
     return Scaffold(
       body: SafeArea(

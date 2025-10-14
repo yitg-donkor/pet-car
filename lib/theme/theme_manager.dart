@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pet_care/theme/app_theme.dart';
-import 'package:pet_care/models/user_profile.dart';
-import 'package:pet_care/providers/auth_providers.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // ============================================
 // THEME MODE ENUM
@@ -44,81 +43,136 @@ extension AppThemeModeExtension on AppThemeMode {
         return AppThemeMode.light;
     }
   }
-}
 
-// ============================================
-// THEME NOTIFIER WITH PERSISTENCE
-// ============================================
-
-class ThemeNotifier extends StateNotifier<AppThemeMode> {
-  ThemeNotifier(AppThemeMode initialTheme) : super(initialTheme);
-
-  void setTheme(AppThemeMode themeMode) {
-    state = themeMode;
-  }
-
-  void toggleTheme() {
-    state =
-        state == AppThemeMode.light ? AppThemeMode.dark : AppThemeMode.light;
-  }
-}
-
-// ============================================
-// LOAD SAVED THEME FROM USER PROFILE
-// ============================================
-
-Future<AppThemeMode> _loadSavedThemeFromProfile(
-  UserProfile? userProfile,
-) async {
-  if (userProfile != null) {
-    try {
-      final savedTheme = AppThemeModeExtension.fromString(
-        userProfile.appSettings.theme,
-      );
-      return savedTheme;
-    } catch (e) {
-      print('Error parsing theme: $e');
+  String toStorageString() {
+    switch (this) {
+      case AppThemeMode.light:
+        return 'light';
+      case AppThemeMode.dark:
+        return 'dark';
+      case AppThemeMode.system:
+        return 'system';
     }
   }
-  return AppThemeMode.system;
 }
 
 // ============================================
-// THEME PROVIDER (UPDATED)
+// SHARED PREFERENCES SERVICE
 // ============================================
 
-final themeProvider = StateNotifierProvider<ThemeNotifier, AppThemeMode>((ref) {
-  return ThemeNotifier(AppThemeMode.system);
+class ThemePreferencesService {
+  static const String _themeKey = 'app_theme_mode';
+  SharedPreferences? _prefs;
+
+  Future<void> _ensureInitialized() async {
+    _prefs ??= await SharedPreferences.getInstance();
+  }
+
+  Future<AppThemeMode> getThemeMode() async {
+    try {
+      await _ensureInitialized();
+      final themeString = _prefs?.getString(_themeKey) ?? 'system';
+      return AppThemeModeExtension.fromString(themeString);
+    } catch (e) {
+      print('Error loading theme preference: $e');
+      return AppThemeMode.system;
+    }
+  }
+
+  Future<void> setThemeMode(AppThemeMode themeMode) async {
+    try {
+      await _ensureInitialized();
+      await _prefs?.setString(_themeKey, themeMode.toStorageString());
+      print('Theme saved: ${themeMode.name}');
+    } catch (e) {
+      print('Error saving theme preference: $e');
+    }
+  }
+
+  Future<void> clearThemePreference() async {
+    try {
+      await _ensureInitialized();
+      await _prefs?.remove(_themeKey);
+    } catch (e) {
+      print('Error clearing theme preference: $e');
+    }
+  }
+}
+
+// ============================================
+// THEME PREFERENCES SERVICE PROVIDER
+// ============================================
+
+final themePreferencesServiceProvider = Provider<ThemePreferencesService>((
+  ref,
+) {
+  return ThemePreferencesService();
 });
 
 // ============================================
-// INITIALIZE THEME FROM USER PROFILE
+// THEME NOTIFIER WITH SHARED PREFERENCES
+// ============================================
+
+class ThemeNotifier extends StateNotifier<AppThemeMode> {
+  final ThemePreferencesService _preferencesService;
+
+  ThemeNotifier(this._preferencesService, AppThemeMode initialTheme)
+    : super(initialTheme);
+
+  Future<void> setTheme(AppThemeMode themeMode) async {
+    state = themeMode;
+    await _preferencesService.setThemeMode(themeMode);
+  }
+
+  Future<void> toggleTheme() async {
+    final newTheme =
+        state == AppThemeMode.light ? AppThemeMode.dark : AppThemeMode.light;
+    await setTheme(newTheme);
+  }
+}
+
+// ============================================
+// LOAD THEME FROM SHARED PREFERENCES
+// ============================================
+
+final loadThemeFromPreferencesProvider = FutureProvider<AppThemeMode>((
+  ref,
+) async {
+  try {
+    final preferencesService = ref.watch(themePreferencesServiceProvider);
+    final savedTheme = await preferencesService.getThemeMode();
+    print('Theme loaded from SharedPreferences: ${savedTheme.name}');
+    return savedTheme;
+  } catch (e) {
+    print('Error loading theme from SharedPreferences: $e');
+    return AppThemeMode.system;
+  }
+});
+
+// ============================================
+// THEME PROVIDER
+// ============================================
+
+final themeProvider = StateNotifierProvider<ThemeNotifier, AppThemeMode>((ref) {
+  final preferencesService = ref.watch(themePreferencesServiceProvider);
+  return ThemeNotifier(preferencesService, AppThemeMode.system);
+});
+
+// ============================================
+// INITIALIZE THEME FROM SHARED PREFERENCES
 // ============================================
 
 final initializeThemeProvider = FutureProvider<void>((ref) async {
   try {
-    // Watch user profile provider
-    final userProfileAsync = ref.watch(userProfileProviderProvider);
+    // Load theme from SharedPreferences
+    final savedTheme = await ref.watch(loadThemeFromPreferencesProvider.future);
 
-    // Wait for user profile data
-    final userProfile = await userProfileAsync.when(
-      data: (profile) async => profile,
-      loading: () async {
-        // Wait a bit for profile to load
-        await Future.delayed(const Duration(milliseconds: 500));
-        return null;
-      },
-      error: (e, st) async {
-        print('Error loading user profile: $e');
-        return null;
-      },
-    );
+    // Set it to the theme provider
+    await ref.read(themeProvider.notifier).setTheme(savedTheme);
 
-    // Load saved theme
-    final savedTheme = await _loadSavedThemeFromProfile(userProfile);
-    ref.read(themeProvider.notifier).setTheme(savedTheme);
+    print('✅ Theme initialized: ${savedTheme.name}');
   } catch (e) {
-    print('Error in initializeThemeProvider: $e');
+    print('❌ Error in initializeThemeProvider: $e');
   }
 });
 

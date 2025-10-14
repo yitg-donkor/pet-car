@@ -1,5 +1,7 @@
 // providers/auth_providers.dart
 import 'package:flutter/material.dart';
+import 'package:pet_care/local_db/sqflite_db.dart';
+import 'package:pet_care/providers/offline_providers.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
@@ -363,6 +365,24 @@ class AuthService extends _$AuthService {
   @override
   AsyncValue<void> build() => const AsyncValue.data(null);
 
+  Future<void> clearLocalDataForNewUser() async {
+    try {
+      print('🗑️ Clearing local database for new user...');
+
+      final db = await LocalDatabaseService.instance.database;
+
+      // Clear all user-specific data tables
+      await db.delete('reminders');
+      await db.delete('medical_records');
+      await db.delete('activity_logs');
+      await db.delete('pets');
+
+      print('✅ Local database cleared successfully');
+    } catch (e) {
+      print('❌ Error clearing local database: $e');
+    }
+  }
+
   Future<AuthResponse> signIn(String email, String password) async {
     state = const AsyncValue.loading();
     try {
@@ -376,8 +396,17 @@ class AuthService extends _$AuthService {
         throw Exception('Login failed - no session returned');
       }
 
-      state = const AsyncValue.data(null);
+      if (response.user != null) {
+        // Clear local data for new user
+        await clearLocalDataForNewUser();
 
+        // Sync new user's data
+        final syncService = ref.read(unifiedSyncServiceProvider);
+        await syncService.fullSync(response.user!.id);
+      }
+
+      // Update state and invalidate related providers
+      state = const AsyncValue.data(null);
       ref.invalidate(currentSessionProvider);
       ref.invalidate(currentUserProvider);
       ref.invalidate(userProfileProviderProvider);
@@ -420,6 +449,7 @@ class AuthService extends _$AuthService {
     try {
       final supabase = ref.read(supabaseProvider);
       await supabase.auth.signOut();
+      await clearLocalDataForNewUser();
 
       state = const AsyncValue.data(null);
 

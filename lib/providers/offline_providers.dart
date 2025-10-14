@@ -1,6 +1,6 @@
 // providers/offline_providers.dart
 import 'package:pet_care/models/user_profile.dart';
-import 'package:pet_care/providers/activity_log_providers.dart';
+
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -165,6 +165,13 @@ class UnifiedSyncService {
 
       for (var record in unsyncedRecords) {
         try {
+          // Get the pet to verify it exists (ownership is checked via RLS)
+          final pet = await petLocalDB.getPetById(record.petId);
+          if (pet == null) {
+            print('Pet not found for medical record ${record.id}');
+            continue;
+          }
+
           await supabase.from('medical_records').upsert({
             'id': record.id,
             'pet_id': record.petId,
@@ -271,19 +278,75 @@ class UnifiedSyncService {
 
     try {
       final unsyncedReminders = await reminderLocalDB.getUnsyncedReminders();
+      print('📤 Found ${unsyncedReminders.length} unsynced reminders');
 
       for (var reminder in unsyncedReminders) {
         try {
-          await supabase.from('reminders').upsert(reminder.toSupabaseMap());
+          // Get the pet to verify it exists
+          final pet = await petLocalDB.getPetById(reminder.petId);
+
+          if (pet == null) {
+            print(
+              '❌ Pet not found for reminder ${reminder.id} with pet_id: ${reminder.petId}',
+            );
+            continue;
+          }
+
+          print(
+            '✅ Found pet: ${pet.name} (id: ${pet.id}, owner: ${pet.ownerId})',
+          );
+
+          final reminderMap = reminder.toSupabaseMap();
+
+          print('📦 Attempting to upsert reminder:');
+          print('   ID: ${reminderMap['id']}');
+          print('   Pet ID: ${reminderMap['pet_id']}');
+          print('   Title: ${reminderMap['title']}');
+          print('   User should be: ${pet.ownerId}');
+
+          // Try to upsert
+          final result = await supabase.from('reminders').upsert(reminderMap);
+
+          print('✅ Successfully synced reminder ${reminder.id}');
           await reminderLocalDB.markAsSynced(reminder.id!);
         } catch (e) {
-          print('Error syncing reminder ${reminder.id}: $e');
+          print('❌ Error syncing reminder ${reminder.id}');
+          print('   Error type: ${e.runtimeType}');
+          print('   Error: $e');
         }
       }
 
-      print('Synced ${unsyncedReminders.length} reminders to Supabase');
+      print('✅ Synced ${unsyncedReminders.length} reminders to Supabase');
     } catch (e) {
-      print('Error syncing reminders to Supabase: $e');
+      print('❌ Error in syncRemindersToSupabase: $e');
+    }
+  }
+
+  // Also add this to help verify policies are working
+  Future<void> testRLSPolicy() async {
+    try {
+      print('\n🔍 Testing RLS policy...');
+
+      // This should work if user owns the pet
+      final testResult = await supabase
+          .from('reminders')
+          .select('id, pet_id')
+          .limit(1);
+
+      print('✅ SELECT policy works - can read reminders');
+
+      // Try to see what's happening
+      final petsResult = await supabase
+          .from('pets')
+          .select('id, owner_id')
+          .limit(3);
+
+      print('✅ User\'s pets: ${petsResult.length}');
+      for (var pet in petsResult) {
+        print('   - Pet: ${pet['id']}, Owner: ${pet['owner_id']}');
+      }
+    } catch (e) {
+      print('❌ Error testing RLS: $e');
     }
   }
 
@@ -363,6 +426,166 @@ UnifiedSyncService unifiedSyncService(UnifiedSyncServiceRef ref) {
     activityLogLocalDB: activityLogLocalDB,
     profileLocalDB: profileLocalDB,
   );
+}
+
+// ============================================
+// OFFLINE-FIRST PETS PROVIDER (ADDED HERE)
+// ============================================
+
+@riverpod
+class PetsOffline extends _$PetsOffline {
+  @override
+  Future<List<Pet>> build() async {
+    final user = ref.watch(currentUserProvider);
+    if (user == null) return [];
+
+    print('🔵 PetsOffline: Loading pets for user ${user.id}');
+
+    // ALWAYS read from local DB first - this is the source of truth
+    final petLocalDB = ref.watch(petLocalDBProvider);
+    final localPets = await petLocalDB.getAllPets(user.id);
+
+    print('🔵 PetsOffline: Found ${localPets.length} pets in local DB');
+
+    // Trigger background sync WITHOUT awaiting it
+    Future.microtask(() async {
+      try {
+        print('🔵 PetsOffline: Starting background sync');
+        final syncService = ref.read(unifiedSyncServiceProvider);
+
+        // Sync both ways
+        await syncService.syncPetsToSupabase(); // Upload local changes
+        await syncService.syncPetsFromSupabase(
+          user.id,
+        ); // Download remote changes
+
+        // Check if there are changes after sync
+        final updatedPets = await petLocalDB.getAllPets(user.id);
+        print('🔵 PetsOffline: After sync, have ${updatedPets.length} pets');
+
+        if (updatedPets.length != localPets.length) {
+          print('🔵 PetsOffline: Pet count changed, refreshing UI');
+          ref.invalidateSelf();
+        }
+      } catch (e) {
+        print('🔴 PetsOffline: Background sync error: $e');
+      }
+    });
+
+    return localPets;
+  }
+
+  Future<void> addPet(Pet pet) async {
+    final user = ref.read(currentUserProvider);
+    if (user == null) throw Exception('User not logged in');
+
+    print('🔵 PetsOffline: Adding pet ${pet.name}');
+
+    final petLocalDB = ref.read(petLocalDBProvider);
+    final petWithOwner = Pet(
+      id: '',
+      ownerId: user.id,
+      name: pet.name,
+      species: pet.species,
+      breed: pet.breed,
+      age: pet.age,
+      birthDate: pet.birthDate,
+      weight: pet.weight,
+      photoUrl: pet.photoUrl,
+      microchipId: pet.microchipId,
+    );
+
+    // Save to local DB first
+    final petId = await petLocalDB.createPet(petWithOwner);
+    print('🔵 PetsOffline: Pet saved locally with ID: $petId');
+
+    // Immediately update UI
+    ref.invalidateSelf();
+
+    // Sync in background
+    Future.microtask(() async {
+      try {
+        print('🔵 PetsOffline: Syncing new pet to Supabase');
+        final syncService = ref.read(unifiedSyncServiceProvider);
+        await syncService.syncPetsToSupabase();
+        print('🔵 PetsOffline: Pet synced successfully');
+      } catch (e) {
+        print('🔴 PetsOffline: Background sync error: $e');
+      }
+    });
+  }
+
+  Future<void> updatePet(Pet pet) async {
+    print('🔵 PetsOffline: Updating pet ${pet.name}');
+
+    final petLocalDB = ref.read(petLocalDBProvider);
+    await petLocalDB.updatePet(pet);
+
+    // Immediately update UI
+    ref.invalidateSelf();
+
+    // Sync in background
+    Future.microtask(() async {
+      try {
+        final syncService = ref.read(unifiedSyncServiceProvider);
+        await syncService.syncPetsToSupabase();
+      } catch (e) {
+        print('🔴 PetsOffline: Background sync error: $e');
+      }
+    });
+  }
+
+  Future<void> deletePet(String petId) async {
+    print('🔵 PetsOffline: Deleting pet $petId');
+
+    final petLocalDB = ref.read(petLocalDBProvider);
+    await petLocalDB.deletePet(petId);
+
+    // Immediately update UI
+    ref.invalidateSelf();
+
+    // Delete from Supabase in background if online
+    Future.microtask(() async {
+      try {
+        final syncService = ref.read(unifiedSyncServiceProvider);
+        if (await syncService.hasInternetConnection()) {
+          await syncService.supabase.from('pets').delete().eq('id', petId);
+          print('🔵 PetsOffline: Pet deleted from Supabase');
+        }
+      } catch (e) {
+        print('🔴 PetsOffline: Error deleting from Supabase: $e');
+      }
+    });
+  }
+
+  Future<void> manualSync() async {
+    print('🔵 PetsOffline: Manual sync triggered');
+
+    final user = ref.read(currentUserProvider);
+    if (user == null) return;
+
+    final syncService = ref.read(unifiedSyncServiceProvider);
+    await syncService.fullSync(user.id);
+    ref.invalidateSelf();
+
+    print('🔵 PetsOffline: Manual sync completed');
+  }
+}
+
+@riverpod
+class SelectedPet extends _$SelectedPet {
+  @override
+  Pet? build() {
+    return null;
+  }
+
+  void selectPet(Pet pet) {
+    state = pet;
+  }
+
+  void clearSelection() {
+    state = null;
+  }
 }
 
 // ============================================
@@ -532,6 +755,7 @@ class ManualSync extends _$ManualSync {
       await syncService.fullSync(user.id);
 
       // Refresh all providers
+      ref.invalidate(petsOfflineProvider);
       ref.invalidate(allRemindersRefreshProvider);
       ref.invalidate(syncStatusProvider);
 

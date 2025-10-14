@@ -394,6 +394,40 @@ class _PeriodicSyncManagerProviderElement
   String get userId => (origin as PeriodicSyncManagerProvider).userId;
 }
 
+String _$petsOfflineHash() => r'1c28a0a7e839368116081f0b1ba52cbc2bb4813d';
+
+/// See also [PetsOffline].
+@ProviderFor(PetsOffline)
+final petsOfflineProvider =
+    AutoDisposeAsyncNotifierProvider<PetsOffline, List<Pet>>.internal(
+      PetsOffline.new,
+      name: r'petsOfflineProvider',
+      debugGetCreateSourceHash:
+          const bool.fromEnvironment('dart.vm.product')
+              ? null
+              : _$petsOfflineHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
+
+typedef _$PetsOffline = AutoDisposeAsyncNotifier<List<Pet>>;
+String _$selectedPetHash() => r'f7a2614d5bcc421b90966f481db10b226f3be385';
+
+/// See also [SelectedPet].
+@ProviderFor(SelectedPet)
+final selectedPetProvider =
+    AutoDisposeNotifierProvider<SelectedPet, Pet?>.internal(
+      SelectedPet.new,
+      name: r'selectedPetProvider',
+      debugGetCreateSourceHash:
+          const bool.fromEnvironment('dart.vm.product')
+              ? null
+              : _$selectedPetHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
+
+typedef _$SelectedPet = AutoDisposeNotifier<Pet?>;
 String _$petMedicalRecordsOfflineHash() =>
     r'1009452753671f6c623c87bdfe6ef043951f92f7';
 
@@ -560,7 +594,7 @@ final syncStatusProvider =
     );
 
 typedef _$SyncStatus = AutoDisposeAsyncNotifier<Map<String, int>>;
-String _$manualSyncHash() => r'0145f5ac6bda8ce05e561f030a74602d54525994';
+String _$manualSyncHash() => r'f6275560a0214a2c9abd7a0d3dec2fd06e5f5227';
 
 /// See also [ManualSync].
 @ProviderFor(ManualSync)

@@ -22,11 +22,24 @@ import 'package:rive/rive.dart' as rive;
 import 'screens/main_screens/homescreen.dart';
 import 'screens/onboarding_screens/loginscreen.dart';
 
+// Global theme mode - will be set before app runs
+AppThemeMode _initialThemeMode = AppThemeMode.system;
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   rive.RiveFile.initialize();
 
   tz.initializeTimeZones();
+
+  // Preload theme from SharedPreferences BEFORE app starts
+  try {
+    final themeService = ThemePreferencesService();
+    _initialThemeMode = await themeService.getThemeMode();
+    print('✅ Theme preloaded: ${_initialThemeMode.name}');
+  } catch (e) {
+    print('⚠️ Could not preload theme: $e, using system default');
+    _initialThemeMode = AppThemeMode.system;
+  }
 
   await Supabase.initialize(
     url: 'https://moaiifmgrbbcmnubgxpm.supabase.co',
@@ -36,7 +49,20 @@ Future<void> main() async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await NotificationService().initialize();
 
-  runApp(const ProviderScope(child: MyApp()));
+  runApp(
+    ProviderScope(
+      overrides: [
+        // Override the initial theme mode with preloaded value
+        themeProvider.overrideWith((ref) {
+          return ThemeNotifier(
+            ref.watch(themePreferencesServiceProvider),
+            _initialThemeMode,
+          );
+        }),
+      ],
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends ConsumerWidget {
@@ -44,10 +70,7 @@ class MyApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Initialize theme from user profile
-    ref.watch(initializeThemeProvider);
-
-    // Watch current theme
+    // Watch current theme (will be preloaded, no hesitation)
     final themeMode = ref.watch(themeProvider);
     final themeData = ref.watch(currentThemeProvider);
 
@@ -64,7 +87,7 @@ class MyApp extends ConsumerWidget {
         '/': (context) => const AuthWrapper(),
         '/login': (context) => const LoginScreen(),
         '/signup': (context) => const Signupscreen(),
-        '/nada': (context) => Homescreen(),
+        '/nada': (context) => const Homescreen(),
         '/introduction': (context) => const IntroductionScreen(),
         '/profile': (context) => const ProfileCreationScreen(),
         '/pet_selection': (context) => const PetSpeciesSelectionScreen(),
@@ -93,7 +116,7 @@ class AuthWrapper extends ConsumerWidget {
         final hasSession = authState.session != null;
 
         if (hasSession) {
-          return MainNavigation(initialIndex: 0);
+          return const MainNavigation(initialIndex: 0);
         } else {
           return hasSeenOnboarding
               ? const LoginScreen()

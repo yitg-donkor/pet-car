@@ -4,7 +4,7 @@ import 'package:pet_care/models/medical_record.dart';
 import 'package:pet_care/models/reminder.dart';
 import 'package:pet_care/providers/auth_providers.dart';
 import 'package:pet_care/providers/offline_providers.dart';
-import 'package:pet_care/providers/pet_providers.dart';
+
 import 'package:pet_care/services/notification_service.dart';
 
 class RemindersScreen extends ConsumerStatefulWidget {
@@ -575,28 +575,71 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
     return days[weekday - 1];
   }
 
-  Future<void> _toggleCompletion(Reminder reminder) async {
-    final db = ref.read(reminderDatabaseProvider);
+  bool _reminnderMedical(Reminder reminder) {
+    final List<String> med = [
+      'medicine',
+      'medical',
+      'hospital',
+      'doctor',
+      'drug',
+    ];
+    final String title = reminder.title.toLowerCase();
 
-    if (!reminder.isCompleted) {
-      final shouldCreateRecord = await _showCreateMedicalRecordDialog(reminder);
-
-      if (shouldCreateRecord == true) {
-        await _createMedicalRecordFromReminder(reminder);
+    for (var i in med) {
+      if (title.contains(i)) {
+        print('$i found in title');
+        return true;
       }
-      await _notificationService.cancelNotification(reminder.id!);
-    } else {
-      final updatedReminder = reminder.copyWith(isCompleted: false);
-
-      await _notificationService.scheduleReminderNotification(updatedReminder);
     }
 
-    await db.toggleCompletion(reminder.id!, !reminder.isCompleted);
+    print('No matching word found in title');
+    return false;
+  }
 
-    final syncService = ref.read(unifiedSyncServiceProvider);
-    await syncService.syncRemindersToSupabase();
+  // Replace _toggleCompletion() in reminders_screen.dart
+  Future<void> _toggleCompletion(Reminder reminder) async {
+    final db = ref.read(reminderDatabaseProvider);
+    final user = ref.read(currentUserProvider);
+    final newCompletionState = !reminder.isCompleted;
 
+    // IMMEDIATE: Update local database first (snappy UI response)
+    await db.toggleCompletion(reminder.id!, newCompletionState);
+
+    // IMMEDIATE: Invalidate providers to refresh UI instantly
     _invalidateAllProviders();
+
+    // BACKGROUND: Handle notifications and syncing asynchronously
+    Future.microtask(() async {
+      try {
+        if (!reminder.isCompleted && _reminnderMedical(reminder)) {
+          final shouldCreateRecord = await _showCreateMedicalRecordDialog(
+            reminder,
+          );
+
+          if (shouldCreateRecord == true) {
+            await _createMedicalRecordFromReminder(reminder);
+          }
+
+          await _notificationService.cancelNotification(reminder.id!);
+        } else {
+          final updatedReminder = reminder.copyWith(
+            isCompleted: newCompletionState,
+          );
+          await _notificationService.scheduleReminderNotification(
+            updatedReminder,
+          );
+        }
+
+        // Sync with user ID
+        final syncService = ref.read(unifiedSyncServiceProvider);
+        if (user != null) {
+          await syncService.syncRemindersToSupabase();
+        }
+      } catch (e) {
+        print('Background toggle operation failed: $e');
+        // Optionally show error to user here if needed
+      }
+    });
   }
 
   Future<bool?> _showCreateMedicalRecordDialog(Reminder reminder) async {
@@ -1230,7 +1273,11 @@ class _AddReminderDialogState extends ConsumerState<_AddReminderDialog> {
     await NotificationService().scheduleEarlyNotification(reminderWithId);
 
     final syncService = widget.parentRef.read(unifiedSyncServiceProvider);
-    await syncService.syncRemindersToSupabase();
+    final user = ref.read(currentUserProvider);
+
+    if (user != null) {
+      await syncService.syncRemindersToSupabase();
+    }
 
     widget.parentRef.invalidate(todayRemindersProvider);
     widget.parentRef.invalidate(weeklyRemindersProvider);

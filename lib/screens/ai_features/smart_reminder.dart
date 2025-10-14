@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pet_care/models/pet.dart';
 import 'package:pet_care/models/medical_record.dart';
 import 'package:pet_care/models/reminder.dart';
+import 'package:pet_care/providers/auth_providers.dart';
 import 'package:pet_care/services/firebase_ai_service.dart';
 import 'package:pet_care/providers/offline_providers.dart';
 import 'package:pet_care/local_db/sqflite_db.dart';
@@ -1338,7 +1339,11 @@ class _SmartRemindersScreenState extends ConsumerState<SmartRemindersScreen> {
 
       // Sync to Supabase
       final syncService = ref.read(unifiedSyncServiceProvider);
-      await syncService.syncRemindersToSupabase();
+      final user = ref.read(currentUserProvider);
+
+      if (user != null) {
+        await syncService.syncRemindersToSupabase();
+      }
 
       // Invalidate providers to refresh
       ref.invalidate(allRemindersProvider);
@@ -1462,7 +1467,11 @@ class _SmartRemindersScreenState extends ConsumerState<SmartRemindersScreen> {
 
       // Sync to Supabase
       final syncService = ref.read(unifiedSyncServiceProvider);
-      await syncService.syncRemindersToSupabase();
+      final user = ref.read(currentUserProvider);
+
+      if (user != null) {
+        await syncService.syncRemindersToSupabase();
+      }
 
       // Invalidate providers to refresh
       ref.invalidate(allRemindersProvider);

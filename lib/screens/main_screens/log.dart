@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:pet_care/models/activity_log.dart';
 import 'package:pet_care/providers/activity_log_providers.dart';
-import 'package:pet_care/providers/pet_providers.dart';
+import 'package:pet_care/providers/offline_providers.dart';
 
 class LogScreen extends ConsumerStatefulWidget {
   const LogScreen({super.key});
