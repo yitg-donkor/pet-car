@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pet_care/providers/offline_providers.dart';
-
 import 'package:pet_care/screens/ai_features/aichatscreen.dart';
 import 'package:pet_care/screens/ai_features/feeding_schedulescren.dart';
 import 'package:pet_care/screens/ai_features/health_insights.dart';
@@ -33,6 +32,7 @@ class _AIDashboardScreenState extends ConsumerState<AIDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
       body: CustomScrollView(
         slivers: [
@@ -125,8 +125,9 @@ class _AIDashboardScreenState extends ConsumerState<AIDashboardScreen> {
                       Expanded(
                         child: _buildQuickActionCard(
                           icon: Icons.chat_bubble_outline,
+                          color: theme.iconTheme.color!,
                           title: 'Chat',
-                          color: Colors.blue,
+
                           onTap: () => _navigateToAichat(context, ref),
                         ),
                       ),
@@ -135,7 +136,7 @@ class _AIDashboardScreenState extends ConsumerState<AIDashboardScreen> {
                         child: _buildQuickActionCard(
                           icon: Icons.camera_alt_outlined,
                           title: 'Scan Photo',
-                          color: Colors.green,
+                          color: theme.iconTheme.color!,
                           onTap: () => _navigateToPhotoAnalysis(context),
                         ),
                       ),
@@ -152,7 +153,10 @@ class _AIDashboardScreenState extends ConsumerState<AIDashboardScreen> {
                     icon: Icons.local_hospital_outlined,
                     title: 'Symptom Checker',
                     description: 'Analyze your pet\'s symptoms',
-                    gradient: [Colors.red.shade400, Colors.pink.shade400],
+                    gradient: [
+                      const Color.fromARGB(150, 239, 83, 80),
+                      const Color.fromARGB(200, 236, 64, 121),
+                    ],
                     onTap: () => _navigateToSymptomChecker(context, ref),
                     isPremium: false,
                   ),
@@ -162,8 +166,8 @@ class _AIDashboardScreenState extends ConsumerState<AIDashboardScreen> {
                     title: 'Medical History Analysis',
                     description: 'AI summary of health records',
                     gradient: [
-                      Colors.purple.shade400,
-                      Colors.deepPurple.shade400,
+                      const Color.fromARGB(150, 170, 71, 188),
+                      const Color.fromARGB(200, 126, 87, 194),
                     ],
                     // onTap: () => _navigateToMedicalAnalysis(context),
                     onTap: () => _navigateToMedicalAnalysis(context, ref),
@@ -175,8 +179,8 @@ class _AIDashboardScreenState extends ConsumerState<AIDashboardScreen> {
                     title: 'Smart Reminders',
                     description: 'AI-powered care scheduling',
                     gradient: [
-                      Colors.orange.shade400,
-                      Colors.deepOrange.shade400,
+                      const Color.fromARGB(150, 255, 168, 38),
+                      const Color.fromARGB(200, 255, 111, 67),
                     ],
                     onTap: () => _navigateToSmartReminders(context, ref),
                     isPremium: true, // Premium feature
@@ -192,7 +196,10 @@ class _AIDashboardScreenState extends ConsumerState<AIDashboardScreen> {
                     icon: Icons.restaurant_outlined,
                     title: 'Feeding Schedule',
                     description: 'Personalized meal plans',
-                    gradient: [Colors.teal.shade400, Colors.cyan.shade400],
+                    gradient: [
+                      const Color.fromARGB(150, 38, 166, 153),
+                      const Color.fromARGB(200, 38, 197, 218),
+                    ],
                     onTap: () => _navigateToFeedingSchedule(context, ref),
                     isPremium: false,
                   ),
@@ -201,7 +208,10 @@ class _AIDashboardScreenState extends ConsumerState<AIDashboardScreen> {
                     icon: Icons.school_outlined,
                     title: 'Training Tips',
                     description: 'Behavior guidance & training',
-                    gradient: [Colors.indigo.shade400, Colors.blue.shade400],
+                    gradient: [
+                      const Color.fromARGB(150, 92, 107, 192),
+                      const Color.fromARGB(200, 66, 164, 245),
+                    ],
                     onTap: () => _navigateToTrainingTips(context, ref),
                     isPremium: false,
                   ),
@@ -216,7 +226,10 @@ class _AIDashboardScreenState extends ConsumerState<AIDashboardScreen> {
                     icon: Icons.insights_outlined,
                     title: 'Health Insights',
                     description: 'AI-powered health trends',
-                    gradient: [Colors.lightBlue.shade400, Colors.blue.shade600],
+                    gradient: [
+                      const Color.fromARGB(150, 41, 181, 246),
+                      const Color.fromARGB(200, 30, 136, 229),
+                    ],
                     onTap: () => _navigateToHealthInsights(context, ref),
                     isPremium: true, // Premium feature
                   ),
@@ -226,8 +239,8 @@ class _AIDashboardScreenState extends ConsumerState<AIDashboardScreen> {
                     title: 'Monthly Report',
                     description: 'Comprehensive care summary',
                     gradient: [
-                      Colors.deepPurple.shade400,
-                      Colors.purple.shade600,
+                      const Color.fromARGB(150, 126, 87, 194),
+                      const Color.fromARGB(200, 141, 36, 170),
                     ],
                     onTap: () => _navigateToMonthlyReport(context, ref),
                     isPremium: true, // Premium feature

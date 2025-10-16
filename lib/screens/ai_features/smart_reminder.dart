@@ -6,7 +6,7 @@ import 'package:pet_care/models/reminder.dart';
 import 'package:pet_care/providers/auth_providers.dart';
 import 'package:pet_care/services/firebase_ai_service.dart';
 import 'package:pet_care/providers/offline_providers.dart';
-import 'package:pet_care/local_db/sqflite_db.dart';
+
 import 'package:intl/intl.dart';
 
 class SmartRemindersScreen extends ConsumerStatefulWidget {

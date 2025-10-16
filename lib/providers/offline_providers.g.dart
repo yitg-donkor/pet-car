@@ -119,7 +119,7 @@ final profileLocalDBProvider = AutoDisposeProvider<ProfileLocalDB>.internal(
 // ignore: unused_element
 typedef ProfileLocalDBRef = AutoDisposeProviderRef<ProfileLocalDB>;
 String _$unifiedSyncServiceHash() =>
-    r'6ba690bd1af526908c4c37223ceff07aacf59734';
+    r'8a83264bee41f3f00fb77e94bf5ae9593c6fe373';
 
 /// See also [unifiedSyncService].
 @ProviderFor(unifiedSyncService)
@@ -394,7 +394,7 @@ class _PeriodicSyncManagerProviderElement
   String get userId => (origin as PeriodicSyncManagerProvider).userId;
 }
 
-String _$petsOfflineHash() => r'1c28a0a7e839368116081f0b1ba52cbc2bb4813d';
+String _$petsOfflineHash() => r'0bec39850bcca0530d24d568c30f7704dc534429';
 
 /// See also [PetsOffline].
 @ProviderFor(PetsOffline)

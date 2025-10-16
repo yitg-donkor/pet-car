@@ -4,7 +4,7 @@ import 'package:pet_care/models/pet.dart';
 import 'package:pet_care/models/reminder.dart';
 import 'package:pet_care/providers/auth_providers.dart';
 import 'package:pet_care/providers/offline_providers.dart';
-
+import 'package:pet_care/widgets/widgets.dart';
 import 'package:pet_care/screens/ai_features/ai_navigation_screen.dart';
 import 'package:pet_care/screens/main_screens/log.dart';
 import 'package:pet_care/screens/main_screens/reminders.dart';
@@ -24,13 +24,12 @@ class MainNavigation extends ConsumerStatefulWidget {
 class _MainNavigationState extends ConsumerState<MainNavigation> {
   int _currentIndex = 0;
 
-  // Replace these with your actual screen widgets
   final List<Widget> _screens = [
-    const Homescreen(), // Your home screen
+    const Homescreen(),
     const AIDashboardScreen(userId: ''),
-    const RemindersScreen(), // Your reminders screen
-    const LogScreen(), // Your log screen
-    const ResourcesScreen(), // Your resources screen
+    const RemindersScreen(),
+    const LogScreen(),
+    const ResourcesScreen(),
   ];
 
   void _onTabTapped(int index) {
@@ -41,67 +40,64 @@ class _MainNavigationState extends ConsumerState<MainNavigation> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Scaffold(
       body: _screens[_currentIndex],
-      bottomNavigationBar: Container(
-        height: 80,
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.2),
-              spreadRadius: 1,
-              blurRadius: 10,
-              offset: const Offset(0, -2),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            _buildNavItem(Icons.home, 'Home', 0),
-
-            _buildNavItem(Icons.auto_awesome, "AI", 1),
-            _buildNavItem(Icons.notifications, 'Reminders', 2),
-            _buildNavItem(Icons.edit_note, 'Log', 3),
-            _buildNavItem(Icons.library_books, 'Resources', 4),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNavItem(IconData icon, String label, int index) {
-    final theme = Theme.of(context);
-    bool isSelected = _currentIndex == index;
-
-    return GestureDetector(
-      onTap: () => _onTabTapped(index),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            icon,
-            color:
-                isSelected ? theme.colorScheme.primaryContainer : Colors.grey,
-            size: 24,
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: _onTabTapped,
+        items: [
+          BottomNavigationBarItem(icon: const Icon(Icons.home), label: 'Home'),
+          BottomNavigationBarItem(
+            icon: const Icon(Icons.auto_awesome),
+            label: 'AI',
           ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              color:
-                  isSelected ? theme.colorScheme.primaryContainer : Colors.grey,
-              fontSize: 12,
-              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-            ),
+          BottomNavigationBarItem(
+            icon: const Icon(Icons.notifications),
+            label: 'Reminders',
+          ),
+          BottomNavigationBarItem(
+            icon: const Icon(Icons.edit_note),
+            label: 'Log',
+          ),
+          BottomNavigationBarItem(
+            icon: const Icon(Icons.library_books),
+            label: 'Resources',
           ),
         ],
       ),
     );
   }
 }
+
+// Widget _buildNavItem(IconData icon, String label, int index) {
+//   final theme = Theme.of(context);
+//   bool isSelected = _currentIndex == index;
+
+//   return GestureDetector(
+//     onTap: () => _onTabTapped(index),
+//     child: Column(
+//       mainAxisAlignment: MainAxisAlignment.center,
+//       children: [
+//         Icon(
+//           icon,
+//           // color:
+//           //     isSelected ? theme.colorScheme.primaryContainer : Colors.grey,
+//           size: 24,
+//         ),
+//         const SizedBox(height: 4),
+//         Text(
+//           label,
+//           style: TextStyle(
+//             // color:
+//             //     isSelected ? theme.colorScheme.primaryContainer : Colors.grey,
+//             fontSize: 12,
+//             fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+//           ),
+//         ),
+//       ],
+//     ),
+//   );
+// }
 
 class Homescreen extends ConsumerStatefulWidget {
   const Homescreen({super.key});
@@ -126,13 +122,13 @@ class _HomescreenState extends ConsumerState<Homescreen> {
     }
   }
 
-  Future<void> _loadInitialData() async {
-    final user = ref.read(currentUserProvider);
-    if (user != null) {
-      // Force a refresh of pets from local DB
-      ref.invalidate(petsOfflineProvider);
-    }
-  }
+  // Future<void> _loadInitialData() async {
+  //   final user = ref.read(currentUserProvider);
+  //   if (user != null) {
+  //     // Force a refresh of pets from local DB
+  //     ref.invalidate(petsOfflineProvider);
+  //   }
+  // }
 
   @override
   Widget build(BuildContext context) {
@@ -220,6 +216,12 @@ class _HomescreenState extends ConsumerState<Homescreen> {
                       const SizedBox(height: 30),
                       _buildQuickActions(theme),
                       const SizedBox(height: 20),
+                      universalButton(
+                        context,
+                        ref,
+                        label: "hit me",
+                        onpressed: () {},
+                      ),
                     ],
                   ),
                 ),
@@ -280,19 +282,10 @@ class _HomescreenState extends ConsumerState<Homescreen> {
                     loading: () => 'Loading...',
                     error: (_, __) => 'My Pets',
                   ),
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.9),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  style: theme.textTheme.headlineLarge,
                 ),
                 const SizedBox(height: 2),
-                Text(
-                  'Home Dashboard',
-                  style: theme.textTheme.headlineLarge?.copyWith(
-                    color: Colors.white,
-                  ),
-                ),
+                Text('Home Dashboard', style: theme.textTheme.headlineLarge),
               ],
             ),
           ),
@@ -445,7 +438,7 @@ class _HomescreenState extends ConsumerState<Homescreen> {
             icon: Icons.check_circle,
             count: completedCount.toString(),
             label: 'Completed',
-            color: Color(0xFF4CAF50),
+            color: Colors.green,
           ),
         ),
         const SizedBox(width: 12),
@@ -455,7 +448,7 @@ class _HomescreenState extends ConsumerState<Homescreen> {
             icon: Icons.pending_actions,
             count: (totalCount - completedCount).toString(),
             label: 'Pending',
-            color: Color(0xFFFF9800),
+            color: theme.colorScheme.tertiary,
           ),
         ),
       ],
@@ -585,7 +578,6 @@ class _HomescreenState extends ConsumerState<Homescreen> {
   }
 
   Widget _buildReminderCard(ThemeData theme, Reminder reminder) {
-    final gradientColors = _getGradientForReminder(reminder);
     final icon = _getIconForReminder(reminder.title);
 
     return Container(

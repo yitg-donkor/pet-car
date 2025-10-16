@@ -6,7 +6,7 @@ part of 'auth_providers.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$supabaseHash() => r'fb098cc6e867811a983d533c1ec70af181985fcf';
+String _$supabaseHash() => r'338c6d1df36ede7b2a16c7ca6fbf7c187cb36510';
 
 /// See also [supabase].
 @ProviderFor(supabase)
@@ -22,7 +22,7 @@ final supabaseProvider = AutoDisposeProvider<SupabaseClient>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef SupabaseRef = AutoDisposeProviderRef<SupabaseClient>;
-String _$authStateHash() => r'87d3df8ebb8d23d2709840015a773a97ceace115';
+String _$authStateHash() => r'96ace570059e60aafed95fc856482e23fdf0a845';
 
 /// See also [authState].
 @ProviderFor(authState)
@@ -38,7 +38,7 @@ final authStateProvider = AutoDisposeStreamProvider<AuthState>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef AuthStateRef = AutoDisposeStreamProviderRef<AuthState>;
-String _$currentSessionHash() => r'4753dd452404f4f85601ddacf99d9c2af6b3c4f3';
+String _$currentSessionHash() => r'b7380f963c5c47c12d2708d534fea38568495a41';
 
 /// See also [currentSession].
 @ProviderFor(currentSession)
@@ -56,7 +56,27 @@ final currentSessionProvider = AutoDisposeProvider<Session?>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef CurrentSessionRef = AutoDisposeProviderRef<Session?>;
-String _$currentUserHash() => r'ba01e374aefb6a5499b7dcbdc92a28497ae7b645';
+String _$currentUserProfileHash() =>
+    r'4ad1a99a91347050e1364aaee1eeec6f9862c54c';
+
+/// See also [currentUserProfile].
+@ProviderFor(currentUserProfile)
+final currentUserProfileProvider =
+    AutoDisposeFutureProvider<UserProfile?>.internal(
+      currentUserProfile,
+      name: r'currentUserProfileProvider',
+      debugGetCreateSourceHash:
+          const bool.fromEnvironment('dart.vm.product')
+              ? null
+              : _$currentUserProfileHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef CurrentUserProfileRef = AutoDisposeFutureProviderRef<UserProfile?>;
+String _$currentUserHash() => r'd9fd088c7b682f0ef6552ae684ab448079f97bf0';
 
 /// See also [currentUser].
 @ProviderFor(currentUser)
@@ -72,7 +92,7 @@ final currentUserProvider = AutoDisposeProvider<User?>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef CurrentUserRef = AutoDisposeProviderRef<User?>;
-String _$currentUserAsyncHash() => r'92f4911c7691c4ace0e6d2b15592efba0c368ab8';
+String _$currentUserAsyncHash() => r'0c3146863c936f68538b8dff8ae6de866e156cce';
 
 /// See also [currentUserAsync].
 @ProviderFor(currentUserAsync)
@@ -91,7 +111,7 @@ final currentUserAsyncProvider = AutoDisposeFutureProvider<User?>.internal(
 // ignore: unused_element
 typedef CurrentUserAsyncRef = AutoDisposeFutureProviderRef<User?>;
 String _$userProfileProviderHash() =>
-    r'5e3adedf68292394f129f25973a7830864a0b486';
+    r'cd8cb7fe0e1538f857fdcd02f5d3b00b3880046b';
 
 /// See also [UserProfileProvider].
 @ProviderFor(UserProfileProvider)
@@ -110,7 +130,7 @@ final userProfileProviderProvider = AutoDisposeAsyncNotifierProvider<
 );
 
 typedef _$UserProfileProvider = AutoDisposeAsyncNotifier<UserProfile?>;
-String _$authServiceHash() => r'1da605233738ebd7a75fd8e620ca7105cea3349a';
+String _$authServiceHash() => r'51bf4a2155bcb6c6b3766fadcc2f619dd5d31d52';
 
 /// See also [AuthService].
 @ProviderFor(AuthService)

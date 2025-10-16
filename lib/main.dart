@@ -2,6 +2,8 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pet_care/firebase_options.dart';
+import 'package:pet_care/local_db/sqflite_db.dart';
+import 'package:pet_care/providers/app_state_provider.dart';
 import 'package:pet_care/screens/main_screens/pet_info.dart';
 import 'package:pet_care/screens/main_screens/setting_screen.dart';
 import 'package:pet_care/screens/onboarding_screens/introduction.dart';
@@ -24,6 +26,7 @@ import 'screens/onboarding_screens/loginscreen.dart';
 
 // Global theme mode - will be set before app runs
 AppThemeMode _initialThemeMode = AppThemeMode.system;
+bool _isOfflineMode = false;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -41,13 +44,39 @@ Future<void> main() async {
     _initialThemeMode = AppThemeMode.system;
   }
 
-  await Supabase.initialize(
-    url: 'https://moaiifmgrbbcmnubgxpm.supabase.co',
-    anonKey:
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1vYWlpZm1ncmJiY21udWJneHBtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgyMzA0MjMsImV4cCI6MjA3MzgwNjQyM30.WLfpehs4MY8wTzBepr5qhTeV-DiZwIT2Imy_WuQxueU',
-  );
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  await NotificationService().initialize();
+  // Initialize Supabase with offline handling
+  try {
+    await Supabase.initialize(
+      url: 'https://moaiifmgrbbcmnubgxpm.supabase.co',
+      anonKey:
+          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1vYWlpZm1ncmJiY21udWJneHBtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgyMzA0MjMsImV4cCI6MjA3MzgwNjQyM30.WLfpehs4MY8wTzBepr5qhTeV-DiZwIT2Imy_WuQxueU',
+    );
+    print('✅ Supabase initialized successfully');
+    _isOfflineMode = false;
+  } catch (e) {
+    print('⚠️ Supabase initialization failed (likely offline): $e');
+    print('📱 Running in OFFLINE MODE');
+    _isOfflineMode = true;
+    // Continue without Supabase - app will work with local database only
+  }
+
+  // Initialize Firebase (also handle offline gracefully)
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    print('✅ Firebase initialized successfully');
+  } catch (e) {
+    print('⚠️ Firebase initialization failed: $e');
+  }
+
+  // Initialize notifications
+  try {
+    await NotificationService().initialize();
+    print('✅ Notification service initialized');
+  } catch (e) {
+    print('⚠️ Notification service failed: $e');
+  }
 
   runApp(
     ProviderScope(
@@ -59,6 +88,8 @@ Future<void> main() async {
             _initialThemeMode,
           );
         }),
+        // Provide offline mode state
+        isOfflineModeProvider.overrideWith((ref) => _isOfflineMode),
       ],
       child: const MyApp(),
     ),
@@ -108,8 +139,16 @@ class AuthWrapper extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final authStateAsync = ref.watch(authStateProvider);
+    final isOffline = ref.watch(isOfflineModeProvider);
     final hasSeenOnboarding = ref.watch(hasSeenOnboardingProvider);
+
+    // OFFLINE MODE: Skip auth, go straight to app
+    if (isOffline) {
+      return OfflineModeWrapper(hasSeenOnboarding: hasSeenOnboarding);
+    }
+
+    // ONLINE MODE: Normal auth flow
+    final authStateAsync = ref.watch(authStateProvider);
 
     return authStateAsync.when(
       data: (authState) {
@@ -126,35 +165,149 @@ class AuthWrapper extends ConsumerWidget {
       loading:
           () =>
               const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error:
-          (error, stack) => Scaffold(
-            body: Center(
+      error: (error, stack) {
+        // Check if it's a network error
+        final isNetworkError =
+            error.toString().contains('SocketException') ||
+            error.toString().contains('Failed host lookup') ||
+            error.toString().contains('ClientException');
+
+        return Scaffold(
+          body: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.error_outline, color: Colors.red, size: 60),
+                  Icon(
+                    isNetworkError ? Icons.wifi_off : Icons.error_outline,
+                    color: Colors.red,
+                    size: 60,
+                  ),
                   const SizedBox(height: 16),
                   Text(
-                    'Something went wrong',
+                    isNetworkError
+                        ? 'No Internet Connection'
+                        : 'Something went wrong',
                     style: Theme.of(context).textTheme.headlineSmall,
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    error.toString(),
+                    isNetworkError
+                        ? 'Please check your internet connection and try again'
+                        : error.toString(),
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
+                  const SizedBox(height: 24),
+                  ElevatedButton.icon(
                     onPressed: () {
                       ref.invalidate(authStateProvider);
                     },
-                    child: const Text('Retry'),
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Retry'),
                   ),
+                  if (isNetworkError) ...[
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        // Switch to offline mode
+                        ref.read(isOfflineModeProvider.notifier).state = true;
+                      },
+                      icon: const Icon(Icons.offline_bolt),
+                      label: const Text('Continue Offline'),
+                    ),
+                  ],
                 ],
               ),
             ),
           ),
+        );
+      },
+    );
+  }
+}
+
+// Offline Mode Wrapper
+class OfflineModeWrapper extends ConsumerWidget {
+  final bool hasSeenOnboarding;
+
+  const OfflineModeWrapper({super.key, required this.hasSeenOnboarding});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // In offline mode, check local database for existing data
+    return FutureBuilder<bool>(
+      future: _hasLocalData(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        final hasLocalData = snapshot.data ?? false;
+
+        if (hasLocalData) {
+          // User has local data, go to main app
+          return const MainNavigation(initialIndex: 0);
+        } else {
+          // No local data, show onboarding
+          return hasSeenOnboarding
+              ? const OfflineNoticeScreen()
+              : const IntroductionScreen();
+        }
+      },
+    );
+  }
+
+  Future<bool> _hasLocalData() async {
+    try {
+      final db = await LocalDatabaseService.instance.database;
+      final result = await db.query('pets', limit: 1);
+      return result.isNotEmpty;
+    } catch (e) {
+      return false;
+    }
+  }
+}
+
+// Offline Notice Screen
+class OfflineNoticeScreen extends StatelessWidget {
+  const OfflineNoticeScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.offline_bolt, size: 80, color: Colors.orange),
+              const SizedBox(height: 24),
+              Text(
+                'Offline Mode',
+                style: Theme.of(context).textTheme.headlineMedium,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'You\'re currently offline. Some features may be limited.',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+              const SizedBox(height: 32),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pushReplacementNamed(context, '/home');
+                },
+                child: const Text('Continue to App'),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

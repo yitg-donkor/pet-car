@@ -408,24 +408,38 @@ class UnifiedSyncService {
   }
 }
 
+// Add this at the top of offline_providers.dart after imports
+
 @riverpod
 UnifiedSyncService unifiedSyncService(UnifiedSyncServiceRef ref) {
-  final supabase = ref.watch(supabaseProvider);
-  final petLocalDB = ref.watch(petLocalDBProvider);
-  final medicalRecordLocalDB = ref.watch(medicalRecordLocalDBProvider);
-  final reminderLocalDB = ref.watch(reminderDatabaseProvider);
-  final profileLocalDB = ref.watch(profileLocalDBProvider);
+  try {
+    final supabase = ref.watch(supabaseProvider);
+    final petLocalDB = ref.watch(petLocalDBProvider);
+    final medicalRecordLocalDB = ref.watch(medicalRecordLocalDBProvider);
+    final reminderLocalDB = ref.watch(reminderDatabaseProvider);
+    final profileLocalDB = ref.watch(profileLocalDBProvider);
+    final activityLogLocalDB = ref.watch(activityLogLocalDBProvider);
 
-  final activityLogLocalDB = ref.watch(activityLogLocalDBProvider);
+    return UnifiedSyncService(
+      supabase: supabase,
+      petLocalDB: petLocalDB,
+      medicalRecordLocalDB: medicalRecordLocalDB,
+      reminderLocalDB: reminderLocalDB,
+      activityLogLocalDB: activityLogLocalDB,
+      profileLocalDB: profileLocalDB,
+    );
+  } catch (e) {
+    // If offline, create a dummy sync service that won't do anything
+    print('⚠️ Cannot create sync service (offline mode): $e');
+    final petLocalDB = ref.watch(petLocalDBProvider);
+    final medicalRecordLocalDB = ref.watch(medicalRecordLocalDBProvider);
+    final reminderLocalDB = ref.watch(reminderDatabaseProvider);
+    final profileLocalDB = ref.watch(profileLocalDBProvider);
+    final activityLogLocalDB = ref.watch(activityLogLocalDBProvider);
 
-  return UnifiedSyncService(
-    supabase: supabase,
-    petLocalDB: petLocalDB,
-    medicalRecordLocalDB: medicalRecordLocalDB,
-    reminderLocalDB: reminderLocalDB,
-    activityLogLocalDB: activityLogLocalDB,
-    profileLocalDB: profileLocalDB,
-  );
+    // Create a dummy Supabase client (will never be used in offline mode)
+    throw Exception('Sync service not available in offline mode');
+  }
 }
 
 // ============================================
@@ -433,17 +447,19 @@ UnifiedSyncService unifiedSyncService(UnifiedSyncServiceRef ref) {
 // ============================================
 
 @riverpod
+@riverpod
 class PetsOffline extends _$PetsOffline {
   @override
   Future<List<Pet>> build() async {
-    final user = ref.watch(currentUserProvider);
-    if (user == null) return [];
+    // Use the unified currentUserProfile provider
+    final profileAsync = await ref.watch(currentUserProfileProvider.future);
+    if (profileAsync == null) return [];
 
-    print('🔵 PetsOffline: Loading pets for user ${user.id}');
+    print('🔵 PetsOffline: Loading pets for user ${profileAsync.id}');
 
     // ALWAYS read from local DB first - this is the source of truth
     final petLocalDB = ref.watch(petLocalDBProvider);
-    final localPets = await petLocalDB.getAllPets(user.id);
+    final localPets = await petLocalDB.getAllPets(profileAsync.id);
 
     print('🔵 PetsOffline: Found ${localPets.length} pets in local DB');
 
@@ -456,11 +472,11 @@ class PetsOffline extends _$PetsOffline {
         // Sync both ways
         await syncService.syncPetsToSupabase(); // Upload local changes
         await syncService.syncPetsFromSupabase(
-          user.id,
+          profileAsync.id,
         ); // Download remote changes
 
         // Check if there are changes after sync
-        final updatedPets = await petLocalDB.getAllPets(user.id);
+        final updatedPets = await petLocalDB.getAllPets(profileAsync.id);
         print('🔵 PetsOffline: After sync, have ${updatedPets.length} pets');
 
         if (updatedPets.length != localPets.length) {
@@ -476,15 +492,15 @@ class PetsOffline extends _$PetsOffline {
   }
 
   Future<void> addPet(Pet pet) async {
-    final user = ref.read(currentUserProvider);
-    if (user == null) throw Exception('User not logged in');
+    final profile = await ref.read(currentUserProfileProvider.future);
+    if (profile == null) throw Exception('User not logged in');
 
     print('🔵 PetsOffline: Adding pet ${pet.name}');
 
     final petLocalDB = ref.read(petLocalDBProvider);
     final petWithOwner = Pet(
       id: '',
-      ownerId: user.id,
+      ownerId: profile.id,
       name: pet.name,
       species: pet.species,
       breed: pet.breed,
@@ -561,11 +577,11 @@ class PetsOffline extends _$PetsOffline {
   Future<void> manualSync() async {
     print('🔵 PetsOffline: Manual sync triggered');
 
-    final user = ref.read(currentUserProvider);
-    if (user == null) return;
+    final profile = await ref.read(currentUserProfileProvider.future);
+    if (profile == null) return;
 
     final syncService = ref.read(unifiedSyncServiceProvider);
-    await syncService.fullSync(user.id);
+    await syncService.fullSync(profile.id);
     ref.invalidateSelf();
 
     print('🔵 PetsOffline: Manual sync completed');

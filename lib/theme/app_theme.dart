@@ -29,7 +29,7 @@ class AppTheme {
 
     // Color Scheme
     colorScheme: const ColorScheme.light(
-      primary: primaryGreen,
+      primary: Color.fromARGB(255, 46, 96, 157),
       primaryContainer: Color(0xFFE8F5E9),
       secondary: secondaryBlue,
       secondaryContainer: Color(0xFFE3F2FD),
@@ -78,7 +78,7 @@ class AppTheme {
     // Elevated Button
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: primaryGreen,
+        backgroundColor: Color(0xFF1E3264),
         foregroundColor: Colors.white,
         elevation: 2,
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -141,8 +141,8 @@ class AppTheme {
     // Bottom Navigation Bar
     bottomNavigationBarTheme: const BottomNavigationBarThemeData(
       backgroundColor: Colors.white,
-      selectedItemColor: primaryGreen,
-      unselectedItemColor: Color(0xFF9E9E9E),
+      selectedItemColor: Color.fromARGB(255, 46, 96, 157),
+      unselectedItemColor: Color.fromARGB(143, 46, 96, 157),
       selectedLabelStyle: TextStyle(fontWeight: FontWeight.w600),
       unselectedLabelStyle: TextStyle(fontWeight: FontWeight.normal),
       type: BottomNavigationBarType.fixed,
@@ -307,11 +307,11 @@ class AppTheme {
 
     // Color Scheme
     colorScheme: const ColorScheme.dark(
-      primary: primaryGreenLight,
+      primary: Color.fromARGB(255, 46, 96, 157),
       primaryContainer: Color(0xFF1B5E20),
-      secondary: Color(0xFF64B5F6),
+      secondary: Color.fromARGB(255, 44, 75, 101),
       secondaryContainer: Color(0xFF0D47A1),
-      tertiary: Color(0xFFFFB74D),
+      tertiary: Color.fromARGB(255, 168, 124, 58),
       tertiaryContainer: Color(0xFFE65100),
       error: Color(0xFFEF5350),
       errorContainer: Color(0xFFB71C1C),
@@ -356,7 +356,7 @@ class AppTheme {
     // Elevated Button
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: primaryGreenLight,
+        backgroundColor: Color.fromARGB(255, 79, 111, 80),
         foregroundColor: const Color(0xFF121212),
         elevation: 4,
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -419,8 +419,8 @@ class AppTheme {
     // Bottom Navigation Bar
     bottomNavigationBarTheme: const BottomNavigationBarThemeData(
       backgroundColor: Color(0xFF1E1E1E),
-      selectedItemColor: primaryGreenLight,
-      unselectedItemColor: Color(0xFF757575),
+      selectedItemColor: Color.fromARGB(255, 52, 104, 168),
+      unselectedItemColor: Color.fromARGB(143, 46, 96, 157),
       selectedLabelStyle: TextStyle(fontWeight: FontWeight.w600),
       unselectedLabelStyle: TextStyle(fontWeight: FontWeight.normal),
       type: BottomNavigationBarType.fixed,
