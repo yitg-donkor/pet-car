@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/svg.dart';
 import 'package:pet_care/models/pet.dart';
 import 'package:pet_care/models/reminder.dart';
 import 'package:pet_care/providers/auth_providers.dart';
@@ -69,36 +70,6 @@ class _MainNavigationState extends ConsumerState<MainNavigation> {
   }
 }
 
-// Widget _buildNavItem(IconData icon, String label, int index) {
-//   final theme = Theme.of(context);
-//   bool isSelected = _currentIndex == index;
-
-//   return GestureDetector(
-//     onTap: () => _onTabTapped(index),
-//     child: Column(
-//       mainAxisAlignment: MainAxisAlignment.center,
-//       children: [
-//         Icon(
-//           icon,
-//           // color:
-//           //     isSelected ? theme.colorScheme.primaryContainer : Colors.grey,
-//           size: 24,
-//         ),
-//         const SizedBox(height: 4),
-//         Text(
-//           label,
-//           style: TextStyle(
-//             // color:
-//             //     isSelected ? theme.colorScheme.primaryContainer : Colors.grey,
-//             fontSize: 12,
-//             fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-//           ),
-//         ),
-//       ],
-//     ),
-//   );
-// }
-
 class Homescreen extends ConsumerStatefulWidget {
   const Homescreen({super.key});
 
@@ -122,20 +93,14 @@ class _HomescreenState extends ConsumerState<Homescreen> {
     }
   }
 
-  // Future<void> _loadInitialData() async {
-  //   final user = ref.read(currentUserProvider);
-  //   if (user != null) {
-  //     // Force a refresh of pets from local DB
-  //     ref.invalidate(petsOfflineProvider);
-  //   }
-  // }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final petsAsync = ref.watch(petsOfflineProvider);
     final todayRemindersAsync = ref.watch(todayRemindersProvider);
     final currentUser = ref.watch(currentUserProvider);
+    const String assetName = 'assets/beige_cloud.svg';
+    final Widget svg = SvgPicture.asset(assetName, semanticsLabel: 'Cloud');
 
     ref.listen<AsyncValue<List<Pet>>>(petsOfflineProvider, (previous, next) {
       next.whenOrNull(
@@ -425,7 +390,8 @@ class _HomescreenState extends ConsumerState<Homescreen> {
         Expanded(
           child: _buildStatCard(
             theme: theme,
-            icon: Icons.pets,
+            svgPath: 'assets/svgs/beige_cloud.svg',
+            // icon: Icons.pets,
             count: pets.length.toString(),
             label: 'Pets',
             color: theme.colorScheme.primary,
@@ -435,7 +401,8 @@ class _HomescreenState extends ConsumerState<Homescreen> {
         Expanded(
           child: _buildStatCard(
             theme: theme,
-            icon: Icons.check_circle,
+            svgPath: 'assets/svgs/blue cloud.svg',
+            // icon: Icons.check_circle,
             count: completedCount.toString(),
             label: 'Completed',
             color: Colors.green,
@@ -445,10 +412,11 @@ class _HomescreenState extends ConsumerState<Homescreen> {
         Expanded(
           child: _buildStatCard(
             theme: theme,
-            icon: Icons.pending_actions,
+            svgPath: 'assets/svgs/green cloud.svg',
+            // icon: Icons.pending_actions,
             count: (totalCount - completedCount).toString(),
             label: 'Pending',
-            color: theme.colorScheme.tertiary,
+            color: Colors.red,
           ),
         ),
       ],
@@ -457,36 +425,30 @@ class _HomescreenState extends ConsumerState<Homescreen> {
 
   Widget _buildStatCard({
     required ThemeData theme,
-    required IconData icon,
+    required String svgPath, // e.g. 'assets/cloud.svg'
     required String count,
     required String label,
     required Color color,
   }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 28),
-          const SizedBox(height: 8),
-          Text(
-            count,
-            style: theme.textTheme.headlineMedium?.copyWith(color: color),
-          ),
-          const SizedBox(height: 2),
-          Text(label, style: theme.textTheme.bodySmall),
-        ],
-      ),
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        // Cloud SVG background
+        SvgPicture.asset(svgPath, width: 160, height: 120, fit: BoxFit.contain),
+
+        // Foreground content
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              count,
+              style: theme.textTheme.headlineMedium?.copyWith(color: color),
+            ),
+            const SizedBox(height: 4),
+            Text(label, style: theme.textTheme.bodySmall),
+          ],
+        ),
+      ],
     );
   }
 

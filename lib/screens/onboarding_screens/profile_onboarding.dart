@@ -336,7 +336,7 @@ class _ProfileCreationScreenState extends ConsumerState<ProfileCreationScreen> {
       if (mounted) {
         Navigator.of(
           context,
-        ).pushReplacementNamed('/location'); // Adjust route as needed
+        ).pushReplacementNamed('/onboarding'); // Adjust route as needed
       }
     } catch (error) {
       print('Profile creation error: $error');

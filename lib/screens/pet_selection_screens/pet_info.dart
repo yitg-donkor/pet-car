@@ -301,7 +301,6 @@ class PetDetailsScreen extends ConsumerWidget {
               Text(
                 'Health Status',
                 style: theme.textTheme.headlineMedium?.copyWith(
-                  color: Colors.white,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -472,12 +471,12 @@ class PetDetailsScreen extends ConsumerWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: theme.colorScheme.secondaryContainer,
+        color: theme.colorScheme.primaryContainer,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         children: [
-          Icon(Icons.alarm, color: theme.colorScheme.secondary, size: 20),
+          Icon(Icons.alarm, color: theme.colorScheme.primary, size: 20),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -519,6 +518,7 @@ class PetDetailsScreen extends ConsumerWidget {
             children: [
               Expanded(
                 child: _buildActionCard(
+                  Theme.of(context),
                   icon: Icons.add_alert,
                   label: 'Add Reminder',
                   color: Colors.blue,
@@ -533,6 +533,7 @@ class PetDetailsScreen extends ConsumerWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: _buildActionCard(
+                  Theme.of(context),
                   icon: Icons.medical_services,
                   label: 'Add Record',
                   color: Colors.red,
@@ -552,6 +553,7 @@ class PetDetailsScreen extends ConsumerWidget {
             children: [
               Expanded(
                 child: _buildActionCard(
+                  Theme.of(context),
                   icon: Icons.edit,
                   label: 'Edit Info',
                   color: Colors.orange,
@@ -566,6 +568,7 @@ class PetDetailsScreen extends ConsumerWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: _buildActionCard(
+                  Theme.of(context),
                   icon: Icons.share,
                   label: 'Share',
                   color: Colors.purple,
@@ -581,7 +584,9 @@ class PetDetailsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildActionCard({
+  Widget _buildActionCard(
+    ThemeData theme, {
+
     required IconData icon,
     required String label,
     required Color color,
@@ -592,7 +597,7 @@ class PetDetailsScreen extends ConsumerWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: theme.colorScheme.primaryContainer,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: color.withOpacity(0.3)),
           boxShadow: [

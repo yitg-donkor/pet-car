@@ -250,23 +250,17 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen>
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        title: const Text(
-          'Resources',
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+        title: const Text('Resources'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.location_on, color: Colors.black),
+            icon: const Icon(Icons.location_on),
             onPressed: _showLocationSettings,
+            tooltip: 'Change Location',
           ),
         ],
         bottom: PreferredSize(
@@ -300,21 +294,15 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen>
                               },
                             )
                             : null,
-                    filled: true,
-                    fillColor: Colors.grey[100],
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
                   ),
                 ),
               ),
               TabBar(
                 controller: _tabController,
                 isScrollable: true,
-                labelColor: const Color(0xFF4CAF50),
-                unselectedLabelColor: Colors.grey,
-                indicatorColor: const Color(0xFF4CAF50),
+                labelColor: colorScheme.primary,
+                unselectedLabelColor: colorScheme.onSurfaceVariant,
+                indicatorColor: colorScheme.primary,
                 tabs: const [
                   Tab(text: 'Emergency'),
                   Tab(text: 'Care Guides'),
@@ -346,6 +334,9 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen>
   // EMERGENCY TAB
   // ============================================
   Widget _buildEmergencyTab() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -355,22 +346,20 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen>
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.blue.shade50,
+              color: colorScheme.secondaryContainer,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.blue.shade200),
+              border: Border.all(color: colorScheme.secondary.withOpacity(0.3)),
             ),
             child: Row(
               children: [
-                Icon(Icons.location_on, color: Colors.blue.shade700),
+                Icon(Icons.location_on, color: colorScheme.secondary),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     _isLoadingLocation
                         ? 'Detecting your location...'
                         : 'Showing contacts for: ${_getCountryName(_userCountry)}',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.blue.shade900,
+                    style: theme.textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -388,15 +377,18 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen>
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.red.shade50,
+              color: colorScheme.errorContainer,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.red.shade200, width: 2),
+              border: Border.all(
+                color: colorScheme.error.withOpacity(0.3),
+                width: 2,
+              ),
             ),
             child: Row(
               children: [
                 Icon(
                   Icons.warning_amber_rounded,
-                  color: Colors.red.shade700,
+                  color: colorScheme.error,
                   size: 32,
                 ),
                 const SizedBox(width: 12),
@@ -406,19 +398,14 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen>
                     children: [
                       Text(
                         'In Case of Emergency',
-                        style: TextStyle(
-                          fontSize: 16,
+                        style: theme.textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.bold,
-                          color: Colors.red.shade900,
                         ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         'Call emergency services immediately for life-threatening situations',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.red.shade800,
-                        ),
+                        style: theme.textTheme.bodySmall?.copyWith(),
                       ),
                     ],
                   ),
@@ -434,16 +421,16 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen>
             children: [
               Row(
                 children: [
-                  const Icon(Icons.phone, color: Color(0xFF4CAF50)),
+                  Icon(Icons.phone, color: colorScheme.primary),
                   const SizedBox(width: 8),
-                  const Text(
+                  Text(
                     'Emergency Contacts',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    style: theme.textTheme.headlineMedium,
                   ),
                 ],
               ),
               IconButton(
-                icon: const Icon(Icons.add_circle, color: Color(0xFF4CAF50)),
+                icon: Icon(Icons.add_circle, color: colorScheme.primary),
                 onPressed: _addCustomContact,
                 tooltip: 'Add custom contact',
               ),
@@ -474,25 +461,22 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen>
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.info_outline,
                       size: 48,
-                      color: Colors.grey,
+                      color: colorScheme.onSurfaceVariant,
                     ),
                     const SizedBox(height: 12),
-                    const Text(
+                    Text(
                       'No emergency contacts available for your region',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 14),
+                      style: theme.textTheme.bodyMedium,
                     ),
                     const SizedBox(height: 16),
                     ElevatedButton.icon(
                       onPressed: _addCustomContact,
                       icon: const Icon(Icons.add),
                       label: const Text('Add Your Own'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF4CAF50),
-                      ),
                     ),
                   ],
                 ),
@@ -504,7 +488,7 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen>
                 contact.name,
                 contact.phoneNumber,
                 contact.description,
-                Colors.red,
+                colorScheme.error,
                 Icons.local_hospital,
               ),
             ),
@@ -517,11 +501,9 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen>
             icon: const Icon(Icons.location_searching),
             label: const Text('Find Emergency Vet Near Me'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
+              backgroundColor: colorScheme.error,
+              foregroundColor: Colors.white,
               padding: const EdgeInsets.all(16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
             ),
           ),
 
@@ -530,11 +512,11 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen>
           // First Aid Guide
           Row(
             children: [
-              const Icon(Icons.healing, color: Color(0xFF4CAF50)),
+              Icon(Icons.healing, color: colorScheme.primary),
               const SizedBox(width: 8),
-              const Text(
+              Text(
                 'Quick First Aid Guide',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                style: theme.textTheme.headlineMedium,
               ),
             ],
           ),
@@ -543,13 +525,13 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen>
             'Choking',
             'Remove visible object, Heimlich if needed',
             Icons.warning,
-            Colors.red,
+            colorScheme.error,
           ),
           _buildFirstAidCard(
             'Bleeding',
             'Apply pressure, elevate, seek vet',
             Icons.bloodtype,
-            Colors.red,
+            colorScheme.error,
           ),
           _buildFirstAidCard(
             'Poisoning',
@@ -607,6 +589,9 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen>
   }
 
   Widget _buildNearbyTab() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -615,14 +600,12 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen>
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Colors.blue.shade50, Colors.blue.shade100],
-              ),
+              color: colorScheme.secondaryContainer,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
               children: [
-                Icon(Icons.location_on, color: Colors.blue.shade700, size: 32),
+                Icon(Icons.location_on, color: colorScheme.secondary, size: 32),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -630,18 +613,15 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen>
                     children: [
                       Text(
                         'Find Pet Services Near You',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blue.shade900,
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          color: colorScheme.onSecondaryContainer,
                         ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         'All services open in Google Maps',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.blue.shade800,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSecondaryContainer,
                         ),
                       ),
                     ],
@@ -656,14 +636,14 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen>
             'Veterinarians',
             'Find general practice vets',
             Icons.medical_services,
-            Colors.blue,
+            colorScheme.secondary,
             () => _findNearbyVets(),
           ),
           _buildNearbyServiceCard(
             'Emergency Vets',
             '24/7 emergency care',
             Icons.emergency,
-            Colors.red,
+            colorScheme.error,
             () => _findNearbyVets(emergency: true),
           ),
           _buildNearbyServiceCard(
@@ -677,14 +657,14 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen>
             'Pet Stores',
             'Supplies and food',
             Icons.store,
-            Colors.orange,
+            colorScheme.tertiary,
             () => _findNearbyService('pet store'),
           ),
           _buildNearbyServiceCard(
             'Dog Parks',
             'Off-leash play areas',
             Icons.park,
-            Colors.green,
+            colorScheme.primary,
             () => _findNearbyService('dog park'),
           ),
           _buildNearbyServiceCard(
@@ -700,32 +680,39 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen>
   }
 
   Widget _buildComingSoonTab(String title, String description) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.construction, size: 80, color: Colors.grey[400]),
+            Icon(
+              Icons.construction,
+              size: 80,
+              color: colorScheme.onSurfaceVariant,
+            ),
             const SizedBox(height: 24),
             Text(
               title,
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              style: theme.textTheme.displaySmall,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
             Text(
               description,
-              style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+              style: theme.textTheme.bodyLarge?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
-            const Text(
+            Text(
               'Coming Soon!',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF4CAF50),
+              style: theme.textTheme.headlineSmall?.copyWith(
+                color: colorScheme.primary,
               ),
             ),
           ],
@@ -747,10 +734,10 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen>
     bool isCustom = false,
     VoidCallback? onDelete,
   }) {
+    final theme = Theme.of(context);
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: Container(
@@ -763,25 +750,19 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen>
         ),
         title: Row(
           children: [
-            Expanded(
-              child: Text(
-                name,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
-              ),
-            ),
+            Expanded(child: Text(name, style: theme.textTheme.titleLarge)),
             if (isCustom)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Colors.purple.shade100,
+                  color: Colors.purple.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Text(
+                child: Text(
                   'CUSTOM',
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
           ],
@@ -792,14 +773,13 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen>
             const SizedBox(height: 4),
             Text(
               phone,
-              style: TextStyle(
-                fontSize: 15,
+              style: theme.textTheme.bodyMedium?.copyWith(
                 fontWeight: FontWeight.w600,
                 color: color,
               ),
             ),
             const SizedBox(height: 2),
-            Text(description, style: const TextStyle(fontSize: 13)),
+            Text(description, style: theme.textTheme.bodySmall),
           ],
         ),
         trailing:
@@ -819,13 +799,19 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen>
                           onTap: () => _makePhoneCall(phone),
                         ),
                         PopupMenuItem(
-                          child: const Row(
+                          child: Row(
                             children: [
-                              Icon(Icons.delete, size: 20, color: Colors.red),
-                              SizedBox(width: 12),
+                              Icon(
+                                Icons.delete,
+                                size: 20,
+                                color: theme.colorScheme.error,
+                              ),
+                              const SizedBox(width: 12),
                               Text(
                                 'Delete',
-                                style: TextStyle(color: Colors.red),
+                                style: TextStyle(
+                                  color: theme.colorScheme.error,
+                                ),
                               ),
                             ],
                           ),
@@ -847,10 +833,10 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen>
     IconData icon,
     Color color,
   ) {
+    final theme = Theme.of(context);
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ExpansionTile(
         leading: Container(
           padding: const EdgeInsets.all(8),
@@ -860,13 +846,13 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen>
           ),
           child: Icon(icon, color: color),
         ),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+        title: Text(title, style: theme.textTheme.titleLarge),
         children: [
           Padding(
             padding: const EdgeInsets.all(16),
             child: Text(
               description,
-              style: const TextStyle(fontSize: 14, height: 1.5),
+              style: theme.textTheme.bodyMedium?.copyWith(height: 1.5),
             ),
           ),
         ],
@@ -881,10 +867,11 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen>
     Color color,
     VoidCallback onTap,
   ) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: Container(
@@ -895,9 +882,9 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen>
           ),
           child: Icon(icon, color: color, size: 28),
         ),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(description),
-        trailing: const Icon(Icons.location_on, color: Colors.blue),
+        title: Text(title, style: theme.textTheme.titleLarge),
+        subtitle: Text(description, style: theme.textTheme.bodyMedium),
+        trailing: Icon(Icons.location_on, color: colorScheme.secondary),
         onTap: onTap,
       ),
     );
@@ -919,13 +906,12 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen>
   }
 
   void _showLocationSettings() {
+    final theme = Theme.of(context);
+
     showDialog(
       context: context,
       builder:
           (context) => AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
             title: const Text('Change Location'),
             content: Column(
               mainAxisSize: MainAxisSize.min,
@@ -939,10 +925,7 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen>
                   },
                 ),
                 const Divider(),
-                const Text(
-                  'Or select manually:',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
+                Text('Or select manually:', style: theme.textTheme.titleMedium),
                 ..._getAvailableCountries().map(
                   (country) => ListTile(
                     title: Text(country['name']!),
@@ -985,9 +968,6 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen>
       context: context,
       builder:
           (context) => AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
             title: const Text('Add Custom Contact'),
             content: SingleChildScrollView(
               child: Column(
@@ -997,7 +977,6 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen>
                     controller: nameController,
                     decoration: const InputDecoration(
                       labelText: 'Contact Name',
-                      border: OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -1005,7 +984,6 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen>
                     controller: phoneController,
                     decoration: const InputDecoration(
                       labelText: 'Phone Number',
-                      border: OutlineInputBorder(),
                       prefixText: '+',
                     ),
                     keyboardType: TextInputType.phone,
@@ -1013,10 +991,7 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen>
                   const SizedBox(height: 12),
                   TextField(
                     controller: descController,
-                    decoration: const InputDecoration(
-                      labelText: 'Description',
-                      border: OutlineInputBorder(),
-                    ),
+                    decoration: const InputDecoration(labelText: 'Description'),
                     maxLines: 2,
                   ),
                 ],
@@ -1053,9 +1028,6 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen>
                     );
                   }
                 },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF4CAF50),
-                ),
                 child: const Text('Add'),
               ),
             ],
@@ -1064,13 +1036,12 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen>
   }
 
   void _deleteCustomContact(String id) {
+    final theme = Theme.of(context);
+
     showDialog(
       context: context,
       builder:
           (context) => AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
             title: const Text('Delete Contact?'),
             content: const Text(
               'Are you sure you want to delete this custom contact?',
@@ -1094,7 +1065,10 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen>
                     const SnackBar(content: Text('Contact deleted')),
                   );
                 },
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: theme.colorScheme.error,
+                  foregroundColor: Colors.white,
+                ),
                 child: const Text('Delete'),
               ),
             ],

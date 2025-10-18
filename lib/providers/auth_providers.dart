@@ -301,6 +301,8 @@ class UserProfileProvider extends _$UserProfileProvider {
     }
   }
 
+  // Fixed createProfile method for auth_providers.dart
+
   Future<void> createProfile({
     required String fullName,
     required String username,
@@ -317,13 +319,26 @@ class UserProfileProvider extends _$UserProfileProvider {
     NotificationPreferences? notificationPreferences,
     AppSettings? appSettings,
   }) async {
-    final profile = await ref.read(currentUserProfileProvider.future);
     final isOffline = ref.read(isOfflineModeProvider);
 
+    // Get the current user's ID
+    String userId;
+    if (isOffline) {
+      // In offline mode, generate an offline ID
+      userId = 'offline_user_${DateTime.now().millisecondsSinceEpoch}';
+    } else {
+      // In online mode, MUST get the real user ID from auth
+      final session = ref.read(currentSessionProvider);
+      if (session == null || session.user.id.isEmpty) {
+        throw Exception('Cannot create profile: User not authenticated');
+      }
+      userId = session.user.id;
+    }
+
+    print('Creating profile for user: $userId (offline: $isOffline)');
+
     final profileData = {
-      'id':
-          profile?.id ??
-          'offline_user_${DateTime.now().millisecondsSinceEpoch}',
+      'id': userId,
       'full_name': fullName,
       'username': username.toLowerCase(),
       'bio': bio,
@@ -348,15 +363,65 @@ class UserProfileProvider extends _$UserProfileProvider {
     if (!isOffline) {
       try {
         final supabase = ref.read(supabaseProvider);
+        print('Attempting to create profile in Supabase with ID: $userId');
         await supabase.from('profiles').upsert(profileData);
+        print('Profile created successfully in Supabase');
       } catch (e) {
         print('Error creating profile online: $e');
+        // Don't throw here - save locally as fallback
       }
     }
 
+    // Always save to local DB
     await _saveLocalProfile(UserProfile.fromJson(profileData));
+    print('Profile saved to local DB');
+
     ref.invalidateSelf();
     ref.invalidate(currentUserProfileProvider);
+  }
+
+  // Alternative: Simpler createProfile that uses current session
+  Future<void> createProfileSimple({
+    required String fullName,
+    required String username,
+    String? bio,
+  }) async {
+    final session = ref.read(currentSessionProvider);
+    if (session == null) {
+      throw Exception('No active session. Please sign in first.');
+    }
+
+    final userId = session.user.id;
+    print('Creating profile for authenticated user: $userId');
+
+    final profileData = {
+      'id': userId,
+      'full_name': fullName,
+      'username': username.toLowerCase(),
+      'bio': bio,
+      'notification_preferences': NotificationPreferences().toJson(),
+      'app_settings': AppSettings().toJson(),
+      'phone_verified': false,
+      'is_active': true,
+      'created_at': DateTime.now().toIso8601String(),
+      'updated_at': DateTime.now().toIso8601String(),
+    };
+
+    try {
+      final supabase = ref.read(supabaseProvider);
+      await supabase.from('profiles').upsert(profileData);
+      print('✅ Profile created in Supabase');
+
+      // Save to local DB
+      await _saveLocalProfile(UserProfile.fromJson(profileData));
+      print('✅ Profile saved locally');
+
+      ref.invalidateSelf();
+      ref.invalidate(currentUserProfileProvider);
+    } catch (e) {
+      print('❌ Error creating profile: $e');
+      throw Exception('Failed to create profile: $e');
+    }
   }
 
   Future<void> updateProfile({

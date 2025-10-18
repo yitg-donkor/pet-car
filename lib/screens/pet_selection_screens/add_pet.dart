@@ -239,7 +239,6 @@ class _AddPet extends ConsumerState<AddPet> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
         title: Text('${widget.species} Details'),
         backgroundColor: Colors.transparent,

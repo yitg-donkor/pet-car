@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pet_care/firebase_options.dart';
 import 'package:pet_care/local_db/sqflite_db.dart';
 import 'package:pet_care/providers/app_state_provider.dart';
-import 'package:pet_care/screens/main_screens/pet_info.dart';
+import 'package:pet_care/screens/pet_selection_screens/pet_info.dart';
 import 'package:pet_care/screens/main_screens/setting_screen.dart';
 import 'package:pet_care/screens/onboarding_screens/introduction.dart';
 import 'package:pet_care/screens/onboarding_screens/onboarding_flow_screen.dart';

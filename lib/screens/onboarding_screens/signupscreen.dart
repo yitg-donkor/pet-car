@@ -62,44 +62,57 @@ class _SignupscreenState extends ConsumerState<Signupscreen> {
         print('User created successfully: ${response.user!.id}');
 
         // Create user profile after successful signup
-        try {
-          // Wait a moment for the auth state to settle
-          await Future.delayed(const Duration(milliseconds: 500));
+        // ONLY if we have a session (user is auto-confirmed)
+        if (response.session != null) {
+          try {
+            print('Creating profile for user: ${response.user!.id}');
 
-          final userProfileProvider = ref.read(
-            userProfileProviderProvider.notifier,
-          );
-          await userProfileProvider.createProfile(
-            fullName: _nameController.text.trim(),
-            username: _emailController.text.trim().split('@')[0],
-          );
-          print('Profile created successfully');
-        } catch (profileError) {
-          print('Profile creation failed: $profileError');
-          _showSnackBar(
-            'Account created successfully, but profile setup failed. You can update your profile in settings.',
-            isError: true,
-          );
-        }
+            final userProfileProvider = ref.read(
+              userProfileProviderProvider.notifier,
+            );
 
-        // Check if email confirmation is required
-        if (response.session == null) {
+            // Generate username from email
+            final username = _emailController.text
+                .trim()
+                .split('@')[0]
+                .toLowerCase()
+                .replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '');
+
+            await userProfileProvider.createProfile(
+              fullName: _nameController.text.trim(),
+              username: username,
+            );
+
+            print('✅ Profile created successfully');
+
+            _showSnackBar('Account created successfully!');
+
+            // Navigate to profile setup or home
+            if (mounted) {
+              Navigator.of(context).pushReplacementNamed('/onboarding');
+            }
+          } catch (profileError) {
+            print('❌ Profile creation failed: $profileError');
+            _showSnackBar(
+              'Account created but profile setup failed. Please update your profile in settings.',
+              isError: true,
+            );
+
+            // Still navigate to app
+            if (mounted) {
+              Navigator.of(context).pushReplacementNamed('/');
+            }
+          }
+        } else {
+          // Email confirmation required
+          print('Email confirmation required');
           _showSnackBar(
             'Please check your email to confirm your account before signing in.',
           );
+
           // Navigate to login screen
           if (mounted) {
             Navigator.of(context).pushReplacementNamed('/login');
-          }
-        } else {
-          // User is automatically signed in
-          _showSnackBar('Account created successfully!');
-          // Navigate to main app or home screen
-          if (mounted) {
-            //TODO  it should point to profile creation and pet selection
-            Navigator.of(
-              context,
-            ).pushReplacementNamed('/profile'); // Adjust route as needed
           }
         }
       } else {
@@ -133,10 +146,7 @@ class _SignupscreenState extends ConsumerState<Signupscreen> {
             'Too many attempts. Please wait a moment before trying again.';
       }
 
-      _showSnackBar(
-        'Error: $errorMessage\nDetails: ${error.toString()}',
-        isError: true,
-      );
+      _showSnackBar(errorMessage, isError: true);
     }
   }
 
@@ -193,7 +203,6 @@ class _SignupscreenState extends ConsumerState<Signupscreen> {
                     if (value == null || value.trim().isEmpty) {
                       return 'Please enter your email';
                     }
-                    // Basic email validation
                     final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
                     if (!emailRegex.hasMatch(value.trim())) {
                       return 'Please enter a valid email';
@@ -218,10 +227,6 @@ class _SignupscreenState extends ConsumerState<Signupscreen> {
                     if (value.length < 6) {
                       return 'Password must be at least 6 characters';
                     }
-                    // Temporarily comment out strict validation for debugging
-                    // if (!RegExp(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)').hasMatch(value)) {
-                    //   return 'Password must contain uppercase, lowercase and number';
-                    // }
                     return null;
                   },
                 ),
