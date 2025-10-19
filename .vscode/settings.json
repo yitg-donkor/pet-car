@@ -5,5 +5,8 @@
     "dart.previewFlutterUiGuides": true,
     "dart.previewFlutterUiGuidesCustomTracking": true,
     "dart.automaticallyGetPackages": false,
-    "dart.runPubGetOnPubspecChanges": "never"
+    "dart.runPubGetOnPubspecChanges": "prompt",
+    "dart.flutterRunAdditionalArgs": [
+        "--no-pub"
+    ]
 }

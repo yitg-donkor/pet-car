@@ -120,9 +120,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget build(BuildContext context) {
     final authState = ref.watch(authServiceProvider);
     final isLoading = authState.isLoading;
+    final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: Colors.white,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16.0),
@@ -138,10 +138,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 const SizedBox(height: 30),
                 TextFormField(
+                  style: TextStyle(color: theme.colorScheme.onPrimary),
                   controller: _emailController,
                   enabled: !isLoading,
                   keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
+                    floatingLabelStyle: TextStyle(
+                      color: theme.colorScheme.onPrimary,
+                    ),
                     labelText: 'Email',
                     border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.email),
@@ -160,9 +164,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
+                  style: TextStyle(color: theme.colorScheme.onPrimary),
                   controller: _passwordController,
                   enabled: !isLoading,
                   decoration: InputDecoration(
+                    floatingLabelStyle: TextStyle(
+                      color: theme.colorScheme.onPrimary,
+                    ),
                     labelText: 'Password',
                     border: const OutlineInputBorder(),
                     prefixIcon: const Icon(Icons.lock),

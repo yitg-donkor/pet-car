@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:pet_care/models/activity_log.dart';
-import 'package:pet_care/providers/activity_log_providers.dart';
+
 import 'package:pet_care/providers/offline_providers.dart';
 
 class LogScreen extends ConsumerStatefulWidget {
@@ -406,235 +406,237 @@ class _LogScreenState extends ConsumerState<LogScreen>
     return DateFormat('h:mm a').format(time);
   }
 
-  void _showAddLogDialog(BuildContext context) {
-    final petsAsync = ref.watch(petsOfflineProvider);
+  void _showAddLogDialog(BuildContext context) async {
+    // Use .future to wait for pets to load
+    try {
+      final pets = await ref.read(petsOfflineProvider.future);
 
-    if (petsAsync is AsyncLoading) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Loading pets... please wait')),
-      );
-      return;
-    }
+      if (!mounted) return;
 
-    if (petsAsync.hasError) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading pets: ${petsAsync.error}')),
-      );
-      return;
-    }
-
-    final pets = petsAsync.value ?? [];
-
-    if (pets.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please add a pet first before logging activities'),
-        ),
-      );
-      return;
-    }
-
-    String? selectedActivityType;
-    String? selectedPetId = pets.first.id;
-    final detailsController = TextEditingController();
-    final durationController = TextEditingController();
-    final amountController = TextEditingController();
-    bool isHealthRelated = false;
-
-    showDialog(
-      context: context,
-      builder: (BuildContext dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-              title: const Text('Add Log Entry'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    DropdownButtonFormField<String>(
-                      decoration: InputDecoration(
-                        labelText: 'Activity Type',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                      value: selectedActivityType,
-                      items:
-                          ActivityType.values.map((type) {
-                            return DropdownMenuItem(
-                              value: type.value,
-                              child: Row(
-                                children: [
-                                  Icon(type.icon, color: type.color, size: 20),
-                                  const SizedBox(width: 8),
-                                  Text(type.label),
-                                ],
-                              ),
-                            );
-                          }).toList(),
-                      onChanged: (value) {
-                        setDialogState(() {
-                          selectedActivityType = value;
-                          // Auto-check health for certain types
-                          if (value == 'health' ||
-                              value == 'vet' ||
-                              value == 'medication' ||
-                              value == 'weight') {
-                            isHealthRelated = true;
-                          }
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 15),
-                    DropdownButtonFormField<String>(
-                      decoration: InputDecoration(
-                        labelText: 'Pet',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                      value: selectedPetId,
-                      items:
-                          pets.map((pet) {
-                            return DropdownMenuItem(
-                              value: pet.id,
-                              child: Text(pet.name),
-                            );
-                          }).toList(),
-                      onChanged: (value) {
-                        setDialogState(() {
-                          selectedPetId = value;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 15),
-                    if (selectedActivityType == 'walk' ||
-                        selectedActivityType == 'playtime') ...[
-                      TextField(
-                        controller: durationController,
-                        keyboardType: TextInputType.number,
-                        decoration: InputDecoration(
-                          labelText: 'Duration (minutes)',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 15),
-                    ],
-                    if (selectedActivityType == 'meal' ||
-                        selectedActivityType == 'medication') ...[
-                      TextField(
-                        controller: amountController,
-                        decoration: InputDecoration(
-                          labelText: 'Amount',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          hintText: 'e.g., 1 cup, 2 pills',
-                        ),
-                      ),
-                      const SizedBox(height: 15),
-                    ],
-                    TextField(
-                      controller: detailsController,
-                      maxLines: 3,
-                      decoration: InputDecoration(
-                        labelText: 'Details',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        hintText: 'Add any notes or observations...',
-                      ),
-                    ),
-                    const SizedBox(height: 15),
-                    CheckboxListTile(
-                      title: const Text('Health-related'),
-                      value: isHealthRelated,
-                      onChanged: (value) {
-                        setDialogState(() {
-                          isHealthRelated = value ?? false;
-                        });
-                      },
-                      controlAffinity: ListTileControlAffinity.leading,
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: () async {
-                    if (selectedActivityType == null || selectedPetId == null) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Please select activity type and pet'),
-                        ),
-                      );
-                      return;
-                    }
-
-                    final activityType = ActivityType.fromString(
-                      selectedActivityType!,
-                    );
-
-                    final log = ActivityLog(
-                      id: '',
-                      petId: selectedPetId!,
-                      activityType: selectedActivityType!,
-                      title: activityType.label,
-                      details:
-                          detailsController.text.isNotEmpty
-                              ? detailsController.text
-                              : null,
-                      timestamp: DateTime.now(),
-                      duration:
-                          durationController.text.isNotEmpty
-                              ? int.tryParse(durationController.text)
-                              : null,
-                      amount:
-                          amountController.text.isNotEmpty
-                              ? amountController.text
-                              : null,
-                      isHealthRelated: isHealthRelated,
-                      lastModified: DateTime.now(),
-                      createdAt: DateTime.now(),
-                    );
-
-                    await ref
-                        .read(activityLogsOfflineProvider.notifier)
-                        .addLog(log);
-
-                    if (context.mounted) {
-                      Navigator.of(dialogContext).pop();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Log entry added successfully'),
-                          backgroundColor: Color(0xFF4CAF50),
-                        ),
-                      );
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF4CAF50),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: const Text('Add Entry'),
-                ),
-              ],
-            );
-          },
+      if (pets.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please add a pet first before logging activities'),
+          ),
         );
-      },
-    );
+        return;
+      }
+
+      String? selectedActivityType;
+      String? selectedPetId = pets.first.id;
+      final detailsController = TextEditingController();
+      final durationController = TextEditingController();
+      final amountController = TextEditingController();
+      bool isHealthRelated = false;
+
+      showDialog(
+        context: context,
+        builder: (BuildContext dialogContext) {
+          return StatefulBuilder(
+            builder: (context, setDialogState) {
+              return AlertDialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                title: const Text('Add Log Entry'),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      DropdownButtonFormField<String>(
+                        decoration: InputDecoration(
+                          labelText: 'Activity Type',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        value: selectedActivityType,
+                        items:
+                            ActivityType.values.map((type) {
+                              return DropdownMenuItem(
+                                value: type.value,
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      type.icon,
+                                      color: type.color,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(type.label),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                        onChanged: (value) {
+                          setDialogState(() {
+                            selectedActivityType = value;
+                            // Auto-check health for certain types
+                            if (value == 'health' ||
+                                value == 'vet' ||
+                                value == 'medication' ||
+                                value == 'weight') {
+                              isHealthRelated = true;
+                            }
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 15),
+                      DropdownButtonFormField<String>(
+                        decoration: InputDecoration(
+                          labelText: 'Pet',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        value: selectedPetId,
+                        items:
+                            pets.map((pet) {
+                              return DropdownMenuItem(
+                                value: pet.id,
+                                child: Text(pet.name),
+                              );
+                            }).toList(),
+                        onChanged: (value) {
+                          setDialogState(() {
+                            selectedPetId = value;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 15),
+                      if (selectedActivityType == 'walk' ||
+                          selectedActivityType == 'playtime') ...[
+                        TextField(
+                          controller: durationController,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            labelText: 'Duration (minutes)',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 15),
+                      ],
+                      if (selectedActivityType == 'meal' ||
+                          selectedActivityType == 'medication') ...[
+                        TextField(
+                          controller: amountController,
+                          decoration: InputDecoration(
+                            labelText: 'Amount',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            hintText: 'e.g., 1 cup, 2 pills',
+                          ),
+                        ),
+                        const SizedBox(height: 15),
+                      ],
+                      TextField(
+                        controller: detailsController,
+                        maxLines: 3,
+                        decoration: InputDecoration(
+                          labelText: 'Details',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          hintText: 'Add any notes or observations...',
+                        ),
+                      ),
+                      const SizedBox(height: 15),
+                      CheckboxListTile(
+                        title: const Text('Health-related'),
+                        value: isHealthRelated,
+                        onChanged: (value) {
+                          setDialogState(() {
+                            isHealthRelated = value ?? false;
+                          });
+                        },
+                        controlAffinity: ListTileControlAffinity.leading,
+                      ),
+                    ],
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(),
+                    child: const Text('Cancel'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () async {
+                      if (selectedActivityType == null ||
+                          selectedPetId == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Please select activity type and pet',
+                            ),
+                          ),
+                        );
+                        return;
+                      }
+
+                      final activityType = ActivityType.fromString(
+                        selectedActivityType!,
+                      );
+
+                      final log = ActivityLog(
+                        id: '',
+                        petId: selectedPetId!,
+                        activityType: selectedActivityType!,
+                        title: activityType.label,
+                        details:
+                            detailsController.text.isNotEmpty
+                                ? detailsController.text
+                                : null,
+                        timestamp: DateTime.now(),
+                        duration:
+                            durationController.text.isNotEmpty
+                                ? int.tryParse(durationController.text)
+                                : null,
+                        amount:
+                            amountController.text.isNotEmpty
+                                ? amountController.text
+                                : null,
+                        isHealthRelated: isHealthRelated,
+                        lastModified: DateTime.now(),
+                        createdAt: DateTime.now(),
+                      );
+
+                      await ref
+                          .read(activityLogsOfflineProvider.notifier)
+                          .addLog(log);
+
+                      if (context.mounted) {
+                        Navigator.of(dialogContext).pop();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Log entry added successfully'),
+                            backgroundColor: Color(0xFF4CAF50),
+                          ),
+                        );
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF4CAF50),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: const Text('Add Entry'),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error loading pets: $e')));
+    }
   }
 }

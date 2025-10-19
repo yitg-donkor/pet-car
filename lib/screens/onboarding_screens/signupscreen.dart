@@ -154,9 +154,9 @@ class _SignupscreenState extends ConsumerState<Signupscreen> {
   Widget build(BuildContext context) {
     final authState = ref.watch(authServiceProvider);
     final isLoading = authState.isLoading;
+    final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: Colors.white,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16.0),
@@ -172,12 +172,16 @@ class _SignupscreenState extends ConsumerState<Signupscreen> {
                 ),
                 const SizedBox(height: 30),
                 TextFormField(
+                  style: TextStyle(color: theme.colorScheme.onPrimary),
                   controller: _nameController,
                   enabled: !isLoading,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Full Name',
                     border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.person),
+                    floatingLabelStyle: TextStyle(
+                      color: theme.colorScheme.onPrimary,
+                    ),
                   ),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
@@ -191,10 +195,14 @@ class _SignupscreenState extends ConsumerState<Signupscreen> {
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
+                  style: TextStyle(color: theme.colorScheme.onPrimary),
                   controller: _emailController,
                   enabled: !isLoading,
                   keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
+                    floatingLabelStyle: TextStyle(
+                      color: theme.colorScheme.onPrimary,
+                    ),
                     labelText: 'Email',
                     border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.email),
@@ -212,9 +220,13 @@ class _SignupscreenState extends ConsumerState<Signupscreen> {
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
+                  style: TextStyle(color: theme.colorScheme.onPrimary),
                   controller: _passwordController,
                   enabled: !isLoading,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
+                    floatingLabelStyle: TextStyle(
+                      color: theme.colorScheme.onPrimary,
+                    ),
                     labelText: 'Password',
                     border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.lock),
@@ -232,9 +244,13 @@ class _SignupscreenState extends ConsumerState<Signupscreen> {
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
+                  style: TextStyle(color: theme.colorScheme.onPrimary),
                   controller: _confirmPasswordController,
                   enabled: !isLoading,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
+                    floatingLabelStyle: TextStyle(
+                      color: theme.colorScheme.onPrimary,
+                    ),
                     labelText: 'Confirm Password',
                     border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.lock),

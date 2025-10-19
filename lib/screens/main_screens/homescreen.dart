@@ -10,6 +10,7 @@ import 'package:pet_care/screens/ai_features/ai_navigation_screen.dart';
 import 'package:pet_care/screens/main_screens/log.dart';
 import 'package:pet_care/screens/main_screens/reminders.dart';
 import 'package:pet_care/screens/main_screens/resources.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import 'package:pet_care/services/notification_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -70,6 +71,115 @@ class _MainNavigationState extends ConsumerState<MainNavigation> {
   }
 }
 
+// 8. CLOUD PUFFS - Rounded bumpy waves
+
+class StrokeText extends StatelessWidget {
+  final String text;
+  final TextStyle textStyle;
+  final Color strokeColor;
+  final double strokeWidth;
+
+  const StrokeText({
+    super.key,
+    required this.text,
+    required this.textStyle,
+    this.strokeColor = Colors.white,
+    this.strokeWidth = 4.0,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        // Stroke (outline) layer
+        Text(
+          text,
+          style: textStyle.copyWith(
+            foreground:
+                Paint()
+                  ..style = PaintingStyle.stroke
+                  ..strokeWidth = strokeWidth
+                  ..color = strokeColor,
+          ),
+        ),
+        // Fill layer
+        Text(text, style: textStyle),
+      ],
+    );
+  }
+}
+
+class CloudPuffsClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) {
+    Path path = Path();
+    path.lineTo(0, size.height * 0.65);
+
+    // Puffy cloud 1
+    path.quadraticBezierTo(
+      size.width * 0.1,
+      size.height * 0.55,
+      size.width * 0.2,
+      size.height * 0.65,
+    );
+
+    // Puffy cloud 2
+    path.quadraticBezierTo(
+      size.width * 0.3,
+      size.height * 0.6,
+      size.width * 0.4,
+      size.height * 0.7,
+    );
+
+    // Puffy cloud 3
+    path.quadraticBezierTo(
+      size.width * 0.5,
+      size.height * 0.75,
+      size.width * 0.6,
+      size.height * 0.68,
+    );
+
+    // Puffy cloud 4
+    path.quadraticBezierTo(
+      size.width * 0.75,
+      size.height * 0.62,
+      size.width * 0.85,
+      size.height * 0.7,
+    );
+
+    path.quadraticBezierTo(
+      size.width * 0.92,
+      size.height * 0.75,
+      size.width,
+      size.height * 0.72,
+    );
+
+    path.lineTo(size.width, 0);
+    path.close();
+    return path;
+  }
+
+  @override
+  bool shouldReclip(CustomClipper<Path> oldClipper) => false;
+}
+
+class PetDashboardBackground extends StatelessWidget {
+  const PetDashboardBackground({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return ClipPath(
+      clipper: CloudPuffsClipper(),
+      child: Container(
+        height: 400,
+        decoration: BoxDecoration(color: theme.colorScheme.primary),
+      ),
+    );
+  }
+}
+
 class Homescreen extends ConsumerStatefulWidget {
   const Homescreen({super.key});
 
@@ -99,8 +209,6 @@ class _HomescreenState extends ConsumerState<Homescreen> {
     final petsAsync = ref.watch(petsOfflineProvider);
     final todayRemindersAsync = ref.watch(todayRemindersProvider);
     final currentUser = ref.watch(currentUserProvider);
-    const String assetName = 'assets/beige_cloud.svg';
-    final Widget svg = SvgPicture.asset(assetName, semanticsLabel: 'Cloud');
 
     ref.listen<AsyncValue<List<Pet>>>(petsOfflineProvider, (previous, next) {
       next.whenOrNull(
@@ -117,83 +225,105 @@ class _HomescreenState extends ConsumerState<Homescreen> {
     });
 
     return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(theme, petsAsync, currentUser),
-            Expanded(
-              child: RefreshIndicator(
-                onRefresh: () async {
-                  ref.invalidate(petsOfflineProvider);
-                  ref.invalidate(todayRemindersProvider);
+      body: Stack(
+        children: [
+          // Background - placed first so it's behind everything
+          const PetDashboardBackground(),
 
-                  final user = ref.read(currentUserProvider);
-                  if (user != null) {
-                    final syncService = ref.read(unifiedSyncServiceProvider);
-                    await syncService.fullSync(user.id);
-                  }
-                },
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildWelcomeSection(theme, currentUser, petsAsync),
-                      const SizedBox(height: 25),
-                      petsAsync.when(
-                        data:
-                            (pets) => _buildQuickStats(
-                              theme,
-                              pets,
-                              todayRemindersAsync,
+          // Main content - placed on top of background
+          SafeArea(
+            child: Column(
+              children: [
+                _buildHeader(theme, petsAsync, currentUser),
+                Expanded(
+                  child: RefreshIndicator(
+                    onRefresh: () async {
+                      ref.invalidate(petsOfflineProvider);
+                      ref.invalidate(todayRemindersProvider);
+
+                      final user = ref.read(currentUserProvider);
+                      if (user != null) {
+                        final syncService = ref.read(
+                          unifiedSyncServiceProvider,
+                        );
+                        await syncService.fullSync(user.id);
+                      }
+                    },
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          petsAsync.when(
+                            data:
+                                (pets) => _buildQuickStats(
+                                  theme,
+                                  pets,
+                                  todayRemindersAsync,
+                                ),
+                            loading: () => const SizedBox.shrink(),
+                            error: (_, __) => const SizedBox.shrink(),
+                          ),
+                          const SizedBox(height: 25),
+                          Center(
+                            child: StrokeText(
+                              text: 'Paws-itively Planned!',
+                              textStyle: TextStyle(
+                                fontSize: 32,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFFFFF4E6), // Brown fill
+                                fontFamily:
+                                    GoogleFonts.comicNeue()
+                                        .fontFamily, // Rounded playful font
+                              ),
+                              strokeColor: Color(
+                                0xFF8B6B47,
+                              ), // Light cream outline
+                              strokeWidth: 6.0,
                             ),
-                        loading: () => const SizedBox.shrink(),
-                        error: (_, __) => const SizedBox.shrink(),
+                          ),
+                          const SizedBox(height: 15),
+                          todayRemindersAsync.when(
+                            data:
+                                (reminders) =>
+                                    _buildRemindersSection(theme, reminders),
+                            loading: () => _buildLoadingShimmer(theme),
+                            error:
+                                (error, _) => _buildErrorState(
+                                  theme,
+                                  'Failed to load reminders',
+                                ),
+                          ),
+                          const SizedBox(height: 30),
+                          _buildSectionHeader(theme, 'Your Pets', Icons.pets),
+                          const SizedBox(height: 15),
+                          petsAsync.when(
+                            data: (pets) => _buildPetsSection(theme, pets),
+                            loading: () => _buildLoadingShimmer(theme),
+                            error:
+                                (error, _) => _buildErrorState(
+                                  theme,
+                                  'Failed to load pets',
+                                ),
+                          ),
+                          const SizedBox(height: 30),
+                          _buildQuickActions(theme),
+                          const SizedBox(height: 20),
+                          universalButton(
+                            context,
+                            ref,
+                            label: "hit me",
+                            onpressed: () {},
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 25),
-                      _buildSectionHeader(
-                        theme,
-                        'Today\'s Reminders',
-                        Icons.alarm,
-                      ),
-                      const SizedBox(height: 15),
-                      todayRemindersAsync.when(
-                        data:
-                            (reminders) =>
-                                _buildRemindersSection(theme, reminders),
-                        loading: () => _buildLoadingShimmer(theme),
-                        error:
-                            (error, _) => _buildErrorState(
-                              theme,
-                              'Failed to load reminders',
-                            ),
-                      ),
-                      const SizedBox(height: 30),
-                      _buildSectionHeader(theme, 'Your Pets', Icons.pets),
-                      const SizedBox(height: 15),
-                      petsAsync.when(
-                        data: (pets) => _buildPetsSection(theme, pets),
-                        loading: () => _buildLoadingShimmer(theme),
-                        error:
-                            (error, _) =>
-                                _buildErrorState(theme, 'Failed to load pets'),
-                      ),
-                      const SizedBox(height: 30),
-                      _buildQuickActions(theme),
-                      const SizedBox(height: 20),
-                      universalButton(
-                        context,
-                        ref,
-                        label: "hit me",
-                        onpressed: () {},
-                      ),
-                    ],
+                    ),
                   ),
                 ),
-              ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -206,22 +336,10 @@ class _HomescreenState extends ConsumerState<Homescreen> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [theme.colorScheme.primary, theme.colorScheme.secondary],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
         borderRadius: const BorderRadius.only(
           bottomLeft: Radius.circular(30),
           bottomRight: Radius.circular(30),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: theme.colorScheme.primary.withOpacity(0.3),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
-          ),
-        ],
       ),
       child: Row(
         children: [
@@ -240,17 +358,14 @@ class _HomescreenState extends ConsumerState<Homescreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  petsAsync.when(
-                    data:
-                        (pets) => pets.isNotEmpty ? pets[0].name : 'Add a Pet',
-                    loading: () => 'Loading...',
-                    error: (_, __) => 'My Pets',
-                  ),
-                  style: theme.textTheme.headlineLarge,
-                ),
+                _greetingCard(theme),
                 const SizedBox(height: 2),
-                Text('Home Dashboard', style: theme.textTheme.headlineLarge),
+                Text(
+                  'Buddy!',
+                  style: theme.textTheme.headlineLarge?.copyWith(
+                    color: Color(0xFFFFFBF5),
+                  ),
+                ),
               ],
             ),
           ),
@@ -317,11 +432,7 @@ class _HomescreenState extends ConsumerState<Homescreen> {
     return Icon(Icons.pets, color: Colors.blue.shade400, size: 28);
   }
 
-  Widget _buildWelcomeSection(
-    ThemeData theme,
-    User? currentUser,
-    AsyncValue<List<Pet>> petsAsync,
-  ) {
+  Widget _greetingCard(ThemeData theme) {
     final hour = DateTime.now().hour;
     String greeting;
     if (hour < 12) {
@@ -331,40 +442,9 @@ class _HomescreenState extends ConsumerState<Homescreen> {
     } else {
       greeting = 'Good Evening';
     }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          greeting,
-          style: theme.textTheme.bodyLarge?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: 4),
-        petsAsync.when(
-          data: (pets) {
-            if (pets.isEmpty) {
-              return Text(
-                'Start by adding your first pet!',
-                style: theme.textTheme.headlineMedium,
-              );
-            }
-            return Text(
-              'You have ${pets.length} ${pets.length == 1 ? 'pet' : 'pets'} to care for today',
-              style: theme.textTheme.headlineSmall,
-            );
-          },
-          loading:
-              () => Text(
-                'Loading your pets...',
-                style: theme.textTheme.headlineSmall,
-              ),
-          error:
-              (_, __) =>
-                  Text('Welcome back!', style: theme.textTheme.headlineSmall),
-        ),
-      ],
+    return Text(
+      greeting,
+      style: theme.textTheme.headlineLarge?.copyWith(color: Color(0xFFFFFBF5)),
     );
   }
 
@@ -392,8 +472,8 @@ class _HomescreenState extends ConsumerState<Homescreen> {
             theme: theme,
             svgPath: 'assets/svgs/beige_cloud.svg',
             // icon: Icons.pets,
-            count: pets.length.toString(),
-            label: 'Pets',
+            icon: Icons.pets,
+            label: '${pets.length} Happy Paw',
             color: theme.colorScheme.primary,
           ),
         ),
@@ -403,8 +483,8 @@ class _HomescreenState extends ConsumerState<Homescreen> {
             theme: theme,
             svgPath: 'assets/svgs/blue cloud.svg',
             // icon: Icons.check_circle,
-            count: completedCount.toString(),
-            label: 'Completed',
+            icon: Icons.check_circle,
+            label: '$completedCount Joyful Jumps',
             color: Colors.green,
           ),
         ),
@@ -414,9 +494,10 @@ class _HomescreenState extends ConsumerState<Homescreen> {
             theme: theme,
             svgPath: 'assets/svgs/green cloud.svg',
             // icon: Icons.pending_actions,
-            count: (totalCount - completedCount).toString(),
-            label: 'Pending',
-            color: Colors.red,
+            icon: Icons.pending_actions,
+
+            label: '${totalCount - completedCount} Paws-pitive Reminders',
+            color: Color(0xFFFAFAF0),
           ),
         ),
       ],
@@ -426,26 +507,30 @@ class _HomescreenState extends ConsumerState<Homescreen> {
   Widget _buildStatCard({
     required ThemeData theme,
     required String svgPath, // e.g. 'assets/cloud.svg'
-    required String count,
+
     required String label,
     required Color color,
+    required IconData icon,
   }) {
     return Stack(
       alignment: Alignment.center,
       children: [
-        // Cloud SVG background
         SvgPicture.asset(svgPath, width: 160, height: 120, fit: BoxFit.contain),
-
-        // Foreground content
         Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              count,
-              style: theme.textTheme.headlineMedium?.copyWith(color: color),
-            ),
+            Icon(icon, color: color, size: 32),
             const SizedBox(height: 4),
-            Text(label, style: theme.textTheme.bodySmall),
+            Text(
+              label,
+              style: GoogleFonts.comicNeue(
+                textStyle: theme.textTheme.bodySmall,
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+            ),
           ],
         ),
       ],
@@ -471,6 +556,7 @@ class _HomescreenState extends ConsumerState<Homescreen> {
 
   Widget _buildRemindersSection(ThemeData theme, List<Reminder> reminders) {
     final activeReminders = reminders.where((r) => !r.isCompleted).toList();
+
     if (activeReminders.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(40),
@@ -494,182 +580,193 @@ class _HomescreenState extends ConsumerState<Homescreen> {
       );
     }
 
-    final displayReminders = activeReminders.take(3).toList();
+    final displayReminders = activeReminders.take(3);
     final remainingCount = activeReminders.length - 3;
 
-    return Column(
-      children: [
-        ...displayReminders.map(
-          (reminder) => _buildReminderCard(theme, reminder),
-        ),
-        if (remainingCount > 0) ...[
-          const SizedBox(height: 12),
-          GestureDetector(
-            onTap: () => Navigator.pushNamed(context, '/reminders'),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 12),
-              decoration: BoxDecoration(
-                border: Border.all(
-                  color: theme.colorScheme.primary.withOpacity(0.5),
-                ),
-                borderRadius: BorderRadius.circular(25),
-                color: theme.colorScheme.surface,
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'View $remainingCount More',
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      color: theme.colorScheme.primary,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Icon(
-                    Icons.arrow_forward,
-                    size: 16,
-                    color: theme.colorScheme.primary,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ],
+    // return Column(
+    //   children: [
+    //     ...displayReminders.map(
+    //       (reminder) => _buildReminderCard(theme, reminder),
+    //     ),
+    //   ],
+    // );
+
+    return SizedBox(
+      height: 180,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: displayReminders.length,
+        itemBuilder: (context, index) {
+          final reminder = reminders[index];
+          return _buildReminderCard(theme, reminder);
+        },
+      ),
     );
   }
 
   Widget _buildReminderCard(ThemeData theme, Reminder reminder) {
-    final icon = _getIconForReminder(reminder.title);
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: theme.colorScheme.outline,
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => Navigator.pushNamed(context, '/reminders'),
+    return GestureDetector(
+      onTap: () {},
+      child: Container(
+        width: 120,
+        margin: const EdgeInsets.only(right: 12),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(20),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    icon,
-                    color: theme.colorScheme.onSurface,
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 15),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        reminder.title,
-                        // style: TextStyle(
-                        //   color: Colors.white,
-                        //   fontSize: 16,
-                        //   fontWeight: FontWeight.w600,
-                        //   decoration:
-                        //       reminder.isCompleted
-                        //           ? TextDecoration.lineThrough
-                        //           : null,
-                        // ),
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          decoration:
-                              reminder.isCompleted
-                                  ? TextDecoration.lineThrough
-                                  : null,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        DateFormat('h:mm a').format(reminder.reminderDate),
-                        // style: TextStyle(
-                        //   color: Colors.white.withOpacity(0.9),
-                        //   fontSize: 14,
-                        // ),
-                        style: theme.textTheme.bodyMedium,
-                      ),
-                    ],
-                  ),
-                ),
-                if (!reminder.isCompleted)
-                  GestureDetector(
-                    onTap: () async {
-                      final db = ref.read(reminderDatabaseProvider);
-                      await db.toggleCompletion(reminder.id!, true);
-                      ref.invalidate(todayRemindersProvider);
-
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Marked as complete!'),
-                          duration: Duration(seconds: 2),
-                        ),
-                      );
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.outline,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        'Complete',
-                        // style: TextStyle(
-                        //   color: Colors.white,
-                        //   fontSize: 12,
-                        //   fontWeight: FontWeight.w600,
-                        // ),
-                        style: theme.textTheme.bodySmall,
-                      ),
-                    ),
-                  ),
-                if (reminder.isCompleted)
-                  const Icon(Icons.check_circle, color: Colors.white, size: 32),
-              ],
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
-          ),
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 70,
+              height: 70,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: theme.colorScheme.primary.withOpacity(0.5),
+                  width: 2,
+                ),
+              ),
+              child: ClipOval(),
+            ),
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Text(
+                reminder.title,
+                style: theme.textTheme.labelLarge,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(DateFormat('h:mm a').format(reminder.reminderDate)),
+          ],
         ),
       ),
     );
   }
 
-  List<Color> _getGradientForReminder(Reminder reminder) {
-    final title = reminder.title.toLowerCase();
-    if (title.contains('walk')) {
-      return [const Color(0xFF4CAF50), const Color(0xFF81C784)];
-    } else if (title.contains('feed') || title.contains('food')) {
-      return [const Color(0xFF2196F3), const Color(0xFF64B5F6)];
-    } else if (title.contains('medication') || title.contains('medicine')) {
-      return [const Color(0xFFE53E3E), const Color(0xFF9C27B0)];
-    } else if (title.contains('vet')) {
-      return [const Color(0xFFFF5722), const Color(0xFFFF7043)];
-    } else if (title.contains('groom')) {
-      return [const Color(0xFF9C27B0), const Color(0xFFBA68C8)];
-    }
-    return [const Color(0xFF3F51B5), const Color(0xFF5C6BC0)];
-  }
+  // Widget _buildReminderCard(ThemeData theme, Reminder reminder) {
+  //   final icon = _getIconForReminder(reminder.title);
+
+  //   return Container(
+  //     margin: const EdgeInsets.only(bottom: 12),
+  //     decoration: BoxDecoration(
+  //       color: theme.colorScheme.surface,
+
+  //       borderRadius: BorderRadius.circular(20),
+  //       boxShadow: [
+  //         BoxShadow(
+  //           color: theme.colorScheme.outline,
+  //           blurRadius: 8,
+  //           offset: const Offset(0, 4),
+  //         ),
+  //       ],
+  //     ),
+  //     child: Material(
+  //       color: Colors.transparent,
+  //       child: InkWell(
+  //         onTap: () => Navigator.pushNamed(context, '/reminders'),
+  //         borderRadius: BorderRadius.circular(20),
+  //         child: Padding(
+  //           padding: const EdgeInsets.all(16),
+  //           child: Row(
+  //             children: [
+  //               Container(
+  //                 padding: const EdgeInsets.all(10),
+  //                 decoration: BoxDecoration(
+  //                   borderRadius: BorderRadius.circular(12),
+  //                 ),
+  //                 child: Icon(
+  //                   icon,
+  //                   color: theme.colorScheme.onSurface,
+  //                   size: 24,
+  //                 ),
+  //               ),
+  //               const SizedBox(width: 15),
+  //               Expanded(
+  //                 child: Column(
+  //                   crossAxisAlignment: CrossAxisAlignment.start,
+  //                   children: [
+  //                     Text(
+  //                       reminder.title,
+  //                       // style: TextStyle(
+  //                       //   color: Colors.white,
+  //                       //   fontSize: 16,
+  //                       //   fontWeight: FontWeight.w600,
+  //                       //   decoration:
+  //                       //       reminder.isCompleted
+  //                       //           ? TextDecoration.lineThrough
+  //                       //           : null,
+  //                       // ),
+  //                       style: theme.textTheme.titleMedium?.copyWith(
+  //                         decoration:
+  //                             reminder.isCompleted
+  //                                 ? TextDecoration.lineThrough
+  //                                 : null,
+  //                       ),
+  //                     ),
+  //                     const SizedBox(height: 2),
+  //                     Text(
+  //                       DateFormat('h:mm a').format(reminder.reminderDate),
+  //
+  //                       style: theme.textTheme.bodyMedium,
+  //                     ),
+  //                   ],
+  //                 ),
+  //               ),
+  //               if (!reminder.isCompleted)
+  //                 GestureDetector(
+  //                   onTap: () async {
+  //                     final db = ref.read(reminderDatabaseProvider);
+  //                     await db.toggleCompletion(reminder.id!, true);
+  //                     ref.invalidate(todayRemindersProvider);
+
+  //                     ScaffoldMessenger.of(context).showSnackBar(
+  //                       const SnackBar(
+  //                         content: Text('Marked as complete!'),
+  //                         duration: Duration(seconds: 2),
+  //                       ),
+  //                     );
+  //                   },
+  //                   child: Container(
+  //                     padding: const EdgeInsets.symmetric(
+  //                       horizontal: 16,
+  //                       vertical: 8,
+  //                     ),
+  //                     decoration: BoxDecoration(
+  //                       color: theme.colorScheme.outline,
+  //                       borderRadius: BorderRadius.circular(20),
+  //                     ),
+  //                     child: Text(
+  //                       'Complete',
+  //                       // style: TextStyle(
+  //                       //   color: Colors.white,
+  //                       //   fontSize: 12,
+  //                       //   fontWeight: FontWeight.w600,
+  //                       // ),
+  //                       style: theme.textTheme.bodySmall,
+  //                     ),
+  //                   ),
+  //                 ),
+  //               if (reminder.isCompleted)
+  //                 const Icon(Icons.check_circle, color: Colors.white, size: 32),
+  //             ],
+  //           ),
+  //         ),
+  //       ),
+  //     ),
+  //   );
+  // }
 
   IconData _getIconForReminder(String title) {
     final titleLower = title.toLowerCase();

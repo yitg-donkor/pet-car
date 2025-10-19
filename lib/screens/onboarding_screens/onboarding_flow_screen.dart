@@ -103,7 +103,6 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -125,7 +124,7 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
       body: Column(
         children: [
           // Progress indicator
-          _buildProgressIndicator(),
+          _buildProgressIndicator(ThemeData()),
 
           // Page content
           Expanded(
@@ -185,7 +184,7 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
     );
   }
 
-  Widget _buildProgressIndicator() {
+  Widget _buildProgressIndicator(ThemeData theme) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
@@ -197,8 +196,8 @@ class _OnboardingFlowScreenState extends ConsumerState<OnboardingFlowScreen> {
               decoration: BoxDecoration(
                 color:
                     index <= _currentPage
-                        ? Theme.of(context).primaryColor
-                        : Colors.grey[300],
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.onPrimary,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),

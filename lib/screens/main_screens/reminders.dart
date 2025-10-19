@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pet_care/models/medical_record.dart';
 import 'package:pet_care/models/reminder.dart';
+import 'package:pet_care/providers/app_state_provider.dart';
 import 'package:pet_care/providers/auth_providers.dart';
 import 'package:pet_care/providers/offline_providers.dart';
 
@@ -596,10 +597,8 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
     return false;
   }
 
-  // Replace _toggleCompletion() in reminders_screen.dart
   Future<void> _toggleCompletion(Reminder reminder) async {
     final db = ref.read(reminderDatabaseProvider);
-    final user = ref.read(currentUserProvider);
     final newCompletionState = !reminder.isCompleted;
 
     // IMMEDIATE: Update local database first (snappy UI response)
@@ -611,6 +610,7 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
     // BACKGROUND: Handle notifications and syncing asynchronously
     Future.microtask(() async {
       try {
+        // Handle medical record creation dialog if needed
         if (!reminder.isCompleted && _reminnderMedical(reminder)) {
           final shouldCreateRecord = await _showCreateMedicalRecordDialog(
             reminder,
@@ -630,10 +630,19 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
           );
         }
 
-        // Sync with user ID
-        final syncService = ref.read(unifiedSyncServiceProvider);
-        if (user != null) {
-          await syncService.syncRemindersToSupabase();
+        // BACKGROUND sync to Supabase (only if online)
+        final isOffline = ref.read(isOfflineModeProvider);
+        if (!isOffline) {
+          try {
+            final syncService = ref.read(unifiedSyncServiceProvider);
+            if (await syncService.hasInternetConnection()) {
+              await syncService.syncRemindersToSupabase();
+              print('✅ Reminder completion synced to Supabase');
+            }
+          } catch (e) {
+            print('⚠️ Error syncing completion to Supabase: $e');
+            // Not critical - already updated locally
+          }
         }
       } catch (e) {
         print('Background toggle operation failed: $e');
@@ -730,28 +739,43 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
 
   Future<void> _deleteReminder(String id) async {
     try {
+      // ALWAYS delete from local DB first
       final db = ref.read(reminderDatabaseProvider);
       await db.deleteReminder(id);
 
       // Cancel notification
       await _notificationService.cancelNotification(id);
 
-      // Delete from Supabase if online
-      final syncService = ref.read(unifiedSyncServiceProvider);
-      if (await syncService.hasInternetConnection()) {
-        try {
-          await syncService.supabase.from('reminders').delete().eq('id', id);
-        } catch (e) {
-          print('Error deleting from Supabase: $e');
-        }
+      // BACKGROUND sync to Supabase (only if online)
+      final isOffline = ref.read(isOfflineModeProvider);
+      if (!isOffline) {
+        Future.microtask(() async {
+          try {
+            final syncService = ref.read(unifiedSyncServiceProvider);
+            if (await syncService.hasInternetConnection()) {
+              await syncService.supabase
+                  .from('reminders')
+                  .delete()
+                  .eq('id', id);
+              print('✅ Reminder deleted from Supabase');
+            }
+          } catch (e) {
+            print('⚠️ Error deleting from Supabase: $e');
+            // Not critical - already deleted locally
+          }
+        });
       }
 
       _invalidateAllProviders();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Reminder deleted'),
+          SnackBar(
+            content: Text(
+              isOffline
+                  ? 'Reminder deleted locally (will sync when online)'
+                  : 'Reminder deleted',
+            ),
             duration: Duration(seconds: 2),
           ),
         );
@@ -1157,7 +1181,6 @@ class _AddReminderDialogState extends ConsumerState<_AddReminderDialog> {
     // Create reminder date based on frequency type
     switch (selectedFrequency) {
       case 'daily':
-        // For daily, store with today's date but the selected time
         final now = DateTime.now();
         reminderDateTime = DateTime(
           now.year,
@@ -1169,11 +1192,9 @@ class _AddReminderDialogState extends ConsumerState<_AddReminderDialog> {
         break;
 
       case 'weekly':
-        // For weekly, find the next occurrence of the selected day
         final now = DateTime.now();
         int daysUntilTarget = (selectedDayOfWeek - now.weekday) % 7;
         if (daysUntilTarget == 0) {
-          // If it's today, check if time has passed
           final todayAtTime = DateTime(
             now.year,
             now.month,
@@ -1182,7 +1203,7 @@ class _AddReminderDialogState extends ConsumerState<_AddReminderDialog> {
             selectedTime.minute,
           );
           if (todayAtTime.isBefore(now)) {
-            daysUntilTarget = 7; // Schedule for next week
+            daysUntilTarget = 7;
           }
         }
 
@@ -1196,12 +1217,10 @@ class _AddReminderDialogState extends ConsumerState<_AddReminderDialog> {
         break;
 
       case 'monthly':
-        // For monthly, use the selected day of month with current/next month
         final now = DateTime.now();
         int targetMonth = now.month;
         int targetYear = now.year;
 
-        // If the day has passed this month, schedule for next month
         if (selectedDateTime.day < now.day) {
           targetMonth++;
           if (targetMonth > 12) {
@@ -1209,7 +1228,6 @@ class _AddReminderDialogState extends ConsumerState<_AddReminderDialog> {
             targetYear++;
           }
         } else if (selectedDateTime.day == now.day) {
-          // If it's today, check if time has passed
           final todayAtTime = DateTime(
             now.year,
             now.month,
@@ -1236,7 +1254,6 @@ class _AddReminderDialogState extends ConsumerState<_AddReminderDialog> {
         break;
 
       default:
-        // One-time reminder
         reminderDateTime = DateTime(
           selectedDateTime.year,
           selectedDateTime.month,
@@ -1258,27 +1275,36 @@ class _AddReminderDialogState extends ConsumerState<_AddReminderDialog> {
       importanceLevel: selectedImportance,
     );
 
+    // SAVE TO LOCAL DB FIRST (always works offline or online)
     final db = widget.parentRef.read(reminderDatabaseProvider);
-    final userProfile = await ref.read(userProfileProviderProvider.future);
     final reminderId = await db.createReminder(reminder);
     final reminderWithId = reminder.copyWith(id: reminderId);
-    await NotificationService().scheduleReminderNotification(reminderWithId);
 
+    // Schedule notification
+    final userProfile = await ref.read(userProfileProviderProvider.future);
     if (userProfile != null) {
-      // Mark as not synced if user is logged in
       NotificationService().setPreferences(userProfile.notificationPreferences);
     }
-
-    // Optional: Schedule early notification (15 mins before)
+    await NotificationService().scheduleReminderNotification(reminderWithId);
     await NotificationService().scheduleEarlyNotification(reminderWithId);
 
-    final syncService = widget.parentRef.read(unifiedSyncServiceProvider);
-    final user = ref.read(currentUserProvider);
-
-    if (user != null) {
-      await syncService.syncRemindersToSupabase();
+    // BACKGROUND SYNC (only if online)
+    final isOffline = ref.read(isOfflineModeProvider);
+    if (!isOffline) {
+      // Try to sync in background without blocking UI
+      Future.microtask(() async {
+        try {
+          final syncService = widget.parentRef.read(unifiedSyncServiceProvider);
+          await syncService.syncRemindersToSupabase();
+          print('✅ Reminder synced to Supabase');
+        } catch (e) {
+          print('⚠️ Background sync failed (will retry later): $e');
+          // Reminder is already saved locally, so this is not critical
+        }
+      });
     }
 
+    // Refresh UI
     widget.parentRef.invalidate(todayRemindersProvider);
     widget.parentRef.invalidate(weeklyRemindersProvider);
     widget.parentRef.invalidate(monthlyRemindersProvider);
@@ -1286,9 +1312,15 @@ class _AddReminderDialogState extends ConsumerState<_AddReminderDialog> {
 
     if (context.mounted) {
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Reminder added!')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isOffline
+                ? 'Reminder saved locally (will sync when online)'
+                : 'Reminder added!',
+          ),
+        ),
+      );
     }
   }
 }

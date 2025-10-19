@@ -28,8 +28,6 @@ class _LocationDetailsStepState extends State<LocationDetailsStep> {
 
   String? _selectedCountry;
 
-  // Common countries list - you can expand this
-
   @override
   void initState() {
     super.initState();
@@ -169,6 +167,8 @@ class _LocationDetailsStepState extends State<LocationDetailsStep> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24.0),
       child: Form(
@@ -210,8 +210,12 @@ class _LocationDetailsStepState extends State<LocationDetailsStep> {
 
             // Country Dropdown
             DropdownButtonFormField<String>(
+              style: TextStyle(color: theme.colorScheme.onPrimary),
               value: _selectedCountry,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
+                floatingLabelStyle: TextStyle(
+                  color: theme.colorScheme.onPrimary,
+                ),
                 labelText: 'Country *',
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.public),
@@ -220,10 +224,8 @@ class _LocationDetailsStepState extends State<LocationDetailsStep> {
               items:
                   CountryUtils.countries.map((country) {
                     return DropdownMenuItem<String>(
-                      value: country.code, // Country code (e.g., "US")
-                      child: Text(
-                        '${country.flag} ${country.name}',
-                      ), // Show flag + name
+                      value: country.code,
+                      child: Text('${country.flag} ${country.name}'),
                     );
                   }).toList(),
               onChanged: (value) {
@@ -246,8 +248,12 @@ class _LocationDetailsStepState extends State<LocationDetailsStep> {
 
             // Street Address
             TextFormField(
+              style: TextStyle(color: theme.colorScheme.onPrimary),
               controller: _streetAddressController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
+                floatingLabelStyle: TextStyle(
+                  color: theme.colorScheme.onPrimary,
+                ),
                 labelText: 'Street Address *',
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.home_outlined),
@@ -265,8 +271,12 @@ class _LocationDetailsStepState extends State<LocationDetailsStep> {
 
             // Apartment/Unit
             TextFormField(
+              style: TextStyle(color: theme.colorScheme.onPrimary),
               controller: _apartmentController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
+                floatingLabelStyle: TextStyle(
+                  color: theme.colorScheme.onPrimary,
+                ),
                 labelText: 'Apartment/Unit (Optional)',
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.apartment_outlined),
@@ -278,8 +288,12 @@ class _LocationDetailsStepState extends State<LocationDetailsStep> {
 
             // City
             TextFormField(
+              style: TextStyle(color: theme.colorScheme.onPrimary),
               controller: _cityController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
+                floatingLabelStyle: TextStyle(
+                  color: theme.colorScheme.onPrimary,
+                ),
                 labelText: 'City *',
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.location_city_outlined),
@@ -302,6 +316,7 @@ class _LocationDetailsStepState extends State<LocationDetailsStep> {
                 Expanded(
                   flex: 2,
                   child: TextFormField(
+                    style: TextStyle(color: theme.colorScheme.onPrimary),
                     controller: _stateController,
                     textCapitalization: TextCapitalization.characters,
                     maxLength: _selectedCountry == 'US' ? 2 : 50,
@@ -315,6 +330,9 @@ class _LocationDetailsStepState extends State<LocationDetailsStep> {
                             ]
                             : null,
                     decoration: InputDecoration(
+                      floatingLabelStyle: TextStyle(
+                        color: theme.colorScheme.onPrimary,
+                      ),
                       labelText: getStateLabel(_selectedCountry ?? ''),
                       border: const OutlineInputBorder(),
                       prefixIcon: const Icon(Icons.map_outlined),
@@ -339,6 +357,7 @@ class _LocationDetailsStepState extends State<LocationDetailsStep> {
                 Expanded(
                   flex: 2,
                   child: TextFormField(
+                    style: TextStyle(color: theme.colorScheme.onPrimary),
                     controller: _zipCodeController,
                     keyboardType:
                         _selectedCountry == 'US'
@@ -357,6 +376,9 @@ class _LocationDetailsStepState extends State<LocationDetailsStep> {
                             ? TextCapitalization.characters
                             : TextCapitalization.none,
                     decoration: InputDecoration(
+                      floatingLabelStyle: TextStyle(
+                        color: theme.colorScheme.onPrimary,
+                      ),
                       labelText: getZipLabel(_selectedCountry ?? ''),
                       border: const OutlineInputBorder(),
                       prefixIcon: const Icon(Icons.markunread_mailbox_outlined),

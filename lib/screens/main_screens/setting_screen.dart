@@ -594,7 +594,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             color: theme.colorScheme.primaryContainer,
             borderRadius: BorderRadius.circular(10),
           ),
-          child: Icon(icon, color: theme.colorScheme.primary),
+          child: Icon(icon, color: theme.colorScheme.onSurface),
         ),
         title: Text(
           title,
@@ -631,7 +631,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     color: theme.colorScheme.primaryContainer,
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(icon, color: theme.colorScheme.primary),
+                  child: Icon(icon, color: theme.colorScheme.onSurface),
                 )
                 : null,
         title: Text(

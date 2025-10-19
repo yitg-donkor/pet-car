@@ -170,6 +170,7 @@ class OnboardingWidget extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
     return IntroductionScreen(
       pages: pages.map((page) => _buildPage(page, context)).toList(),
       onDone: onComplete,
@@ -177,13 +178,13 @@ class OnboardingWidget extends ConsumerWidget {
       showSkipButton: false,
       skip: Text(
         skipText ?? 'Skip',
-        style: TextStyle(color: Theme.of(context).primaryColor),
+        style: TextStyle(color: theme.colorScheme.onPrimary),
       ),
-      next: Icon(Icons.arrow_forward, color: Theme.of(context).primaryColor),
+      next: Icon(Icons.arrow_forward, color: theme.colorScheme.onPrimary),
       done: Text(
         doneText ?? 'Done',
         style: TextStyle(
-          color: Theme.of(context).primaryColor,
+          color: theme.colorScheme.onPrimary,
           fontWeight: FontWeight.bold,
         ),
       ),
@@ -193,8 +194,8 @@ class OnboardingWidget extends ConsumerWidget {
         activeShape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(25.0),
         ),
-        activeColor: Theme.of(context).primaryColor,
-        color: Colors.grey.shade300,
+        activeColor: theme.colorScheme.onPrimary,
+        color: theme.colorScheme.primary,
       ),
       curve: Curves.easeInOut,
       controlsPadding: const EdgeInsets.all(16),
@@ -202,6 +203,7 @@ class OnboardingWidget extends ConsumerWidget {
   }
 
   PageViewModel _buildPage(OnboardingPageData page, BuildContext context) {
+    final theme = Theme.of(context);
     return PageViewModel(
       title: page.title,
       bodyWidget:
@@ -211,7 +213,7 @@ class OnboardingWidget extends ConsumerWidget {
                 page.description,
                 style: TextStyle(
                   fontSize: 16.0,
-                  color: Colors.grey.shade600,
+                  color: theme.colorScheme.onPrimary,
                   height: 1.4,
                 ),
                 textAlign: TextAlign.center,
@@ -230,15 +232,15 @@ class OnboardingWidget extends ConsumerWidget {
         titleTextStyle: TextStyle(
           fontSize: 28.0,
           fontWeight: FontWeight.bold,
-          color: Theme.of(context).primaryColor,
+          color: theme.colorScheme.onPrimary,
         ),
         bodyTextStyle: TextStyle(
           fontSize: 16.0,
-          color: Colors.grey.shade600,
+          color: theme.colorScheme.onPrimary,
           height: 1.4,
         ),
         imagePadding: const EdgeInsets.only(top: 20, bottom: 20),
-        pageColor: page.backgroundColor ?? Colors.white,
+        pageColor: page.backgroundColor ?? theme.scaffoldBackgroundColor,
         imageFlex: page.imageFlex ?? 3,
         bodyFlex: page.bodyFlex ?? 2,
         titlePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -298,7 +300,7 @@ final List<OnboardingPageData> petCareOnboardingPages = [
           ],
           textStyle: TextStyle(
             fontSize: 16.0,
-            color: Colors.grey.shade600,
+            // color: Colors.grey.shade600,
             height: 1.4,
           ),
         ),

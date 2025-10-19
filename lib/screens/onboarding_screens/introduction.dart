@@ -13,7 +13,6 @@ class _LoginScreenState extends ConsumerState<IntroductionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
       body: SafeArea(
         child: OnboardingWidget(
           pages: petCareOnboardingPages,

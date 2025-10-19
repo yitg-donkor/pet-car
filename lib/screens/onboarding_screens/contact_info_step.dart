@@ -1,5 +1,3 @@
-//  `lib/screens/onboarding/steps/contact_info_step.dart`
-// ```dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -89,6 +87,8 @@ class _ContactInfoStepState extends State<ContactInfoStep> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24.0),
       child: Form(
@@ -129,6 +129,7 @@ class _ContactInfoStepState extends State<ContactInfoStep> {
             const SizedBox(height: 32),
 
             TextFormField(
+              style: TextStyle(color: theme.colorScheme.onPrimary),
               controller: _phoneController,
               keyboardType: TextInputType.phone,
               inputFormatters: [
@@ -136,7 +137,10 @@ class _ContactInfoStepState extends State<ContactInfoStep> {
                 LengthLimitingTextInputFormatter(10),
                 _PhoneNumberFormatter(),
               ],
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
+                floatingLabelStyle: TextStyle(
+                  color: theme.colorScheme.onPrimary,
+                ),
                 labelText: 'Phone Number *',
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.phone_outlined),
@@ -169,8 +173,12 @@ class _ContactInfoStepState extends State<ContactInfoStep> {
             const SizedBox(height: 24),
 
             TextFormField(
+              style: TextStyle(color: theme.colorScheme.onPrimary),
               controller: _emergencyNameController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
+                floatingLabelStyle: TextStyle(
+                  color: theme.colorScheme.onPrimary,
+                ),
                 labelText: 'Emergency Contact Name',
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.person_outline),
@@ -181,6 +189,7 @@ class _ContactInfoStepState extends State<ContactInfoStep> {
             const SizedBox(height: 20),
 
             TextFormField(
+              style: TextStyle(color: theme.colorScheme.onPrimary),
               controller: _emergencyPhoneController,
               keyboardType: TextInputType.phone,
               inputFormatters: [
@@ -188,7 +197,10 @@ class _ContactInfoStepState extends State<ContactInfoStep> {
                 LengthLimitingTextInputFormatter(10),
                 _PhoneNumberFormatter(),
               ],
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
+                floatingLabelStyle: TextStyle(
+                  color: theme.colorScheme.onPrimary,
+                ),
                 labelText: 'Emergency Contact Phone',
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.phone_outlined),

@@ -1,5 +1,7 @@
 // providers/offline_providers.dart
+import 'package:flutter/material.dart';
 import 'package:pet_care/models/user_profile.dart';
+import 'package:pet_care/providers/app_state_provider.dart';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -696,6 +698,301 @@ Future<List<Reminder>> monthlyReminders(MonthlyRemindersRef ref) async {
 Future<List<Reminder>> allReminders(AllRemindersRef ref) async {
   final db = ref.watch(reminderDatabaseProvider);
   return db.getAllReminders();
+}
+
+// providers/activity_log_providers.dart
+
+// ============================================
+// ACTIVITY LOG LOCAL DB PROVIDER
+// ============================================
+
+// ============================================
+// OFFLINE-FIRST ACTIVITY LOGS PROVIDER (FIXED)
+// ============================================
+
+@riverpod
+class ActivityLogsOffline extends _$ActivityLogsOffline {
+  @override
+  Future<List<ActivityLog>> build() async {
+    // Use the unified currentUserProfile provider
+    final profileAsync = await ref.watch(currentUserProfileProvider.future);
+    if (profileAsync == null) return [];
+
+    print('🔵 ActivityLogsOffline: Loading logs for user ${profileAsync.id}');
+
+    // ALWAYS read from local DB first - this is the source of truth
+    final activityLogLocalDB = ref.watch(activityLogLocalDBProvider);
+    final localLogs = await activityLogLocalDB.getAllLogsForOwner(
+      profileAsync.id,
+    );
+
+    print('🔵 ActivityLogsOffline: Found ${localLogs.length} logs in local DB');
+
+    // Trigger background sync WITHOUT awaiting it
+    Future.microtask(() async {
+      try {
+        final isOffline = ref.read(isOfflineModeProvider);
+        if (isOffline) {
+          print('🔵 ActivityLogsOffline: Offline mode, skipping sync');
+          return;
+        }
+
+        print('🔵 ActivityLogsOffline: Starting background sync');
+        final syncService = ref.read(unifiedSyncServiceProvider);
+
+        // Sync both ways
+        await syncService.syncActivityLogsToSupabase(); // Upload local changes
+        await syncService.syncActivityLogsFromSupabase(
+          profileAsync.id,
+        ); // Download remote changes
+
+        // Check if there are changes after sync
+        final updatedLogs = await activityLogLocalDB.getAllLogsForOwner(
+          profileAsync.id,
+        );
+        print(
+          '🔵 ActivityLogsOffline: After sync, have ${updatedLogs.length} logs',
+        );
+
+        if (updatedLogs.length != localLogs.length) {
+          print('🔵 ActivityLogsOffline: Log count changed, refreshing UI');
+          ref.invalidateSelf();
+        }
+      } catch (e) {
+        print('🔴 ActivityLogsOffline: Background sync error: $e');
+      }
+    });
+
+    return localLogs;
+  }
+
+  Future<void> addLog(ActivityLog log) async {
+    final profile = await ref.read(currentUserProfileProvider.future);
+    if (profile == null) throw Exception('User not logged in');
+
+    print('🔵 ActivityLogsOffline: Adding log ${log.title}');
+
+    final activityLogLocalDB = ref.read(activityLogLocalDBProvider);
+
+    // Save to local DB first
+    final logId = await activityLogLocalDB.createActivityLog(log);
+    print('🔵 ActivityLogsOffline: Log saved locally with ID: $logId');
+
+    // Immediately update UI
+    ref.invalidateSelf();
+
+    // Sync in background (only if online)
+    final isOffline = ref.read(isOfflineModeProvider);
+    if (!isOffline) {
+      Future.microtask(() async {
+        try {
+          print('🔵 ActivityLogsOffline: Syncing new log to Supabase');
+          final syncService = ref.read(unifiedSyncServiceProvider);
+          await syncService.syncActivityLogsToSupabase();
+          print('🔵 ActivityLogsOffline: Log synced successfully');
+        } catch (e) {
+          print('🔴 ActivityLogsOffline: Background sync error: $e');
+          // Not critical - log is already saved locally
+        }
+      });
+    }
+  }
+
+  Future<void> updateLog(ActivityLog log) async {
+    print('🔵 ActivityLogsOffline: Updating log ${log.title}');
+
+    final activityLogLocalDB = ref.read(activityLogLocalDBProvider);
+    await activityLogLocalDB.updateActivityLog(log);
+
+    // Immediately update UI
+    ref.invalidateSelf();
+
+    // Sync in background (only if online)
+    final isOffline = ref.read(isOfflineModeProvider);
+    if (!isOffline) {
+      Future.microtask(() async {
+        try {
+          final syncService = ref.read(unifiedSyncServiceProvider);
+          await syncService.syncActivityLogsToSupabase();
+        } catch (e) {
+          print('🔴 ActivityLogsOffline: Background sync error: $e');
+        }
+      });
+    }
+  }
+
+  Future<void> deleteLog(String logId) async {
+    print('🔵 ActivityLogsOffline: Deleting log $logId');
+
+    final activityLogLocalDB = ref.read(activityLogLocalDBProvider);
+    await activityLogLocalDB.deleteActivityLog(logId);
+
+    // Immediately update UI
+    ref.invalidateSelf();
+
+    // Delete from Supabase in background if online
+    final isOffline = ref.read(isOfflineModeProvider);
+    if (!isOffline) {
+      Future.microtask(() async {
+        try {
+          final syncService = ref.read(unifiedSyncServiceProvider);
+          if (await syncService.hasInternetConnection()) {
+            await syncService.supabase
+                .from('activity_logs')
+                .delete()
+                .eq('id', logId);
+            print('🔵 ActivityLogsOffline: Log deleted from Supabase');
+          }
+        } catch (e) {
+          print('🔴 ActivityLogsOffline: Error deleting from Supabase: $e');
+        }
+      });
+    }
+  }
+
+  Future<void> manualSync() async {
+    print('🔵 ActivityLogsOffline: Manual sync triggered');
+
+    final profile = await ref.read(currentUserProfileProvider.future);
+    if (profile == null) return;
+
+    final syncService = ref.read(unifiedSyncServiceProvider);
+    await syncService.fullSync(profile.id);
+    ref.invalidateSelf();
+
+    print('🔵 ActivityLogsOffline: Manual sync completed');
+  }
+}
+
+// ============================================
+// FILTERED ACTIVITY LOGS PROVIDERS
+// ============================================
+
+// Daily logs (today and yesterday)
+@riverpod
+Future<Map<String, List<ActivityLog>>> dailyActivityLogs(
+  DailyActivityLogsRef ref,
+) async {
+  final allLogs = await ref.watch(activityLogsOfflineProvider.future);
+
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final yesterday = today.subtract(const Duration(days: 1));
+
+  final todayLogs =
+      allLogs.where((log) {
+        final logDate = DateTime(
+          log.timestamp.year,
+          log.timestamp.month,
+          log.timestamp.day,
+        );
+        return logDate == today;
+      }).toList();
+
+  final yesterdayLogs =
+      allLogs.where((log) {
+        final logDate = DateTime(
+          log.timestamp.year,
+          log.timestamp.month,
+          log.timestamp.day,
+        );
+        return logDate == yesterday;
+      }).toList();
+
+  return {'today': todayLogs, 'yesterday': yesterdayLogs};
+}
+
+// Health-related logs
+@riverpod
+Future<List<ActivityLog>> healthActivityLogs(HealthActivityLogsRef ref) async {
+  final allLogs = await ref.watch(activityLogsOfflineProvider.future);
+  return allLogs.where((log) => log.isHealthRelated).toList();
+}
+
+// Logs for specific pet
+@riverpod
+Future<List<ActivityLog>> petActivityLogs(
+  PetActivityLogsRef ref,
+  String petId,
+) async {
+  final activityLogDB = ref.watch(activityLogLocalDBProvider);
+  return activityLogDB.getActivityLogsForPet(petId);
+}
+
+// Logs by date range
+@riverpod
+Future<List<ActivityLog>> activityLogsByDateRange(
+  ActivityLogsByDateRangeRef ref,
+  String petId,
+  DateTime startDate,
+  DateTime endDate,
+) async {
+  final activityLogDB = ref.watch(activityLogLocalDBProvider);
+  return activityLogDB.getLogsByDateRange(petId, startDate, endDate);
+}
+
+// ============================================
+// ACTIVITY LOG STATISTICS
+// ============================================
+
+@riverpod
+Future<Map<String, int>> activityLogStats(ActivityLogStatsRef ref) async {
+  final allLogs = await ref.watch(activityLogsOfflineProvider.future);
+
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final thisWeek = today.subtract(const Duration(days: 7));
+
+  final todayCount =
+      allLogs.where((log) {
+        return log.timestamp.isAfter(today);
+      }).length;
+
+  final weekCount =
+      allLogs.where((log) {
+        return log.timestamp.isAfter(thisWeek);
+      }).length;
+
+  final healthCount = allLogs.where((log) => log.isHealthRelated).length;
+
+  return {
+    'today': todayCount,
+    'week': weekCount,
+    'health': healthCount,
+    'total': allLogs.length,
+  };
+}
+
+// ============================================
+// ACTIVITY TYPES ENUM (Helper)
+// ============================================
+
+enum ActivityType {
+  walk('walk', 'Walk', Icons.directions_walk, Color(0xFF4CAF50)),
+  meal('meal', 'Meal', Icons.restaurant, Color(0xFFFF9800)),
+  bathroom('bathroom', 'Bathroom', Icons.grass, Color(0xFF8BC34A)),
+  medication('medication', 'Medication', Icons.medication, Color(0xFFE53E3E)),
+  playtime('playtime', 'Playtime', Icons.toys, Color(0xFF9C27B0)),
+  health('health', 'Health Check', Icons.health_and_safety, Color(0xFFE91E63)),
+  grooming('grooming', 'Grooming', Icons.clean_hands, Color(0xFF795548)),
+  vet('vet', 'Vet Visit', Icons.medical_services, Color(0xFF009688)),
+  weight('weight', 'Weight Check', Icons.monitor_weight, Color(0xFF3F51B5)),
+  behavior('behavior', 'Behavior', Icons.psychology, Color(0xFFFF5722)),
+  other('other', 'Other', Icons.note, Color(0xFF607D8B));
+
+  final String value;
+  final String label;
+  final IconData icon;
+  final Color color;
+
+  const ActivityType(this.value, this.label, this.icon, this.color);
+
+  static ActivityType fromString(String value) {
+    return ActivityType.values.firstWhere(
+      (type) => type.value == value,
+      orElse: () => ActivityType.other,
+    );
+  }
 }
 
 // ============================================
