@@ -150,15 +150,15 @@ class AppTheme {
 
     bottomNavigationBarTheme: BottomNavigationBarThemeData(
       backgroundColor: accentCream,
-      selectedItemColor: warmBrown,
+      selectedItemColor: Color.fromARGB(255, 196, 131, 82),
       unselectedItemColor: lightTextSecondary.withOpacity(0.5),
       selectedLabelStyle: GoogleFonts.comicNeue(
-        fontWeight: FontWeight.w600,
+        fontWeight: FontWeight.bold,
         fontSize: 12,
       ),
       unselectedLabelStyle: GoogleFonts.comicNeue(
-        fontWeight: FontWeight.normal,
-        fontSize: 11,
+        fontWeight: FontWeight.w800,
+        fontSize: 12,
       ),
       type: BottomNavigationBarType.fixed,
       elevation: 8,
@@ -417,15 +417,15 @@ class AppTheme {
 
     bottomNavigationBarTheme: BottomNavigationBarThemeData(
       backgroundColor: darkCardBackground,
-      selectedItemColor: primaryPeach,
-      unselectedItemColor: darkTextSecondary.withOpacity(0.5),
+      selectedItemColor: const Color.fromARGB(255, 234, 230, 227),
+      unselectedItemColor: Color.fromARGB(255, 196, 131, 82),
       selectedLabelStyle: GoogleFonts.comicNeue(
-        fontWeight: FontWeight.w600,
+        fontWeight: FontWeight.bold,
         fontSize: 12,
       ),
       unselectedLabelStyle: GoogleFonts.comicNeue(
-        fontWeight: FontWeight.normal,
-        fontSize: 11,
+        fontWeight: FontWeight.w800,
+        fontSize: 12,
       ),
       type: BottomNavigationBarType.fixed,
       elevation: 8,

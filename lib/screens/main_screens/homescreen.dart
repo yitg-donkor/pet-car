@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/svg.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:pet_care/models/pet.dart';
 import 'package:pet_care/models/reminder.dart';
 import 'package:pet_care/providers/auth_providers.dart';
@@ -48,22 +49,25 @@ class _MainNavigationState extends ConsumerState<MainNavigation> {
         currentIndex: _currentIndex,
         onTap: _onTabTapped,
         items: [
-          BottomNavigationBarItem(icon: const Icon(Icons.home), label: 'Home'),
           BottomNavigationBarItem(
-            icon: const Icon(Icons.auto_awesome),
-            label: 'AI',
+            icon: const Icon(FontAwesomeIcons.house),
+            label: 'Home',
           ),
           BottomNavigationBarItem(
-            icon: const Icon(Icons.notifications),
-            label: 'Reminders',
+            icon: const Icon(FontAwesomeIcons.wandMagicSparkles),
+            label: 'Smart Buddies',
           ),
           BottomNavigationBarItem(
-            icon: const Icon(Icons.edit_note),
-            label: 'Log',
+            icon: const Icon(FontAwesomeIcons.clock),
+            label: 'My schedule',
           ),
           BottomNavigationBarItem(
-            icon: const Icon(Icons.library_books),
-            label: 'Resources',
+            icon: const Icon(FontAwesomeIcons.book),
+            label: 'Daily Dairy',
+          ),
+          BottomNavigationBarItem(
+            icon: const Icon(FontAwesomeIcons.lightbulb),
+            label: 'Pet Playbook',
           ),
         ],
       ),
@@ -295,7 +299,11 @@ class _HomescreenState extends ConsumerState<Homescreen> {
                                 ),
                           ),
                           const SizedBox(height: 30),
-                          _buildSectionHeader(theme, 'Your Pets', Icons.pets),
+                          _buildSectionHeader(
+                            theme,
+                            'Your Buddies',
+                            Icons.pets,
+                          ),
                           const SizedBox(height: 15),
                           petsAsync.when(
                             data: (pets) => _buildPetsSection(theme, pets),
@@ -448,6 +456,24 @@ class _HomescreenState extends ConsumerState<Homescreen> {
     );
   }
 
+  Widget _buildStyledFontAwesomeIcon({
+    required IconData icon,
+    required Color fillColor,
+    required Color strokeColor,
+    double size = 24.0,
+    double strokeWidth = 2.0,
+  }) {
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        // Stroke layer
+        FaIcon(icon, size: size + (strokeWidth * 4), color: strokeColor),
+        // Fill layer
+        FaIcon(icon, size: size, color: fillColor),
+      ],
+    );
+  }
+
   Widget _buildQuickStats(
     ThemeData theme,
     List<Pet> pets,
@@ -473,6 +499,8 @@ class _HomescreenState extends ConsumerState<Homescreen> {
             svgPath: 'assets/svgs/beige_cloud.svg',
             // icon: Icons.pets,
             icon: Icons.pets,
+            strokecolor: Color.fromARGB(255, 200, 230, 201),
+            textcolor: Color(0xFF3D3428),
             label: '${pets.length} Happy Paw',
             color: theme.colorScheme.primary,
           ),
@@ -484,6 +512,8 @@ class _HomescreenState extends ConsumerState<Homescreen> {
             svgPath: 'assets/svgs/blue cloud.svg',
             // icon: Icons.check_circle,
             icon: Icons.check_circle,
+            strokecolor: Color.fromARGB(255, 237, 236, 215),
+            textcolor: Color.fromARGB(255, 249, 246, 244),
             label: '$completedCount Joyful Jumps',
             color: Colors.green,
           ),
@@ -494,7 +524,9 @@ class _HomescreenState extends ConsumerState<Homescreen> {
             theme: theme,
             svgPath: 'assets/svgs/green cloud.svg',
             // icon: Icons.pending_actions,
-            icon: Icons.pending_actions,
+            icon: FontAwesomeIcons.bell,
+            textcolor: Color.fromARGB(255, 249, 246, 244),
+            strokecolor: Color(0xFF3D3428),
 
             label: '${totalCount - completedCount} Paws-pitive Reminders',
             color: Color(0xFFFAFAF0),
@@ -510,7 +542,9 @@ class _HomescreenState extends ConsumerState<Homescreen> {
 
     required String label,
     required Color color,
+    required Color textcolor,
     required IconData icon,
+    required Color strokecolor,
   }) {
     return Stack(
       alignment: Alignment.center,
@@ -519,12 +553,20 @@ class _HomescreenState extends ConsumerState<Homescreen> {
         Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: color, size: 32),
+            _buildStyledFontAwesomeIcon(
+              icon: icon,
+              fillColor: color,
+              strokeColor: strokecolor,
+              size: 32.0,
+              strokeWidth: 1.5,
+            ),
             const SizedBox(height: 4),
             Text(
               label,
               style: GoogleFonts.comicNeue(
-                textStyle: theme.textTheme.bodySmall,
+                textStyle: theme.textTheme.bodySmall?.copyWith(
+                  color: textcolor,
+                ),
                 fontWeight: FontWeight.w700,
                 fontSize: 14,
               ),
@@ -583,14 +625,6 @@ class _HomescreenState extends ConsumerState<Homescreen> {
     final displayReminders = activeReminders.take(3);
     final remainingCount = activeReminders.length - 3;
 
-    // return Column(
-    //   children: [
-    //     ...displayReminders.map(
-    //       (reminder) => _buildReminderCard(theme, reminder),
-    //     ),
-    //   ],
-    // );
-
     return SizedBox(
       height: 180,
       child: ListView.builder(
@@ -634,7 +668,7 @@ class _HomescreenState extends ConsumerState<Homescreen> {
                   width: 2,
                 ),
               ),
-              child: ClipOval(),
+              child: ClipOval(child: Icon(_getIconForReminder(reminder.title))),
             ),
             const SizedBox(height: 12),
             Padding(
@@ -762,7 +796,7 @@ class _HomescreenState extends ConsumerState<Homescreen> {
   //                 const Icon(Icons.check_circle, color: Colors.white, size: 32),
   //             ],
   //           ),
-  //         ),
+  //         ),t
   //       ),
   //     ),
   //   );
@@ -770,16 +804,16 @@ class _HomescreenState extends ConsumerState<Homescreen> {
 
   IconData _getIconForReminder(String title) {
     final titleLower = title.toLowerCase();
-    if (titleLower.contains('walk')) return Icons.pets;
+    if (titleLower.contains('walk')) return FontAwesomeIcons.personWalking;
     if (titleLower.contains('feed') ||
         titleLower.contains('food') ||
         titleLower.contains('feeding')) {
-      return Icons.restaurant_outlined;
+      return FontAwesomeIcons.bowlFood;
     }
     if (titleLower.contains('medication') || titleLower.contains('medicine')) {
-      return Icons.medication;
+      return FontAwesomeIcons.medkit;
     }
-    if (titleLower.contains('vet')) return Icons.local_hospital_outlined;
+    if (titleLower.contains('vet')) return FontAwesomeIcons.hospital;
     if (titleLower.contains('groom')) return Icons.content_cut_outlined;
     if (titleLower.contains('clean')) return Icons.cleaning_services;
     return Icons.notifications_outlined;
@@ -876,7 +910,7 @@ class _HomescreenState extends ConsumerState<Homescreen> {
                               ),
                         )
                         : Icon(
-                          Icons.pets,
+                          FontAwesomeIcons.paw,
                           size: 40,
                           color: theme.colorScheme.primary,
                         ),
