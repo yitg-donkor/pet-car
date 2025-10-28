@@ -845,6 +845,30 @@ class _AddReminderDialogState extends ConsumerState<_AddReminderDialog> {
                 labelText: 'Reminder Title',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.primary.withOpacity(0.5),
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(
+                    color: Theme.of(context).colorScheme.primary,
+                    width: 2,
+                  ),
+                ),
+                errorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(
+                    color: Theme.of(context).colorScheme.error,
+                  ),
                 ),
               ),
             ),
@@ -982,7 +1006,6 @@ class _AddReminderDialogState extends ConsumerState<_AddReminderDialog> {
         ElevatedButton(
           onPressed: () => _saveReminder(context),
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF4CAF50),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(10),
             ),

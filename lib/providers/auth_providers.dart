@@ -69,29 +69,50 @@ Session? currentSession(CurrentSessionRef ref) {
 // ============================================
 
 @riverpod
+// Replace the currentUserProfile provider in auth_providers.dart
+@riverpod
 Future<UserProfile?> currentUserProfile(CurrentUserProfileRef ref) async {
   final isOffline = ref.watch(isOfflineModeProvider);
+  final profileLocalDB = ref.watch(profileLocalDBProvider);
 
   if (isOffline) {
+    print('🟡 currentUserProfile: Offline mode - loading from local DB');
     // In offline mode, get from local DB
-    final profileLocalDB = ref.watch(profileLocalDBProvider);
     final profiles = await profileLocalDB.getAllProfiles();
 
-    if (profiles.isEmpty) return null;
+    if (profiles.isEmpty) {
+      print('⚠️ currentUserProfile: No profiles found in local DB');
+      return null;
+    }
 
-    // Return the first active profile
-    return profiles.firstWhere((p) => p.isActive, orElse: () => profiles.first);
+    // Return the active profile or first one
+    final profile = profiles.firstWhere(
+      (p) => p.isActive,
+      orElse: () => profiles.first,
+    );
+    print('✅ currentUserProfile: Loaded ${profile.username} (${profile.id})');
+    return profile;
   }
 
-  // Online mode - get from Supabase session
-  final session = ref.watch(currentSessionProvider);
-  if (session == null) {
-    // Fallback to local DB if no session
-    final profileLocalDB = ref.watch(profileLocalDBProvider);
+  // Online mode - try to get from Supabase session
+  Session? session;
+  try {
+    session = ref.watch(currentSessionProvider);
+  } catch (e) {
+    print('⚠️ currentUserProfile: Error getting session: $e');
+    // Fallback to local DB
     final profiles = await profileLocalDB.getAllProfiles();
     return profiles.isEmpty ? null : profiles.first;
   }
 
+  if (session == null) {
+    print('🟡 currentUserProfile: No session - checking local DB');
+    // Fallback to local DB if no session
+    final profiles = await profileLocalDB.getAllProfiles();
+    return profiles.isEmpty ? null : profiles.first;
+  }
+
+  // Try to fetch from Supabase
   try {
     final supabase = ref.watch(supabaseProvider);
     final response =
@@ -102,28 +123,38 @@ Future<UserProfile?> currentUserProfile(CurrentUserProfileRef ref) async {
             .maybeSingle();
 
     if (response == null) {
+      print(
+        '⚠️ currentUserProfile: Profile not found in Supabase, using local',
+      );
       // Fallback to local DB
-      final profileLocalDB = ref.watch(profileLocalDBProvider);
       return await profileLocalDB.getProfileById(session.user.id);
     }
 
     final profile = UserProfile.fromJson(response);
+    print('✅ currentUserProfile: Loaded from Supabase: ${profile.username}');
 
     // Cache in local DB
-    final profileLocalDB = ref.watch(profileLocalDBProvider);
     await profileLocalDB.upsertProfile(profile);
 
     return profile;
   } catch (e) {
-    print('Error fetching user profile: $e');
+    print('❌ currentUserProfile: Error fetching from Supabase: $e');
 
     // Fallback to local DB
-    final profileLocalDB = ref.watch(profileLocalDBProvider);
     final session = ref.read(currentSessionProvider);
     if (session != null) {
-      return await profileLocalDB.getProfileById(session.user.id);
+      final localProfile = await profileLocalDB.getProfileById(session.user.id);
+      if (localProfile != null) {
+        print(
+          '✅ currentUserProfile: Using local fallback for ${localProfile.username}',
+        );
+        return localProfile;
+      }
     }
-    return null;
+
+    // Last resort: return any local profile
+    final profiles = await profileLocalDB.getAllProfiles();
+    return profiles.isEmpty ? null : profiles.first;
   }
 }
 

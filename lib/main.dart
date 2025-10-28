@@ -126,7 +126,7 @@ class MyApp extends ConsumerWidget {
         '/home': (context) => const MainNavigation(initialIndex: 0),
         '/reminders': (context) => const MainNavigation(initialIndex: 1),
         '/pet-details': (context) => const PetDetailsScreen(),
-        '/add-pet': (context) => const AddPet(species: 'dog'),
+        '/add-pet': (context) => const PetSpeciesSelectionScreen(),
         '/edit-pet': (context) => const Editpetscreen(),
         '/settings': (context) => const SettingsScreen(),
       },

@@ -173,12 +173,26 @@ class PetDashboardBackground extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return ClipPath(
       clipper: CloudPuffsClipper(),
       child: Container(
         height: 400,
-        decoration: BoxDecoration(color: theme.colorScheme.primary),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors:
+                isDark
+                    ? [Color(0xFF3D4145), Color.fromARGB(97, 250, 240, 220)]
+                    : [
+                      Color(0xFFE8B89A), // Richer peach
+                      Color(0xFFD09970), // Deeper peach-orange
+                      Color(0xFFC88A60), // Even deeper
+                    ],
+          ),
+        ),
       ),
     );
   }
@@ -213,6 +227,7 @@ class _HomescreenState extends ConsumerState<Homescreen> {
     final petsAsync = ref.watch(petsOfflineProvider);
     final todayRemindersAsync = ref.watch(todayRemindersProvider);
     final currentUser = ref.watch(currentUserProvider);
+    final isDark = theme.brightness == Brightness.dark;
 
     ref.listen<AsyncValue<List<Pet>>>(petsOfflineProvider, (previous, next) {
       next.whenOrNull(
@@ -275,14 +290,20 @@ class _HomescreenState extends ConsumerState<Homescreen> {
                               textStyle: TextStyle(
                                 fontSize: 32,
                                 fontWeight: FontWeight.w800,
-                                color: Color(0xFFFFF4E6), // Brown fill
-                                fontFamily:
-                                    GoogleFonts.comicNeue()
-                                        .fontFamily, // Rounded playful font
+                                color:
+                                    theme.brightness == Brightness.dark
+                                        ? Color(0xFFFFD89C)
+                                        : Color(
+                                          0xFF7A5843,
+                                        ), // Dark brown for light mode
+                                fontFamily: GoogleFonts.comicNeue().fontFamily,
                               ),
-                              strokeColor: Color(
-                                0xFF8B6B47,
-                              ), // Light cream outline
+                              strokeColor:
+                                  theme.brightness == Brightness.dark
+                                      ? Color(0xFF1C1E21)
+                                      : Color(
+                                        0xFFFFF8F0,
+                                      ), // Light cream outline for light mode
                               strokeWidth: 6.0,
                             ),
                           ),
@@ -341,6 +362,8 @@ class _HomescreenState extends ConsumerState<Homescreen> {
     AsyncValue<List<Pet>> petsAsync,
     User? currentUser,
   ) {
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -356,7 +379,7 @@ class _HomescreenState extends ConsumerState<Homescreen> {
               if (pets.isEmpty) {
                 return _buildDefaultAvatar(theme);
               }
-              return _buildPetAvatar(pets[0].photoUrl);
+              return _buildPetAvatar(pets[0].photoUrl, theme);
             },
             loading: () => _buildDefaultAvatar(theme),
             error: (_, __) => _buildDefaultAvatar(theme),
@@ -371,7 +394,8 @@ class _HomescreenState extends ConsumerState<Homescreen> {
                 Text(
                   'Buddy!',
                   style: theme.textTheme.headlineLarge?.copyWith(
-                    color: Color(0xFFFFFBF5),
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ],
@@ -379,14 +403,24 @@ class _HomescreenState extends ConsumerState<Homescreen> {
           ),
           Container(
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+              color: Colors.white.withOpacity(isDark ? 0.15 : 0.25),
               borderRadius: BorderRadius.circular(12),
+              border:
+                  isDark
+                      ? Border.all(
+                        color: Color(0xFF9D7B8A).withOpacity(0.3),
+                        width: 1,
+                      )
+                      : null,
             ),
             child: IconButton(
               onPressed: () {
                 Navigator.pushNamed(context, '/settings');
               },
-              icon: const Icon(Icons.auto_awesome, color: Colors.white),
+              icon: Icon(
+                Icons.auto_awesome,
+                color: isDark ? Color(0xFFFFD89C) : Colors.white,
+              ),
             ),
           ),
         ],
@@ -394,50 +428,60 @@ class _HomescreenState extends ConsumerState<Homescreen> {
     );
   }
 
-  Widget _buildPetAvatar(String? photoUrl) {
+  Widget _buildPetAvatar(String? photoUrl, ThemeData theme) {
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
-      width: 50,
-      height: 50,
+      width: 100,
+      height: 100,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(25),
-        border: Border.all(color: Colors.white, width: 2),
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 3),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: Colors.black.withOpacity(isDark ? 0.4 : 0.2),
+            blurRadius: 10,
+            offset: Offset(0, 4),
           ),
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(23),
+        borderRadius: BorderRadius.circular(47),
         child:
             photoUrl != null && photoUrl.isNotEmpty
                 ? Image.network(
                   photoUrl,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => _buildDefaultAvatarContent(),
+                  errorBuilder:
+                      (_, __, ___) => _buildDefaultAvatarContent(theme),
                 )
-                : _buildDefaultAvatarContent(),
+                : _buildDefaultAvatarContent(theme),
       ),
     );
   }
 
   Widget _buildDefaultAvatar(ThemeData theme) {
     return Container(
-      width: 50,
-      height: 50,
+      width: 100,
+      height: 100,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(25),
-        color: Colors.white,
-        border: Border.all(color: Colors.white, width: 2),
+        shape: BoxShape.circle,
+        color: Colors.white.withOpacity(0.2),
+        border: Border.all(color: Colors.white, width: 3),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.15),
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
       ),
-      child: _buildDefaultAvatarContent(),
+      child: _buildDefaultAvatarContent(theme),
     );
   }
 
-  Widget _buildDefaultAvatarContent() {
-    return Icon(Icons.pets, color: Colors.blue.shade400, size: 28);
+  Widget _buildDefaultAvatarContent(ThemeData theme) {
+    return Icon(Icons.pets, color: Colors.white.withOpacity(0.9), size: 40);
   }
 
   Widget _greetingCard(ThemeData theme) {
@@ -452,7 +496,10 @@ class _HomescreenState extends ConsumerState<Homescreen> {
     }
     return Text(
       greeting,
-      style: theme.textTheme.headlineLarge?.copyWith(color: Color(0xFFFFFBF5)),
+      style: theme.textTheme.headlineMedium?.copyWith(
+        color: Colors.white,
+        fontWeight: FontWeight.w600,
+      ),
     );
   }
 
@@ -479,6 +526,7 @@ class _HomescreenState extends ConsumerState<Homescreen> {
     List<Pet> pets,
     AsyncValue<List<Reminder>> remindersAsync,
   ) {
+    final isDark = theme.brightness == Brightness.dark;
     final completedCount = remindersAsync.when(
       data: (reminders) => reminders.where((r) => r.isCompleted).length,
       loading: () => 0,
@@ -497,12 +545,15 @@ class _HomescreenState extends ConsumerState<Homescreen> {
           child: _buildStatCard(
             theme: theme,
             svgPath: 'assets/svgs/beige_cloud.svg',
-            // icon: Icons.pets,
             icon: Icons.pets,
-            strokecolor: Color.fromARGB(255, 200, 230, 201),
-            textcolor: Color(0xFF3D3428),
+            strokecolor:
+                isDark
+                    ? Color(0xFF1C1E21)
+                    : Color(0xFF7A5843), // Dark brown outline
+            textcolor:
+                isDark ? Color(0xFFFAFAE6) : Color(0xFF2D2520), // Dark text
             label: '${pets.length} Happy Paw',
-            color: theme.colorScheme.primary,
+            color: isDark ? Color(0xFFFFD89C) : Color(0xFFE8B89A), // Warm peach
           ),
         ),
         const SizedBox(width: 12),
@@ -510,12 +561,11 @@ class _HomescreenState extends ConsumerState<Homescreen> {
           child: _buildStatCard(
             theme: theme,
             svgPath: 'assets/svgs/blue cloud.svg',
-            // icon: Icons.check_circle,
             icon: Icons.check_circle,
-            strokecolor: Color.fromARGB(255, 237, 236, 215),
-            textcolor: Color.fromARGB(255, 249, 246, 244),
+            strokecolor: isDark ? Color(0xFF1C1E21) : Color(0xFF2D2520),
+            textcolor: isDark ? Color(0xFFFFFBF5) : Colors.white,
             label: '$completedCount Joyful Jumps',
-            color: Colors.green,
+            color: isDark ? Color(0xFF7FA390) : Color(0xFF7FB3C4), // Soft blue
           ),
         ),
         const SizedBox(width: 12),
@@ -523,13 +573,11 @@ class _HomescreenState extends ConsumerState<Homescreen> {
           child: _buildStatCard(
             theme: theme,
             svgPath: 'assets/svgs/green cloud.svg',
-            // icon: Icons.pending_actions,
             icon: FontAwesomeIcons.bell,
-            textcolor: Color.fromARGB(255, 249, 246, 244),
-            strokecolor: Color(0xFF3D3428),
-
+            textcolor: isDark ? Color(0xFFFFFBF5) : Colors.white,
+            strokecolor: isDark ? Color(0xFF1C1E21) : Color(0xFF2D2520),
             label: '${totalCount - completedCount} Paws-pitive Reminders',
-            color: Color(0xFFFAFAF0),
+            color: isDark ? Color(0xFFFFD89C) : Color(0xFF8A9B7E), // Sage green
           ),
         ),
       ],
@@ -538,44 +586,81 @@ class _HomescreenState extends ConsumerState<Homescreen> {
 
   Widget _buildStatCard({
     required ThemeData theme,
-    required String svgPath, // e.g. 'assets/cloud.svg'
-
+    required String svgPath,
     required String label,
     required Color color,
     required Color textcolor,
     required IconData icon,
     required Color strokecolor,
   }) {
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        SvgPicture.asset(svgPath, width: 160, height: 120, fit: BoxFit.contain),
-        Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildStyledFontAwesomeIcon(
-              icon: icon,
-              fillColor: color,
-              strokeColor: strokecolor,
-              size: 32.0,
-              strokeWidth: 1.5,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: GoogleFonts.comicNeue(
-                textStyle: theme.textTheme.bodySmall?.copyWith(
-                  color: textcolor,
-                ),
-                fontWeight: FontWeight.w700,
-                fontSize: 14,
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        boxShadow:
+            isDark
+                ? [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: Offset(0, 2),
+                  ),
+                ]
+                : [],
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          if (isDark)
+            Container(
+              width: 150,
+              height: 110,
+              decoration: BoxDecoration(
+                color: Color(0xFF2D3033),
+                borderRadius: BorderRadius.circular(20),
               ),
-              textAlign: TextAlign.center,
-              maxLines: 2,
             ),
-          ],
-        ),
-      ],
+          SvgPicture.asset(
+            svgPath,
+            width: 160,
+            height: 120,
+            fit: BoxFit.contain,
+            colorFilter:
+                isDark
+                    ? ColorFilter.mode(
+                      Colors.white.withOpacity(0.15),
+                      BlendMode.modulate,
+                    )
+                    : null,
+          ),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildStyledFontAwesomeIcon(
+                icon: icon,
+                fillColor: color,
+                strokeColor: strokecolor,
+                size: 32.0,
+                strokeWidth: isDark ? 2.0 : 1.5,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: GoogleFonts.comicNeue(
+                  textStyle: theme.textTheme.bodySmall?.copyWith(
+                    color: textcolor,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  fontSize: 14,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -600,18 +685,22 @@ class _HomescreenState extends ConsumerState<Homescreen> {
     final activeReminders = reminders.where((r) => !r.isCompleted).toList();
 
     if (activeReminders.isEmpty) {
+      final isDark = theme.brightness == Brightness.dark;
+
       return Container(
         padding: const EdgeInsets.all(40),
         decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
+          color: isDark ? Color(0xFF2D3033) : theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(20),
+          border:
+              isDark ? Border.all(color: Color(0xFF404448), width: 1) : null,
         ),
         child: Column(
           children: [
             Icon(
               Icons.check_circle_outline,
               size: 60,
-              color: const Color(0xFF4CAF50),
+              color: isDark ? Color(0xFF7FA390) : Color(0xFF4CAF50),
             ),
             const SizedBox(height: 16),
             Text('No reminders for today!', style: theme.textTheme.titleLarge),
@@ -623,7 +712,6 @@ class _HomescreenState extends ConsumerState<Homescreen> {
     }
 
     final displayReminders = activeReminders.take(3);
-    final remainingCount = activeReminders.length - 3;
 
     return SizedBox(
       height: 180,
@@ -639,17 +727,24 @@ class _HomescreenState extends ConsumerState<Homescreen> {
   }
 
   Widget _buildReminderCard(ThemeData theme, Reminder reminder) {
+    final isDark = theme.brightness == Brightness.dark;
+
     return GestureDetector(
       onTap: () {},
       child: Container(
         width: 120,
         margin: const EdgeInsets.only(right: 12),
         decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
+          color: isDark ? theme.colorScheme.surface : Colors.white,
           borderRadius: BorderRadius.circular(20),
+          border:
+              isDark ? null : Border.all(color: Color(0xFFD0BCAA), width: 1),
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
+              color:
+                  isDark
+                      ? Colors.black.withOpacity(0.2)
+                      : Colors.black.withOpacity(0.08),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -663,12 +758,23 @@ class _HomescreenState extends ConsumerState<Homescreen> {
               height: 70,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
+                color:
+                    isDark
+                        ? theme.colorScheme.primary.withOpacity(0.2)
+                        : Color(0xFFFFF8F0),
                 border: Border.all(
-                  color: theme.colorScheme.primary.withOpacity(0.5),
+                  color:
+                      isDark
+                          ? theme.colorScheme.primary.withOpacity(0.5)
+                          : Color(0xFFD09970),
                   width: 2,
                 ),
               ),
-              child: ClipOval(child: Icon(_getIconForReminder(reminder.title))),
+              child: Icon(
+                _getIconForReminder(reminder.title),
+                color: isDark ? Color(0xFFFFD89C) : Color(0xFFD09970),
+                size: 32,
+              ),
             ),
             const SizedBox(height: 12),
             Padding(
@@ -682,7 +788,10 @@ class _HomescreenState extends ConsumerState<Homescreen> {
               ),
             ),
             const SizedBox(height: 2),
-            Text(DateFormat('h:mm a').format(reminder.reminderDate)),
+            Text(
+              DateFormat('h:mm a').format(reminder.reminderDate),
+              style: theme.textTheme.bodySmall,
+            ),
           ],
         ),
       ),
@@ -864,6 +973,8 @@ class _HomescreenState extends ConsumerState<Homescreen> {
   }
 
   Widget _buildPetCard(ThemeData theme, Pet pet) {
+    final isDark = theme.brightness == Brightness.dark;
+
     return GestureDetector(
       onTap: () {
         ref.read(selectedPetProvider.notifier).selectPet(pet);
@@ -873,11 +984,16 @@ class _HomescreenState extends ConsumerState<Homescreen> {
         width: 120,
         margin: const EdgeInsets.only(right: 12),
         decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
+          color: isDark ? theme.colorScheme.surface : Colors.white,
           borderRadius: BorderRadius.circular(20),
+          border:
+              isDark ? null : Border.all(color: Color(0xFFD0BCAA), width: 1),
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
+              color:
+                  isDark
+                      ? Colors.black.withOpacity(0.2)
+                      : Colors.black.withOpacity(0.08),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -891,8 +1007,15 @@ class _HomescreenState extends ConsumerState<Homescreen> {
               height: 70,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
+                color:
+                    isDark
+                        ? theme.colorScheme.primary.withOpacity(0.2)
+                        : Color(0xFFFFF8F0),
                 border: Border.all(
-                  color: theme.colorScheme.primary.withOpacity(0.5),
+                  color:
+                      isDark
+                          ? theme.colorScheme.primary.withOpacity(0.5)
+                          : Color(0xFFD09970),
                   width: 2,
                 ),
               ),
@@ -905,14 +1028,17 @@ class _HomescreenState extends ConsumerState<Homescreen> {
                           errorBuilder:
                               (_, __, ___) => Icon(
                                 Icons.pets,
-                                size: 40,
-                                color: theme.colorScheme.primary,
+                                size: 32,
+                                color:
+                                    isDark
+                                        ? Color(0xFFFFD89C)
+                                        : Color(0xFFD09970),
                               ),
                         )
                         : Icon(
                           FontAwesomeIcons.paw,
-                          size: 40,
-                          color: theme.colorScheme.primary,
+                          size: 32,
+                          color: isDark ? Color(0xFFFFD89C) : Color(0xFFD09970),
                         ),
               ),
             ),
