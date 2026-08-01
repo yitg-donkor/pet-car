@@ -17,7 +17,7 @@ class MedicalRecord {
   MedicalRecord({
     required this.id,
     required this.petId,
-    required this.ownerId,
+    this.ownerId = '',
     required this.recordType,
     required this.title,
     this.description,

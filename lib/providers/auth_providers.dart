@@ -230,6 +230,8 @@ class UserProfileController extends _$UserProfileController {
 // AUTH ACTIONS (sign in / sign up / sign out)
 // ============================================
 
+final userProfileProviderProvider = userProfileControllerProvider;
+
 @riverpod
 class AuthService extends _$AuthService {
   @override
@@ -307,9 +309,7 @@ class AuthService extends _$AuthService {
   Future<void> resetPassword(String email) async {
     state = const AsyncValue.loading();
     try {
-      await ref.read(firebaseAuthProvider).sendPasswordResetEmail(
-        email: email,
-      );
+      await ref.read(firebaseAuthProvider).sendPasswordResetEmail(email: email);
       state = const AsyncValue.data(null);
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);

@@ -231,7 +231,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             if (userProfile == null) {
               return authStateAsync.when(
                 data: (authState) {
-                  final userId = authState.session?.user.id;
+                  final userId = ref.read(currentUserProvider)?.uid;
                   if (userId != null) {
                     return FutureBuilder<UserProfile?>(
                       future: _loadProfileFromOfflineDB(userId),

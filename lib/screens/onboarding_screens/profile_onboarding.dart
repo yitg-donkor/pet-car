@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pet_care/providers/auth_providers.dart';
@@ -41,10 +42,10 @@ class _ProfileCreationScreenState extends ConsumerState<ProfileCreationScreen> {
     // Pre-populate fields if user data is available
     final user = ref.read(currentUserProvider);
     if (user != null) {
-      // Set default full name from user metadata if available
-      final userMetadata = user.userMetadata;
-      if (userMetadata?['full_name'] != null) {
-        _fullNameController.text = userMetadata!['full_name'];
+      // Set default full name from Firebase user profile if available
+      final displayName = user.displayName;
+      if (displayName != null && displayName.trim().isNotEmpty) {
+        _fullNameController.text = displayName;
       }
 
       // Set default username from email prefix
@@ -283,18 +284,17 @@ class _ProfileCreationScreenState extends ConsumerState<ProfileCreationScreen> {
     });
 
     try {
-      final supabase = ref.read(supabaseProvider);
-      final response =
-          await supabase
-              .from('profiles')
-              .select('username')
-              .eq('username', username.toLowerCase())
-              .maybeSingle();
+      final snapshot =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .where('username', isEqualTo: username.toLowerCase())
+              .limit(1)
+              .get();
 
       if (mounted) {
         setState(() {
           _isCheckingUsername = false;
-          if (response != null) {
+          if (snapshot.docs.isNotEmpty) {
             _usernameError = 'Username is already taken';
           } else {
             _usernameError = null;

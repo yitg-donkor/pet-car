@@ -1,26 +1,55 @@
 // models/activity_log.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+
 import '../utils/firestore_helpers.dart';
+
+enum ActivityType {
+  walk('walk', 'Walk', Icons.directions_walk, Colors.brown),
+  meal('meal', 'Meal', Icons.restaurant, Colors.orange),
+  bathroom('bathroom', 'Bathroom', Icons.wc, Colors.blueGrey),
+  medication('medication', 'Medication', Icons.medication, Colors.red),
+  playtime('playtime', 'Playtime', Icons.toys, Colors.purple),
+  health('health', 'Health', Icons.favorite, Colors.green),
+  grooming('grooming', 'Grooming', Icons.content_cut, Colors.pink),
+  vet('vet', 'Vet', Icons.local_hospital, Colors.teal),
+  weight('weight', 'Weight', Icons.monitor_weight, Colors.indigo),
+  other('other', 'Other', Icons.event_note, Colors.grey);
+
+  const ActivityType(this.value, this.label, this.icon, this.color);
+
+  final String value;
+  final String label;
+  final IconData icon;
+  final Color color;
+
+  static ActivityType fromString(String value) {
+    return ActivityType.values.firstWhere(
+      (type) => type.value == value,
+      orElse: () => ActivityType.other,
+    );
+  }
+}
 
 class ActivityLog {
   final String id;
   final String petId;
   final String ownerId;
-  final String
-  activityType; // 'walk', 'meal', 'bathroom', 'medication', 'playtime', 'health', 'grooming', 'vet'
+  final String activityType;
   final String title;
   final String? details;
   final DateTime timestamp;
-  final int? duration; // in minutes
-  final String? amount; // for meals, medication
-  final Map<String, dynamic>? metadata; // flexible, type-specific data
+  final int? duration;
+  final String? amount;
+  final Map<String, dynamic>? metadata;
   final bool isHealthRelated;
   final DateTime createdAt;
+  final DateTime? lastModified;
 
   ActivityLog({
     required this.id,
     required this.petId,
-    required this.ownerId,
+    this.ownerId = '',
     required this.activityType,
     required this.title,
     this.details,
@@ -29,8 +58,9 @@ class ActivityLog {
     this.amount,
     this.metadata,
     this.isHealthRelated = false,
-    required this.createdAt,
-  });
+    DateTime? createdAt,
+    this.lastModified,
+  }) : createdAt = createdAt ?? DateTime.now();
 
   factory ActivityLog.fromFirestore(Map<String, dynamic> data, String id) {
     return ActivityLog(
@@ -43,10 +73,10 @@ class ActivityLog {
       timestamp: timestampToDateOrNow(data['timestamp']),
       duration: data['duration'] as int?,
       amount: data['amount'] as String?,
-      // Firestore stores maps natively - no jsonEncode/jsonDecode needed.
       metadata: (data['metadata'] as Map<String, dynamic>?),
       isHealthRelated: data['isHealthRelated'] as bool? ?? false,
       createdAt: timestampToDateOrNow(data['createdAt']),
+      lastModified: timestampToDate(data['lastModified']),
     );
   }
 
@@ -63,6 +93,7 @@ class ActivityLog {
       'metadata': metadata,
       'isHealthRelated': isHealthRelated,
       'createdAt': dateToTimestamp(createdAt),
+      'lastModified': dateToTimestamp(lastModified ?? DateTime.now()),
       'updatedAt': FieldValue.serverTimestamp(),
     };
   }
@@ -76,6 +107,7 @@ class ActivityLog {
     String? amount,
     Map<String, dynamic>? metadata,
     bool? isHealthRelated,
+    DateTime? lastModified,
   }) {
     return ActivityLog(
       id: id,
@@ -90,6 +122,7 @@ class ActivityLog {
       metadata: metadata ?? this.metadata,
       isHealthRelated: isHealthRelated ?? this.isHealthRelated,
       createdAt: createdAt,
+      lastModified: lastModified ?? this.lastModified,
     );
   }
 }

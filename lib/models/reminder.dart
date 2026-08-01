@@ -9,21 +9,23 @@ class Reminder {
   final String title;
   final String? description;
   final DateTime reminderDate;
-  final String reminderType; // daily, weekly, monthly, once
-  final String? importanceLevel; // high, medium, low
+  final String reminderType;
+  final String? importanceLevel;
   final bool isCompleted;
+  final bool isSynced;
   final DateTime createdAt;
 
   Reminder({
     this.id,
     required this.petId,
-    required this.ownerId,
+    this.ownerId = '',
     required this.title,
     this.description,
     required this.reminderDate,
     required this.reminderType,
     this.importanceLevel,
     this.isCompleted = false,
+    this.isSynced = true,
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now();
 
@@ -38,6 +40,7 @@ class Reminder {
       reminderType: data['reminderType'] as String,
       importanceLevel: data['importanceLevel'] as String?,
       isCompleted: data['isCompleted'] as bool? ?? false,
+      isSynced: data['isSynced'] as bool? ?? true,
       createdAt: timestampToDateOrNow(data['createdAt']),
     );
   }
@@ -52,6 +55,7 @@ class Reminder {
       'reminderType': reminderType,
       'importanceLevel': importanceLevel,
       'isCompleted': isCompleted,
+      'isSynced': isSynced,
       'createdAt': dateToTimestamp(createdAt),
       'updatedAt': FieldValue.serverTimestamp(),
     };
@@ -64,6 +68,7 @@ class Reminder {
     String? reminderType,
     String? importanceLevel,
     bool? isCompleted,
+    bool? isSynced,
   }) {
     return Reminder(
       id: id,
@@ -75,6 +80,7 @@ class Reminder {
       reminderType: reminderType ?? this.reminderType,
       importanceLevel: importanceLevel ?? this.importanceLevel,
       isCompleted: isCompleted ?? this.isCompleted,
+      isSynced: isSynced ?? this.isSynced,
       createdAt: createdAt,
     );
   }

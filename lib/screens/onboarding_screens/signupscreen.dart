@@ -46,73 +46,57 @@ class _SignupscreenState extends ConsumerState<Signupscreen> {
       print('Starting signup process...');
       print('Email: ${_emailController.text.trim()}');
 
-      // Sign up the user
       final response = await authService.signUp(
-        
-        email: '', password: '', fullName: '', username: '',
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+        fullName: _nameController.text.trim(),
+        username: _emailController.text
+            .trim()
+            .split('@')[0]
+            .toLowerCase()
+            .replaceAll(RegExp(r'[^a-zA-Z0-9_]'), ''),
       );
 
       print('Signup response received');
       print('User: ${response.user?.uid}');
-      print(
-        'Session: ${response.user?.accessToken != null ? "Present" : "Null"}',
-      );
 
       if (response.user != null) {
-        print('User created successfully: ${response.user!.id}');
+        print('User created successfully: ${response.user!.uid}');
 
-        // Create user profile after successful signup
-        // ONLY if we have a session (user is auto-confirmed)
-        if (response.session != null) {
-          try {
-            print('Creating profile for user: ${response.user!.id}');
+        try {
+          print('Creating profile for user: ${response.user!.uid}');
 
-            final userProfileProvider = ref.read(
-              userProfileProviderProvider.notifier,
-            );
-
-            // Generate username from email
-            final username = _emailController.text
-                .trim()
-                .split('@')[0]
-                .toLowerCase()
-                .replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '');
-
-            await userProfileProvider.createProfile(
-              fullName: _nameController.text.trim(),
-              username: username,
-            );
-
-            print('✅ Profile created successfully');
-
-            _showSnackBar('Account created successfully!');
-
-            // Navigate to profile setup or home
-            if (mounted) {
-              Navigator.of(context).pushReplacementNamed('/onboarding');
-            }
-          } catch (profileError) {
-            print('❌ Profile creation failed: $profileError');
-            _showSnackBar(
-              'Account created but profile setup failed. Please update your profile in settings.',
-              isError: true,
-            );
-
-            // Still navigate to app
-            if (mounted) {
-              Navigator.of(context).pushReplacementNamed('/');
-            }
-          }
-        } else {
-          // Email confirmation required
-          print('Email confirmation required');
-          _showSnackBar(
-            'Please check your email to confirm your account before signing in.',
+          final userProfileProvider = ref.read(
+            userProfileProviderProvider.notifier,
           );
 
-          // Navigate to login screen
+          final username = _emailController.text
+              .trim()
+              .split('@')[0]
+              .toLowerCase()
+              .replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '');
+
+          await userProfileProvider.createProfile(
+            fullName: _nameController.text.trim(),
+            username: username,
+          );
+
+          print('✅ Profile created successfully');
+
+          _showSnackBar('Account created successfully!');
+
           if (mounted) {
-            Navigator.of(context).pushReplacementNamed('/login');
+            Navigator.of(context).pushReplacementNamed('/onboarding');
+          }
+        } catch (profileError) {
+          print('❌ Profile creation failed: $profileError');
+          _showSnackBar(
+            'Account created but profile setup failed. Please update your profile in settings.',
+            isError: true,
+          );
+
+          if (mounted) {
+            Navigator.of(context).pushReplacementNamed('/');
           }
         }
       } else {

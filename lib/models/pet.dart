@@ -13,6 +13,7 @@ class Pet {
   final double? weight;
   final String? photoUrl;
   final String? microchipId;
+  final String? color;
 
   Pet({
     required this.id,
@@ -25,6 +26,7 @@ class Pet {
     this.weight,
     this.photoUrl,
     this.microchipId,
+    this.color,
   });
 
   factory Pet.fromFirestore(Map<String, dynamic> data, String id) {
@@ -39,6 +41,7 @@ class Pet {
       weight: (data['weight'] as num?)?.toDouble(),
       photoUrl: data['photoUrl'] as String?,
       microchipId: data['microchipId'] as String?,
+      color: data['color'] as String?,
     );
   }
 
@@ -53,6 +56,7 @@ class Pet {
       'weight': weight,
       'photoUrl': photoUrl,
       'microchipId': microchipId,
+      'color': color,
       'updatedAt': FieldValue.serverTimestamp(),
     };
   }
@@ -66,6 +70,7 @@ class Pet {
     double? weight,
     String? photoUrl,
     String? microchipId,
+    String? color,
   }) {
     return Pet(
       id: id,
@@ -78,6 +83,7 @@ class Pet {
       weight: weight ?? this.weight,
       photoUrl: photoUrl ?? this.photoUrl,
       microchipId: microchipId ?? this.microchipId,
+      color: color ?? this.color,
     );
   }
 }

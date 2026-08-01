@@ -415,7 +415,7 @@ class _MedicalRecordsScreenState extends ConsumerState<MedicalRecordsScreen> {
 
     try {
       final syncService = ref.read(unifiedSyncServiceProvider);
-      await syncService.fullSync(user.id);
+      await syncService.fullSync(user.uid);
 
       if (selectedPetId != null) {
         ref.invalidate(petMedicalRecordsOfflineProvider(selectedPetId!));

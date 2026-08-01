@@ -47,7 +47,7 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
     final user = ref.read(currentUserProvider);
     if (user != null) {
       final syncService = ref.read(unifiedSyncServiceProvider);
-      await syncService.fullSync(user.id);
+      await syncService.fullSync(user.uid);
 
       if (mounted) {
         _invalidateAllProviders();
@@ -137,7 +137,7 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
 
     try {
       final syncService = ref.read(unifiedSyncServiceProvider);
-      await syncService.fullSync(user.id);
+      await syncService.fullSync(user.uid);
 
       _invalidateAllProviders();
 

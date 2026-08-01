@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pet_care/models/pet.dart';
 
 import 'package:pet_care/providers/auth_providers.dart';
+import 'package:pet_care/providers/firestore_providers.dart';
 import 'package:pet_care/providers/offline_providers.dart';
 import 'package:pet_care/services/avatar_upload_service.dart';
 
@@ -111,9 +112,7 @@ class _EditpetscreenState extends ConsumerState<Editpetscreen> {
         _uploadProgress = 0.0;
       });
 
-      // Get the avatar upload service
-      final supabase = ref.read(supabaseProvider);
-      final avatarService = AvatarUploadService(supabase);
+      final avatarService = AvatarUploadService();
 
       // Show picker dialog
       final imageFile = await avatarService.showImageSourceDialog(context);
@@ -133,7 +132,7 @@ class _EditpetscreenState extends ConsumerState<Editpetscreen> {
 
       // Upload to Supabase storage
       final photoUrl = await avatarService.uploadAvatar(
-        userId: 'pets/${user.id}', // Store in pets subfolder
+        userId: 'pets/${user.uid}', // Store in pets subfolder
         imageFile: imageFile,
         onProgress: (progress) {
           setState(() {
@@ -184,7 +183,7 @@ class _EditpetscreenState extends ConsumerState<Editpetscreen> {
 
       final updatedPet = Pet(
         id: _displayPet!.id,
-        ownerId: user.id,
+        ownerId: user.uid,
         name: _nameController.text.trim(),
         species: _displayPet!.species,
         breed:
@@ -204,7 +203,7 @@ class _EditpetscreenState extends ConsumerState<Editpetscreen> {
                 : null,
       );
 
-      await ref.read(petsOfflineProvider.notifier).updatePet(updatedPet);
+      await ref.read(petsControllerProvider.notifier).updatePet(updatedPet);
 
       if (mounted) {
         _showSnackBar('${updatedPet.name} updated successfully!');

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pet_care/models/user_profile.dart';
-import 'package:pet_care/providers/offline_providers.dart';
+import 'package:pet_care/providers/auth_providers.dart';
 
 import 'package:image_picker/image_picker.dart';
 
@@ -99,8 +99,6 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final profileDB = ref.read(profileLocalDBProvider);
-
       final updatedProfile = UserProfile(
         id: widget.profile.id,
         fullName: _fullNameController.text,
@@ -136,11 +134,25 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
         updatedAt: widget.profile.updatedAt,
       );
 
-      await profileDB.updateProfile(updatedProfile);
-
-      // Sync to Supabase
-      final syncService = ref.read(unifiedSyncServiceProvider);
-      await syncService.syncProfilesToSupabase();
+      await ref
+          .read(userProfileControllerProvider.notifier)
+          .updateProfile(
+            fullName: updatedProfile.fullName,
+            username: updatedProfile.username,
+            bio: updatedProfile.bio,
+            phoneNumber: updatedProfile.phoneNumber,
+            country: updatedProfile.country,
+            streetAddress: updatedProfile.streetAddress,
+            apartment: updatedProfile.apartment,
+            city: updatedProfile.city,
+            state: updatedProfile.state,
+            zipCode: updatedProfile.zipCode,
+            emergencyContactName: updatedProfile.emergencyContactName,
+            emergencyContactPhone: updatedProfile.emergencyContactPhone,
+            notificationPreferences: updatedProfile.notificationPreferences,
+            appSettings: updatedProfile.appSettings,
+            avatarUrl: updatedProfile.avatarUrl,
+          );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
