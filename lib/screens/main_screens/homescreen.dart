@@ -4,7 +4,6 @@ import 'package:flutter_svg/svg.dart';
 import 'package:pet_care/models/pet.dart';
 import 'package:pet_care/models/reminder.dart';
 import 'package:pet_care/providers/auth_providers.dart';
-import 'package:pet_care/providers/offline_providers.dart';
 import 'package:pet_care/widgets/widgets.dart';
 import 'package:pet_care/screens/ai_features/ai_navigation_screen.dart';
 import 'package:pet_care/screens/main_screens/log.dart';

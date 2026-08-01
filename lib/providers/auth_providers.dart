@@ -1,307 +1,83 @@
 // ============================================
-// AUTH PROVIDERS (auth_providers.dart)
+// AUTH PROVIDERS (Firebase Auth + Firestore)
 // ============================================
-
+//
+// Replaces the Supabase-based auth_providers.dart. Notable simplifications
+// versus the old version:
+//   - No more isOffline branching that reads/writes a local sqflite copy of
+//     the profile as a fallback - Firestore's own offline cache does this,
+//     and Firebase Auth persists the signed-in session locally too.
+//   - createProfile/createProfileSimple duplication removed - one method.
+//   - Avatar upload now goes through Firebase Storage (see
+//     services/avatar_upload_service.dart) instead of Supabase Storage.
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart' hide User;
+import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
 import 'package:flutter/material.dart';
-import 'package:pet_care/local_db/sqflite_db.dart';
-import 'package:pet_care/providers/app_state_provider.dart';
-import 'package:pet_care/providers/offline_providers.dart';
-import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
-import '../services/avatar_upload_service.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
+
 import '../models/user_profile.dart';
+import '../services/avatar_upload_service.dart';
+import '../services/firestore_repository.dart';
 
 part 'auth_providers.g.dart';
 
-// Supabase client provider with offline check
-@riverpod
-SupabaseClient supabase(SupabaseRef ref) {
-  final isOffline = ref.watch(isOfflineModeProvider);
-  if (isOffline) {
-    throw Exception('Offline mode - Supabase not available');
-  }
+// ============================================
+// CORE FIREBASE PROVIDERS
+// ============================================
 
-  try {
-    return Supabase.instance.client;
-  } catch (e) {
-    print('⚠️ Supabase not initialized: $e');
-    throw Exception('Supabase not available');
-  }
+@riverpod
+fb_auth.FirebaseAuth firebaseAuth(FirebaseAuthRef ref) =>
+    fb_auth.FirebaseAuth.instance;
+
+@riverpod
+FirebaseFirestore firestore(FirestoreRef ref) => FirebaseFirestore.instance;
+
+@riverpod
+FirestoreRepository<UserProfile> userProfileRepository(
+  UserProfileRepositoryRef ref,
+) {
+  return FirestoreRepository<UserProfile>(
+    collectionPath: 'users',
+    fromFirestore: UserProfile.fromFirestore,
+    toFirestore: (profile) => profile.toFirestore(),
+  );
 }
 
-// Auth state stream provider with offline handling
+// Auth state stream - fires on sign in / sign out / token refresh.
 @riverpod
-Stream<AuthState> authState(AuthStateRef ref) async* {
-  final isOffline = ref.watch(isOfflineModeProvider);
-
-  if (isOffline) {
-    yield const AuthState(AuthChangeEvent.signedOut, null);
-    return;
-  }
-
-  try {
-    final supabase = ref.watch(supabaseProvider);
-    yield* supabase.auth.onAuthStateChange;
-  } catch (e) {
-    print('⚠️ Auth state error: $e');
-    yield const AuthState(AuthChangeEvent.signedOut, null);
-  }
+Stream<fb_auth.User?> authState(AuthStateRef ref) {
+  return ref.watch(firebaseAuthProvider).authStateChanges();
 }
 
-// Current session provider
+// Convenience sync accessor for the current user, derived from authState.
 @riverpod
-Session? currentSession(CurrentSessionRef ref) {
-  final isOffline = ref.watch(isOfflineModeProvider);
-  if (isOffline) return null;
-
-  try {
-    final supabase = ref.watch(supabaseProvider);
-    return supabase.auth.currentSession;
-  } catch (e) {
-    print('⚠️ Current session error: $e');
-    return null;
-  }
+fb_auth.User? currentUser(CurrentUserRef ref) {
+  return ref.watch(authStateProvider).valueOrNull;
 }
 
 // ============================================
-// UNIFIED CURRENT USER PROFILE PROVIDER
+// CURRENT USER PROFILE (Firestore document)
 // ============================================
 
 @riverpod
 Future<UserProfile?> currentUserProfile(CurrentUserProfileRef ref) async {
-  final isOffline = ref.watch(isOfflineModeProvider);
+  final user = ref.watch(currentUserProvider);
+  if (user == null) return null;
 
-  if (isOffline) {
-    // In offline mode, get from local DB
-    final profileLocalDB = ref.watch(profileLocalDBProvider);
-    final profiles = await profileLocalDB.getAllProfiles();
-
-    if (profiles.isEmpty) return null;
-
-    // Return the first active profile
-    return profiles.firstWhere((p) => p.isActive, orElse: () => profiles.first);
-  }
-
-  // Online mode - get from Supabase session
-  final session = ref.watch(currentSessionProvider);
-  if (session == null) {
-    // Fallback to local DB if no session
-    final profileLocalDB = ref.watch(profileLocalDBProvider);
-    final profiles = await profileLocalDB.getAllProfiles();
-    return profiles.isEmpty ? null : profiles.first;
-  }
-
-  try {
-    final supabase = ref.watch(supabaseProvider);
-    final response =
-        await supabase
-            .from('profiles')
-            .select()
-            .eq('id', session.user.id)
-            .maybeSingle();
-
-    if (response == null) {
-      // Fallback to local DB
-      final profileLocalDB = ref.watch(profileLocalDBProvider);
-      return await profileLocalDB.getProfileById(session.user.id);
-    }
-
-    final profile = UserProfile.fromJson(response);
-
-    // Cache in local DB
-    final profileLocalDB = ref.watch(profileLocalDBProvider);
-    await profileLocalDB.upsertProfile(profile);
-
-    return profile;
-  } catch (e) {
-    print('Error fetching user profile: $e');
-
-    // Fallback to local DB
-    final profileLocalDB = ref.watch(profileLocalDBProvider);
-    final session = ref.read(currentSessionProvider);
-    if (session != null) {
-      return await profileLocalDB.getProfileById(session.user.id);
-    }
-    return null;
-  }
+  final repo = ref.watch(userProfileRepositoryProvider);
+  return repo.get(user.uid);
 }
 
-// ============================================
-// LEGACY CURRENT USER PROVIDER (For backwards compatibility)
-// ============================================
-
 @riverpod
-User? currentUser(CurrentUserRef ref) {
-  final isOffline = ref.watch(isOfflineModeProvider);
-
-  if (isOffline) {
-    // Cannot return User synchronously in offline mode
-    // Consumers should use currentUserProfile instead
-    return null;
-  }
-
-  final session = ref.watch(currentSessionProvider);
-  if (session != null && !session.isExpired) {
-    return session.user;
-  }
-  return null;
-}
-
-// Current user async version
-@riverpod
-Future<User?> currentUserAsync(CurrentUserAsyncRef ref) async {
-  final isOffline = ref.watch(isOfflineModeProvider);
-  if (isOffline) return null;
-
-  final authStateAsync = ref.watch(authStateProvider);
-
-  return authStateAsync.when(
-    data: (authState) {
-      final session = authState.session;
-      if (session != null && !session.isExpired) {
-        return session.user;
-      }
-      return null;
-    },
-    loading: () {
-      final currentSession = ref.watch(currentSessionProvider);
-      return currentSession?.user;
-    },
-    error: (_, __) => null,
-  );
-}
-
-// ============================================
-// USER PROFILE PROVIDER (Enhanced)
-// ============================================
-
-@riverpod
-class UserProfileProvider extends _$UserProfileProvider {
+class UserProfileController extends _$UserProfileController {
   @override
-  FutureOr<UserProfile?> build() async {
-    // Delegate to currentUserProfile for consistency
+  FutureOr<UserProfile?> build() {
     return ref.watch(currentUserProfileProvider.future);
   }
 
-  Future<UserProfile?> _loadLocalProfile() async {
-    try {
-      final profileDB = ProfileLocalDB();
-      final profiles = await profileDB.getAllProfiles();
-
-      if (profiles.isEmpty) return null;
-      return profiles.firstWhere(
-        (p) => p.isActive,
-        orElse: () => profiles.first,
-      );
-    } catch (e) {
-      print('Error loading local profile: $e');
-      return null;
-    }
-  }
-
-  Future<void> _saveLocalProfile(UserProfile profile) async {
-    try {
-      final profileDB = ProfileLocalDB();
-      await profileDB.upsertProfile(profile);
-    } catch (e) {
-      print('Error saving local profile: $e');
-    }
-  }
-
-  AvatarUploadService get _avatarService {
-    try {
-      final supabase = ref.read(supabaseProvider);
-      return AvatarUploadService(supabase);
-    } catch (e) {
-      throw Exception('Cannot use avatar service in offline mode');
-    }
-  }
-
-  Future<String> uploadAvatar({
-    required XFile imageFile,
-    Function(double)? onProgress,
-  }) async {
-    final isOffline = ref.read(isOfflineModeProvider);
-    if (isOffline) {
-      throw Exception('Cannot upload avatar in offline mode');
-    }
-
-    final profile = await ref.read(currentUserProfileProvider.future);
-    if (profile == null) throw Exception('No user logged in');
-
-    try {
-      final avatarUrl = await _avatarService.uploadAvatar(
-        userId: profile.id,
-        imageFile: imageFile,
-        onProgress: onProgress,
-      );
-
-      await updateProfile(avatarUrl: avatarUrl);
-      return avatarUrl;
-    } catch (e) {
-      throw Exception('Failed to upload avatar: $e');
-    }
-  }
-
-  Future<String?> pickAndUploadAvatar({
-    ImageSource source = ImageSource.gallery,
-    Function(double)? onProgress,
-  }) async {
-    final isOffline = ref.read(isOfflineModeProvider);
-    if (isOffline) {
-      throw Exception('Cannot upload avatar in offline mode');
-    }
-
-    try {
-      final imageFile = await _avatarService.pickImage(source: source);
-      if (imageFile == null) return null;
-
-      return await uploadAvatar(imageFile: imageFile, onProgress: onProgress);
-    } catch (e) {
-      throw Exception('Failed to pick and upload avatar: $e');
-    }
-  }
-
-  Future<String?> showAvatarPickerAndUpload(
-    BuildContext context, {
-    Function(double)? onProgress,
-  }) async {
-    final isOffline = ref.read(isOfflineModeProvider);
-    if (isOffline) {
-      throw Exception('Cannot upload avatar in offline mode');
-    }
-
-    try {
-      final imageFile = await _avatarService.showImageSourceDialog(context);
-      if (imageFile == null) return null;
-
-      return await uploadAvatar(imageFile: imageFile, onProgress: onProgress);
-    } catch (e) {
-      throw Exception('Failed to upload avatar: $e');
-    }
-  }
-
-  Future<void> deleteAvatar() async {
-    final isOffline = ref.read(isOfflineModeProvider);
-    if (isOffline) {
-      throw Exception('Cannot delete avatar in offline mode');
-    }
-
-    final profile = await ref.read(currentUserProfileProvider.future);
-    if (profile == null) throw Exception('No user logged in');
-
-    try {
-      if (profile.avatarUrl != null) {
-        await _avatarService.deleteAvatar(profile.avatarUrl!);
-        await updateProfile(avatarUrl: null);
-      }
-    } catch (e) {
-      throw Exception('Failed to delete avatar: $e');
-    }
-  }
-
-  // Fixed createProfile method for auth_providers.dart
+  AvatarUploadService get _avatarService => AvatarUploadService();
 
   Future<void> createProfile({
     required String fullName,
@@ -319,109 +95,39 @@ class UserProfileProvider extends _$UserProfileProvider {
     NotificationPreferences? notificationPreferences,
     AppSettings? appSettings,
   }) async {
-    final isOffline = ref.read(isOfflineModeProvider);
-
-    // Get the current user's ID
-    String userId;
-    if (isOffline) {
-      // In offline mode, generate an offline ID
-      userId = 'offline_user_${DateTime.now().millisecondsSinceEpoch}';
-    } else {
-      // In online mode, MUST get the real user ID from auth
-      final session = ref.read(currentSessionProvider);
-      if (session == null || session.user.id.isEmpty) {
-        throw Exception('Cannot create profile: User not authenticated');
-      }
-      userId = session.user.id;
+    final user = ref.read(currentUserProvider);
+    if (user == null) {
+      throw Exception('Cannot create profile: user not authenticated');
     }
 
-    print('Creating profile for user: $userId (offline: $isOffline)');
+    final now = DateTime.now();
+    final profile = UserProfile(
+      id: user.uid,
+      fullName: fullName,
+      username: username.toLowerCase(),
+      bio: bio,
+      phoneNumber: phoneNumber,
+      phoneVerified: false,
+      streetAddress: streetAddress,
+      apartment: apartment,
+      city: city,
+      state: state,
+      zipCode: zipCode,
+      country: country,
+      emergencyContactName: emergencyContactName,
+      emergencyContactPhone: emergencyContactPhone,
+      notificationPreferences:
+          notificationPreferences ?? NotificationPreferences(),
+      appSettings: appSettings ?? AppSettings(),
+      isActive: true,
+      createdAt: now,
+      updatedAt: now,
+    );
 
-    final profileData = {
-      'id': userId,
-      'full_name': fullName,
-      'username': username.toLowerCase(),
-      'bio': bio,
-      'phone_number': phoneNumber,
-      'country': country,
-      'street_address': streetAddress,
-      'apartment': apartment,
-      'city': city,
-      'state': state,
-      'zip_code': zipCode,
-      'emergency_contact_name': emergencyContactName,
-      'emergency_contact_phone': emergencyContactPhone,
-      'notification_preferences':
-          (notificationPreferences ?? NotificationPreferences()).toJson(),
-      'app_settings': (appSettings ?? AppSettings()).toJson(),
-      'phone_verified': false,
-      'is_active': true,
-      'created_at': DateTime.now().toIso8601String(),
-      'updated_at': DateTime.now().toIso8601String(),
-    };
-
-    if (!isOffline) {
-      try {
-        final supabase = ref.read(supabaseProvider);
-        print('Attempting to create profile in Supabase with ID: $userId');
-        await supabase.from('profiles').upsert(profileData);
-        print('Profile created successfully in Supabase');
-      } catch (e) {
-        print('Error creating profile online: $e');
-        // Don't throw here - save locally as fallback
-      }
-    }
-
-    // Always save to local DB
-    await _saveLocalProfile(UserProfile.fromJson(profileData));
-    print('Profile saved to local DB');
+    await ref.read(userProfileRepositoryProvider).set(user.uid, profile);
 
     ref.invalidateSelf();
     ref.invalidate(currentUserProfileProvider);
-  }
-
-  // Alternative: Simpler createProfile that uses current session
-  Future<void> createProfileSimple({
-    required String fullName,
-    required String username,
-    String? bio,
-  }) async {
-    final session = ref.read(currentSessionProvider);
-    if (session == null) {
-      throw Exception('No active session. Please sign in first.');
-    }
-
-    final userId = session.user.id;
-    print('Creating profile for authenticated user: $userId');
-
-    final profileData = {
-      'id': userId,
-      'full_name': fullName,
-      'username': username.toLowerCase(),
-      'bio': bio,
-      'notification_preferences': NotificationPreferences().toJson(),
-      'app_settings': AppSettings().toJson(),
-      'phone_verified': false,
-      'is_active': true,
-      'created_at': DateTime.now().toIso8601String(),
-      'updated_at': DateTime.now().toIso8601String(),
-    };
-
-    try {
-      final supabase = ref.read(supabaseProvider);
-      await supabase.from('profiles').upsert(profileData);
-      print('✅ Profile created in Supabase');
-
-      // Save to local DB
-      await _saveLocalProfile(UserProfile.fromJson(profileData));
-      print('✅ Profile saved locally');
-
-      ref.invalidateSelf();
-      ref.invalidate(currentUserProfileProvider);
-    } catch (e) {
-      print('❌ Error creating profile: $e');
-      throw Exception('Failed to create profile: $e');
-    }
   }
 
   Future<void> updateProfile({
@@ -441,49 +147,29 @@ class UserProfileProvider extends _$UserProfileProvider {
     AppSettings? appSettings,
     String? avatarUrl,
   }) async {
-    final isOffline = ref.read(isOfflineModeProvider);
     final profile = await ref.read(currentUserProfileProvider.future);
+    if (profile == null) throw Exception('No user logged in');
 
-    final updateData = <String, dynamic>{
-      'updated_at': DateTime.now().toIso8601String(),
-    };
+    final updated = profile.copyWith(
+      fullName: fullName,
+      username: username?.toLowerCase(),
+      bio: bio,
+      phoneNumber: phoneNumber,
+      streetAddress: streetAddress,
+      apartment: apartment,
+      city: city,
+      state: state,
+      zipCode: zipCode,
+      country: country,
+      emergencyContactName: emergencyContactName,
+      emergencyContactPhone: emergencyContactPhone,
+      notificationPreferences: notificationPreferences,
+      appSettings: appSettings,
+      avatarUrl: avatarUrl,
+      updatedAt: DateTime.now(),
+    );
 
-    if (fullName != null) updateData['full_name'] = fullName;
-    if (username != null) updateData['username'] = username.toLowerCase();
-    if (bio != null) updateData['bio'] = bio;
-    if (phoneNumber != null) updateData['phone_number'] = phoneNumber;
-    if (country != null) updateData['country'] = country;
-    if (streetAddress != null) updateData['street_address'] = streetAddress;
-    if (apartment != null) updateData['apartment'] = apartment;
-    if (city != null) updateData['city'] = city;
-    if (state != null) updateData['state'] = state;
-    if (zipCode != null) updateData['zip_code'] = zipCode;
-    if (emergencyContactName != null)
-      updateData['emergency_contact_name'] = emergencyContactName;
-    if (emergencyContactPhone != null)
-      updateData['emergency_contact_phone'] = emergencyContactPhone;
-    if (avatarUrl != null) updateData['avatar_url'] = avatarUrl;
-    if (notificationPreferences != null) {
-      updateData['notification_preferences'] = notificationPreferences.toJson();
-    }
-    if (appSettings != null) {
-      updateData['app_settings'] = appSettings.toJson();
-    }
-
-    if (!isOffline && profile != null) {
-      try {
-        final supabase = ref.read(supabaseProvider);
-        await supabase.from('profiles').update(updateData).eq('id', profile.id);
-      } catch (e) {
-        print('Error updating profile online: $e');
-      }
-    }
-
-    final currentProfile = await _loadLocalProfile();
-    if (currentProfile != null) {
-      final updatedData = {...currentProfile.toJson(), ...updateData};
-      await _saveLocalProfile(UserProfile.fromJson(updatedData));
-    }
+    await ref.read(userProfileRepositoryProvider).set(profile.id, updated);
 
     ref.invalidateSelf();
     ref.invalidate(currentUserProfileProvider);
@@ -491,111 +177,57 @@ class UserProfileProvider extends _$UserProfileProvider {
 
   Future<void> updateNotificationPreferences(
     NotificationPreferences preferences,
-  ) async {
-    await updateProfile(notificationPreferences: preferences);
-  }
+  ) => updateProfile(notificationPreferences: preferences);
 
-  Future<void> updateAppSettings(AppSettings settings) async {
-    await updateProfile(appSettings: settings);
-  }
+  Future<void> updateAppSettings(AppSettings settings) =>
+      updateProfile(appSettings: settings);
 
-  Future<void> updateContactInfo({
-    required String phoneNumber,
-    String? emergencyContactName,
-    String? emergencyContactPhone,
+  Future<String> uploadAvatar({
+    required XFile imageFile,
+    Function(double)? onProgress,
   }) async {
-    await updateProfile(
-      phoneNumber: phoneNumber,
-      emergencyContactName: emergencyContactName,
-      emergencyContactPhone: emergencyContactPhone,
-    );
-  }
-
-  Future<void> updateAddress({
-    required String country,
-    required String streetAddress,
-    String? apartment,
-    required String city,
-    required String state,
-    required String zipCode,
-  }) async {
-    await updateProfile(
-      country: country,
-      streetAddress: streetAddress,
-      apartment: apartment,
-      city: city,
-      state: state,
-      zipCode: zipCode,
-    );
-  }
-
-  Future<void> markPhoneAsVerified() async {
     final profile = await ref.read(currentUserProfileProvider.future);
     if (profile == null) throw Exception('No user logged in');
 
-    final isOffline = ref.read(isOfflineModeProvider);
-
-    if (!isOffline) {
-      try {
-        final supabase = ref.read(supabaseProvider);
-        await supabase
-            .from('profiles')
-            .update({
-              'phone_verified': true,
-              'updated_at': DateTime.now().toIso8601String(),
-            })
-            .eq('id', profile.id);
-      } catch (e) {
-        print('Error marking phone as verified online: $e');
-      }
-    }
-
-    final currentProfile = await _loadLocalProfile();
-    if (currentProfile != null) {
-      final updatedData = {
-        ...currentProfile.toJson(),
-        'phone_verified': true,
-        'updated_at': DateTime.now().toIso8601String(),
-      };
-      await _saveLocalProfile(UserProfile.fromJson(updatedData));
-    }
-
-    ref.invalidateSelf();
-    ref.invalidate(currentUserProfileProvider);
+    final avatarUrl = await _avatarService.uploadAvatar(
+      userId: profile.id,
+      imageFile: imageFile,
+      onProgress: onProgress,
+    );
+    await updateProfile(avatarUrl: avatarUrl);
+    return avatarUrl;
   }
 
-  Future<bool> isProfileComplete() async {
-    final profile = await ref.read(currentUserProfileProvider.future);
-    if (profile == null) return false;
-    return profile.hasCompleteProfile;
+  Future<String?> pickAndUploadAvatar({
+    ImageSource source = ImageSource.gallery,
+    Function(double)? onProgress,
+  }) async {
+    final imageFile = await _avatarService.pickImage(source: source);
+    if (imageFile == null) return null;
+    return uploadAvatar(imageFile: imageFile, onProgress: onProgress);
   }
 
-  Future<double> getProfileCompletionPercentage() async {
+  Future<String?> showAvatarPickerAndUpload(
+    BuildContext context, {
+    Function(double)? onProgress,
+  }) async {
+    final imageFile = await _avatarService.showImageSourceDialog(context);
+    if (imageFile == null) return null;
+    return uploadAvatar(imageFile: imageFile, onProgress: onProgress);
+  }
+
+  Future<void> deleteAvatar() async {
     final profile = await ref.read(currentUserProfileProvider.future);
-    if (profile == null) return 0.0;
+    if (profile == null) throw Exception('No user logged in');
+    if (profile.avatarUrl == null) return;
 
-    int completedFields = 0;
-    const int totalEssentialFields = 6;
-
-    if (profile.fullName.isNotEmpty) completedFields++;
-    if (profile.username.isNotEmpty) completedFields++;
-    if (profile.phoneNumber != null && profile.phoneNumber!.isNotEmpty) {
-      completedFields++;
-    }
-    if (profile.streetAddress != null && profile.streetAddress!.isNotEmpty) {
-      completedFields++;
-    }
-    if (profile.city != null && profile.city!.isNotEmpty) completedFields++;
-    if (profile.country != null && profile.country!.isNotEmpty) {
-      completedFields++;
-    }
-
-    return completedFields / totalEssentialFields;
+    await _avatarService.deleteAvatar(profile.avatarUrl!);
+    await updateProfile(avatarUrl: null);
   }
 }
 
 // ============================================
-// AUTH SERVICE PROVIDER
+// AUTH ACTIONS (sign in / sign up / sign out)
 // ============================================
 
 @riverpod
@@ -603,89 +235,57 @@ class AuthService extends _$AuthService {
   @override
   AsyncValue<void> build() => const AsyncValue.data(null);
 
-  Future<void> clearLocalDataForNewUser() async {
-    try {
-      print('🗑️ Clearing local database for new user...');
-
-      final db = await LocalDatabaseService.instance.database;
-      await db.delete('reminders');
-      await db.delete('medical_records');
-      await db.delete('activity_logs');
-      await db.delete('pets');
-      await db.delete('profiles');
-
-      print('✅ Local database cleared successfully');
-    } catch (e) {
-      print('❌ Error clearing local database: $e');
-    }
-  }
-
-  Future<AuthResponse> signIn(String email, String password) async {
-    final isOffline = ref.read(isOfflineModeProvider);
-    if (isOffline) {
-      throw Exception('Cannot sign in while offline');
-    }
-
+  Future<fb_auth.UserCredential> signIn(String email, String password) async {
     state = const AsyncValue.loading();
     try {
-      final supabase = ref.read(supabaseProvider);
-
-      final response = await supabase.auth.signInWithPassword(
-        email: email,
-        password: password,
-      );
-
-      if (response.session == null) {
-        throw Exception('Login failed - no session returned');
-      }
-
-      if (response.user != null) {
-        await clearLocalDataForNewUser();
-
-        final syncService = ref.read(unifiedSyncServiceProvider);
-        await syncService.fullSync(response.user!.id);
-      }
+      final credential = await ref
+          .read(firebaseAuthProvider)
+          .signInWithEmailAndPassword(email: email, password: password);
 
       state = const AsyncValue.data(null);
-      ref.invalidate(currentSessionProvider);
-      ref.invalidate(currentUserProvider);
       ref.invalidate(currentUserProfileProvider);
-      ref.invalidate(userProfileProviderProvider);
-
-      return response;
+      return credential;
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
       rethrow;
     }
   }
 
-  Future<AuthResponse> signUp(String email, String password) async {
-    final isOffline = ref.read(isOfflineModeProvider);
-    if (isOffline) {
-      throw Exception('Cannot sign up while offline');
-    }
-
+  /// Signs up and creates the Firestore profile in one step. [fullName] and
+  /// [username] are required up front so callers don't end up with an auth
+  /// account that has no matching `users/{uid}` document.
+  Future<fb_auth.UserCredential> signUp({
+    required String email,
+    required String password,
+    required String fullName,
+    required String username,
+  }) async {
     state = const AsyncValue.loading();
     try {
-      final supabase = ref.read(supabaseProvider);
+      final credential = await ref
+          .read(firebaseAuthProvider)
+          .createUserWithEmailAndPassword(email: email, password: password);
 
-      final response = await supabase.auth.signUp(
-        email: email,
-        password: password,
+      final user = credential.user;
+      if (user == null) throw Exception('Sign up failed - no user returned');
+
+      final now = DateTime.now();
+      final profile = UserProfile(
+        id: user.uid,
+        fullName: fullName,
+        username: username.toLowerCase(),
+        phoneVerified: false,
+        notificationPreferences: NotificationPreferences(),
+        appSettings: AppSettings(),
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
       );
-
-      if (response.user == null) {
-        throw Exception('Sign up failed - no user returned');
-      }
+      await ref.read(userProfileRepositoryProvider).set(user.uid, profile);
 
       state = const AsyncValue.data(null);
-
-      ref.invalidate(currentSessionProvider);
-      ref.invalidate(currentUserProvider);
       ref.invalidate(currentUserProfileProvider);
-      ref.invalidate(userProfileProviderProvider);
-
-      return response;
+      return credential;
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
       rethrow;
@@ -695,25 +295,9 @@ class AuthService extends _$AuthService {
   Future<void> signOut() async {
     state = const AsyncValue.loading();
     try {
-      final isOffline = ref.read(isOfflineModeProvider);
-
-      if (!isOffline) {
-        try {
-          final supabase = ref.read(supabaseProvider);
-          await supabase.auth.signOut();
-        } catch (e) {
-          print('Error signing out from Supabase: $e');
-        }
-      }
-
-      await clearLocalDataForNewUser();
-
+      await ref.read(firebaseAuthProvider).signOut();
       state = const AsyncValue.data(null);
-
-      ref.invalidate(currentSessionProvider);
-      ref.invalidate(currentUserProvider);
       ref.invalidate(currentUserProfileProvider);
-      ref.invalidate(userProfileProviderProvider);
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
       rethrow;
@@ -721,16 +305,11 @@ class AuthService extends _$AuthService {
   }
 
   Future<void> resetPassword(String email) async {
-    final isOffline = ref.read(isOfflineModeProvider);
-    if (isOffline) {
-      throw Exception('Cannot reset password while offline');
-    }
-
     state = const AsyncValue.loading();
     try {
-      final supabase = ref.read(supabaseProvider);
-
-      await supabase.auth.resetPasswordForEmail(email);
+      await ref.read(firebaseAuthProvider).sendPasswordResetEmail(
+        email: email,
+      );
       state = const AsyncValue.data(null);
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
@@ -738,15 +317,5 @@ class AuthService extends _$AuthService {
     }
   }
 
-  Future<bool> isSignedIn() async {
-    final isOffline = ref.read(isOfflineModeProvider);
-    if (isOffline) {
-      final db = await LocalDatabaseService.instance.database;
-      final result = await db.query('profiles', limit: 1);
-      return result.isNotEmpty;
-    }
-
-    final session = ref.read(currentSessionProvider);
-    return session != null && !session.isExpired;
-  }
+  bool get isSignedIn => ref.read(firebaseAuthProvider).currentUser != null;
 }

@@ -49,12 +49,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       );
 
       print('Login response received');
-      print('User: ${response.user?.id}');
+      print('User: ${response.user?.uid}');
       print(
-        'Session: ${response.session?.accessToken != null ? "Present" : "Null"}',
+        'Session: ${response.user?.uid != null ? "Present" : "Null"}',
       );
 
-      if (response.user != null && response.session != null) {
+      if (response.user != null && response.user != null) {
         _showSnackBar('Login successful!');
 
         // Navigate to main app or home screen

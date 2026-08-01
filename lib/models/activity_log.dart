@@ -1,8 +1,11 @@
-import 'dart:convert';
+// models/activity_log.dart
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../utils/firestore_helpers.dart';
 
 class ActivityLog {
   final String id;
   final String petId;
+  final String ownerId;
   final String
   activityType; // 'walk', 'meal', 'bathroom', 'medication', 'playtime', 'health', 'grooming', 'vet'
   final String title;
@@ -10,15 +13,14 @@ class ActivityLog {
   final DateTime timestamp;
   final int? duration; // in minutes
   final String? amount; // for meals, medication
-  final Map<String, dynamic>? metadata; // flexible JSON for type-specific data
+  final Map<String, dynamic>? metadata; // flexible, type-specific data
   final bool isHealthRelated;
-  final bool isSynced;
-  final DateTime lastModified;
   final DateTime createdAt;
 
   ActivityLog({
     required this.id,
     required this.petId,
+    required this.ownerId,
     required this.activityType,
     required this.title,
     this.details,
@@ -27,92 +29,45 @@ class ActivityLog {
     this.amount,
     this.metadata,
     this.isHealthRelated = false,
-    this.isSynced = false,
-    required this.lastModified,
     required this.createdAt,
   });
 
-  // Convert to JSON for database
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'pet_id': petId,
-      'activity_type': activityType,
-      'title': title,
-      'details': details,
-      'timestamp': timestamp.toIso8601String(),
-      'duration': duration,
-      'amount': amount,
-      'metadata': metadata != null ? jsonEncode(metadata) : null,
-      'is_health_related': isHealthRelated ? 1 : 0,
-      'is_synced': isSynced ? 1 : 0,
-      'last_modified': lastModified.toIso8601String(),
-      'created_at': createdAt.toIso8601String(),
-    };
-  }
-
-  // Create from JSON (database)
-  factory ActivityLog.fromJson(Map<String, dynamic> json) {
+  factory ActivityLog.fromFirestore(Map<String, dynamic> data, String id) {
     return ActivityLog(
-      id: json['id'] as String,
-      petId: json['pet_id'] as String,
-      activityType: json['activity_type'] as String,
-      title: json['title'] as String,
-      details: json['details'] as String?,
-      timestamp: DateTime.parse(json['timestamp'] as String),
-      duration: json['duration'] as int?,
-      amount: json['amount'] as String?,
-      metadata:
-          json['metadata'] != null
-              ? jsonDecode(json['metadata'] as String) as Map<String, dynamic>
-              : null,
-      isHealthRelated: (json['is_health_related'] as int) == 1,
-      isSynced: (json['is_synced'] as int) == 1,
-      lastModified: DateTime.parse(json['last_modified'] as String),
-      createdAt: DateTime.parse(json['created_at'] as String),
+      id: id,
+      petId: data['petId'] as String,
+      ownerId: data['ownerId'] as String,
+      activityType: data['activityType'] as String,
+      title: data['title'] as String,
+      details: data['details'] as String?,
+      timestamp: timestampToDateOrNow(data['timestamp']),
+      duration: data['duration'] as int?,
+      amount: data['amount'] as String?,
+      // Firestore stores maps natively - no jsonEncode/jsonDecode needed.
+      metadata: (data['metadata'] as Map<String, dynamic>?),
+      isHealthRelated: data['isHealthRelated'] as bool? ?? false,
+      createdAt: timestampToDateOrNow(data['createdAt']),
     );
   }
 
-  // Create from Supabase (for syncing)
-  factory ActivityLog.fromSupabase(Map<String, dynamic> json) {
-    return ActivityLog(
-      id: json['id'] as String,
-      petId: json['pet_id'] as String,
-      activityType: json['activity_type'] as String,
-      title: json['title'] as String,
-      details: json['details'] as String?,
-      timestamp: DateTime.parse(json['timestamp'] as String),
-      duration: json['duration'] as int?,
-      amount: json['amount'] as String?,
-      metadata: json['metadata'] as Map<String, dynamic>?,
-      isHealthRelated: json['is_health_related'] as bool? ?? false,
-      isSynced: true,
-      lastModified: DateTime.parse(json['last_modified'] as String),
-      createdAt: DateTime.parse(json['created_at'] as String),
-    );
-  }
-
-  // Convert to Supabase format (for syncing)
-  Map<String, dynamic> toSupabaseMap() {
+  Map<String, dynamic> toFirestore() {
     return {
-      'id': id,
-      'pet_id': petId,
-      'activity_type': activityType,
+      'petId': petId,
+      'ownerId': ownerId,
+      'activityType': activityType,
       'title': title,
       'details': details,
-      'timestamp': timestamp.toIso8601String(),
+      'timestamp': dateToTimestamp(timestamp),
       'duration': duration,
       'amount': amount,
       'metadata': metadata,
-      'is_health_related': isHealthRelated,
-      'last_modified': lastModified.toIso8601String(),
-      'created_at': createdAt.toIso8601String(),
+      'isHealthRelated': isHealthRelated,
+      'createdAt': dateToTimestamp(createdAt),
+      'updatedAt': FieldValue.serverTimestamp(),
     };
   }
 
   ActivityLog copyWith({
-    String? id,
-    String? petId,
     String? activityType,
     String? title,
     String? details,
@@ -121,13 +76,11 @@ class ActivityLog {
     String? amount,
     Map<String, dynamic>? metadata,
     bool? isHealthRelated,
-    bool? isSynced,
-    DateTime? lastModified,
-    DateTime? createdAt,
   }) {
     return ActivityLog(
-      id: id ?? this.id,
-      petId: petId ?? this.petId,
+      id: id,
+      petId: petId,
+      ownerId: ownerId,
       activityType: activityType ?? this.activityType,
       title: title ?? this.title,
       details: details ?? this.details,
@@ -136,9 +89,7 @@ class ActivityLog {
       amount: amount ?? this.amount,
       metadata: metadata ?? this.metadata,
       isHealthRelated: isHealthRelated ?? this.isHealthRelated,
-      isSynced: isSynced ?? this.isSynced,
-      lastModified: lastModified ?? this.lastModified,
-      createdAt: createdAt ?? this.createdAt,
+      createdAt: createdAt,
     );
   }
 }

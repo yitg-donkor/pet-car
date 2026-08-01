@@ -1,6 +1,9 @@
 // models/user_profile.dart
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../utils/firestore_helpers.dart';
+
 class UserProfile {
-  final String id;
+  final String id; // matches the Firebase Auth UID
 
   // Basic Information
   final String fullName;
@@ -58,59 +61,58 @@ class UserProfile {
     this.avatarUrl,
   });
 
-  // Convert from JSON (from Supabase)
-  factory UserProfile.fromJson(Map<String, dynamic> json) {
+  factory UserProfile.fromFirestore(Map<String, dynamic> data, String id) {
     return UserProfile(
-      id: json['id'] as String,
-      fullName: json['full_name'] as String,
-      username: json['username'] as String,
-      bio: json['bio'] as String?,
-      phoneNumber: json['phone_number'] as String?,
-      phoneVerified: json['phone_verified'] as bool? ?? false,
-      streetAddress: json['street_address'] as String?,
-      apartment: json['apartment'] as String?,
-      city: json['city'] as String?,
-      state: json['state'] as String?,
-      zipCode: json['zip_code'] as String?,
-      country: json['country'] as String?,
-      emergencyContactName: json['emergency_contact_name'] as String?,
-      emergencyContactPhone: json['emergency_contact_phone'] as String?,
+      id: id,
+      fullName: data['fullName'] as String,
+      username: data['username'] as String,
+      bio: data['bio'] as String?,
+      phoneNumber: data['phoneNumber'] as String?,
+      phoneVerified: data['phoneVerified'] as bool? ?? false,
+      streetAddress: data['streetAddress'] as String?,
+      apartment: data['apartment'] as String?,
+      city: data['city'] as String?,
+      state: data['state'] as String?,
+      zipCode: data['zipCode'] as String?,
+      country: data['country'] as String?,
+      emergencyContactName: data['emergencyContactName'] as String?,
+      emergencyContactPhone: data['emergencyContactPhone'] as String?,
+      // Nested maps - Firestore stores these natively, so the existing
+      // fromJson/toJson on these two classes needs no changes at all.
       notificationPreferences: NotificationPreferences.fromJson(
-        json['notification_preferences'] as Map<String, dynamic>? ?? {},
+        (data['notificationPreferences'] as Map<String, dynamic>?) ?? {},
       ),
       appSettings: AppSettings.fromJson(
-        json['app_settings'] as Map<String, dynamic>? ?? {},
+        (data['appSettings'] as Map<String, dynamic>?) ?? {},
       ),
-      avatarUrl: json['avatar_url'] as String?,
-      isActive: json['is_active'] as bool? ?? true,
-      createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: DateTime.parse(json['updated_at'] as String),
+      avatarUrl: data['avatarUrl'] as String?,
+      isActive: data['isActive'] as bool? ?? true,
+      createdAt: timestampToDateOrNow(data['createdAt']),
+      updatedAt: timestampToDateOrNow(data['updatedAt']),
     );
   }
 
-  // Convert to JSON (for Supabase)
-  Map<String, dynamic> toJson() {
+  Map<String, dynamic> toFirestore() {
     return {
-      'id': id,
-      'full_name': fullName,
+      'fullName': fullName,
       'username': username,
       'bio': bio,
-      'phone_number': phoneNumber,
-      'phone_verified': phoneVerified,
-      'street_address': streetAddress,
+      'phoneNumber': phoneNumber,
+      'phoneVerified': phoneVerified,
+      'streetAddress': streetAddress,
       'apartment': apartment,
       'city': city,
       'state': state,
-      'zip_code': zipCode,
+      'zipCode': zipCode,
       'country': country,
-      'emergency_contact_name': emergencyContactName,
-      'emergency_contact_phone': emergencyContactPhone,
-      'notification_preferences': notificationPreferences.toJson(),
-      'app_settings': appSettings.toJson(),
-      'avatar_url': avatarUrl,
-      'is_active': isActive,
-      'created_at': createdAt.toIso8601String(),
-      'updated_at': updatedAt.toIso8601String(),
+      'emergencyContactName': emergencyContactName,
+      'emergencyContactPhone': emergencyContactPhone,
+      'notificationPreferences': notificationPreferences.toJson(),
+      'appSettings': appSettings.toJson(),
+      'avatarUrl': avatarUrl,
+      'isActive': isActive,
+      'createdAt': dateToTimestamp(createdAt),
+      'updatedAt': FieldValue.serverTimestamp(),
     };
   }
 
@@ -139,7 +141,6 @@ class UserProfile {
     return emergencyContactName != null && emergencyContactPhone != null;
   }
 
-  // CopyWith method for updates
   UserProfile copyWith({
     String? fullName,
     String? username,
@@ -188,10 +189,9 @@ class UserProfile {
 }
 
 // ============================================
-// NOTIFICATION PREFERENCES MODEL
+// NOTIFICATION PREFERENCES MODEL (unchanged - already a plain map)
 // ============================================
 
-// Add this to your NotificationPreferences model in user_profile.dart
 class NotificationPreferences {
   final bool allNotificationsEnabled;
   final bool reminderNotifications;
@@ -200,8 +200,8 @@ class NotificationPreferences {
   final bool quietHoursEnabled;
   final String quietHoursStart;
   final String quietHoursEnd;
-  final bool soundEnabled; // NEW
-  final bool vibrationEnabled; // NEW
+  final bool soundEnabled;
+  final bool vibrationEnabled;
 
   NotificationPreferences({
     this.allNotificationsEnabled = true,
@@ -211,8 +211,8 @@ class NotificationPreferences {
     this.quietHoursEnabled = false,
     this.quietHoursStart = '21:00',
     this.quietHoursEnd = '08:00',
-    this.soundEnabled = true, // NEW
-    this.vibrationEnabled = true, // NEW
+    this.soundEnabled = true,
+    this.vibrationEnabled = true,
   });
 
   factory NotificationPreferences.fromJson(Map<String, dynamic> json) {
@@ -225,8 +225,8 @@ class NotificationPreferences {
       quietHoursEnabled: json['quiet_hours_enabled'] as bool? ?? false,
       quietHoursStart: json['quiet_hours_start'] as String? ?? '21:00',
       quietHoursEnd: json['quiet_hours_end'] as String? ?? '08:00',
-      soundEnabled: json['sound_enabled'] as bool? ?? true, // NEW
-      vibrationEnabled: json['vibration_enabled'] as bool? ?? true, // NEW
+      soundEnabled: json['sound_enabled'] as bool? ?? true,
+      vibrationEnabled: json['vibration_enabled'] as bool? ?? true,
     );
   }
 
@@ -239,8 +239,8 @@ class NotificationPreferences {
       'quiet_hours_enabled': quietHoursEnabled,
       'quiet_hours_start': quietHoursStart,
       'quiet_hours_end': quietHoursEnd,
-      'sound_enabled': soundEnabled, // NEW
-      'vibration_enabled': vibrationEnabled, // NEW
+      'sound_enabled': soundEnabled,
+      'vibration_enabled': vibrationEnabled,
     };
   }
 
@@ -252,8 +252,8 @@ class NotificationPreferences {
     bool? quietHoursEnabled,
     String? quietHoursStart,
     String? quietHoursEnd,
-    bool? soundEnabled, // NEW
-    bool? vibrationEnabled, // NEW
+    bool? soundEnabled,
+    bool? vibrationEnabled,
   }) {
     return NotificationPreferences(
       allNotificationsEnabled:
@@ -265,14 +265,14 @@ class NotificationPreferences {
       quietHoursEnabled: quietHoursEnabled ?? this.quietHoursEnabled,
       quietHoursStart: quietHoursStart ?? this.quietHoursStart,
       quietHoursEnd: quietHoursEnd ?? this.quietHoursEnd,
-      soundEnabled: soundEnabled ?? this.soundEnabled, // NEW
-      vibrationEnabled: vibrationEnabled ?? this.vibrationEnabled, // NEW
+      soundEnabled: soundEnabled ?? this.soundEnabled,
+      vibrationEnabled: vibrationEnabled ?? this.vibrationEnabled,
     );
   }
 }
 
 // ============================================
-// APP SETTINGS MODEL
+// APP SETTINGS MODEL (unchanged - already a plain map)
 // ============================================
 
 class AppSettings {

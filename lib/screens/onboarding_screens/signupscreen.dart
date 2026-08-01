@@ -48,14 +48,14 @@ class _SignupscreenState extends ConsumerState<Signupscreen> {
 
       // Sign up the user
       final response = await authService.signUp(
-        _emailController.text.trim(),
-        _passwordController.text,
+        
+        email: '', password: '', fullName: '', username: '',
       );
 
       print('Signup response received');
-      print('User: ${response.user?.id}');
+      print('User: ${response.user?.uid}');
       print(
-        'Session: ${response.session?.accessToken != null ? "Present" : "Null"}',
+        'Session: ${response.user?.accessToken != null ? "Present" : "Null"}',
       );
 
       if (response.user != null) {

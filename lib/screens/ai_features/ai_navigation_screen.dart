@@ -482,7 +482,7 @@ class _AIDashboardScreenState extends ConsumerState<AIDashboardScreen> {
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 Divider(),
-                if (pets.isEmpty)
+                if (pets?.isEmpty)
                   Text('No pets available')
                 else
                   Expanded(

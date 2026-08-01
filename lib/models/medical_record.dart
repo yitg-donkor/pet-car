@@ -1,7 +1,11 @@
 // models/medical_record.dart
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../utils/firestore_helpers.dart';
+
 class MedicalRecord {
   final String id;
   final String petId;
+  final String ownerId;
   final String recordType;
   final String title;
   final String? description;
@@ -13,6 +17,7 @@ class MedicalRecord {
   MedicalRecord({
     required this.id,
     required this.petId,
+    required this.ownerId,
     required this.recordType,
     required this.title,
     this.description,
@@ -22,23 +27,33 @@ class MedicalRecord {
     this.nextDueDate,
   });
 
-  factory MedicalRecord.fromJson(Map<String, dynamic> json) {
+  factory MedicalRecord.fromFirestore(Map<String, dynamic> data, String id) {
     return MedicalRecord(
-      id: json['id'],
-      petId: json['pet_id'],
-      recordType: json['record_type'],
-      title: json['title'],
-      description: json['description'],
-      date:
-          json['date'] is String
-              ? DateTime.parse(json['date'])
-              : DateTime.fromMillisecondsSinceEpoch((json['date'] as int)),
-      veterinarian: json['veterinarian'],
-      cost: (json['cost'] != null) ? (json['cost'] as num).toDouble() : null,
-      nextDueDate:
-          json['next_due_date'] != null
-              ? DateTime.parse(json['next_due_date'])
-              : null,
+      id: id,
+      petId: data['petId'] as String,
+      ownerId: data['ownerId'] as String,
+      recordType: data['recordType'] as String,
+      title: data['title'] as String,
+      description: data['description'] as String?,
+      date: timestampToDateOrNow(data['date']),
+      veterinarian: data['veterinarian'] as String?,
+      cost: (data['cost'] as num?)?.toDouble(),
+      nextDueDate: timestampToDate(data['nextDueDate']),
     );
+  }
+
+  Map<String, dynamic> toFirestore() {
+    return {
+      'petId': petId,
+      'ownerId': ownerId,
+      'recordType': recordType,
+      'title': title,
+      'description': description,
+      'date': dateToTimestamp(date),
+      'veterinarian': veterinarian,
+      'cost': cost,
+      'nextDueDate': dateToTimestamp(nextDueDate),
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
   }
 }

@@ -6,27 +6,64 @@ part of 'auth_providers.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$supabaseHash() => r'338c6d1df36ede7b2a16c7ca6fbf7c187cb36510';
+String _$firebaseAuthHash() => r'4794235b6b197cffe55fb75f838dc2bbc6ee166d';
 
-/// See also [supabase].
-@ProviderFor(supabase)
-final supabaseProvider = AutoDisposeProvider<SupabaseClient>.internal(
-  supabase,
-  name: r'supabaseProvider',
+/// See also [firebaseAuth].
+@ProviderFor(firebaseAuth)
+final firebaseAuthProvider = AutoDisposeProvider<fb_auth.FirebaseAuth>.internal(
+  firebaseAuth,
+  name: r'firebaseAuthProvider',
   debugGetCreateSourceHash:
-      const bool.fromEnvironment('dart.vm.product') ? null : _$supabaseHash,
+      const bool.fromEnvironment('dart.vm.product') ? null : _$firebaseAuthHash,
   dependencies: null,
   allTransitiveDependencies: null,
 );
 
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
-typedef SupabaseRef = AutoDisposeProviderRef<SupabaseClient>;
-String _$authStateHash() => r'96ace570059e60aafed95fc856482e23fdf0a845';
+typedef FirebaseAuthRef = AutoDisposeProviderRef<fb_auth.FirebaseAuth>;
+String _$firestoreHash() => r'57116d7f1e2dda861cf1362ca8fe50edc7a149b3';
+
+/// See also [firestore].
+@ProviderFor(firestore)
+final firestoreProvider = AutoDisposeProvider<FirebaseFirestore>.internal(
+  firestore,
+  name: r'firestoreProvider',
+  debugGetCreateSourceHash:
+      const bool.fromEnvironment('dart.vm.product') ? null : _$firestoreHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef FirestoreRef = AutoDisposeProviderRef<FirebaseFirestore>;
+String _$userProfileRepositoryHash() =>
+    r'8ec064483dd369495c433ff5e3abb48482de8927';
+
+/// See also [userProfileRepository].
+@ProviderFor(userProfileRepository)
+final userProfileRepositoryProvider =
+    AutoDisposeProvider<FirestoreRepository<UserProfile>>.internal(
+      userProfileRepository,
+      name: r'userProfileRepositoryProvider',
+      debugGetCreateSourceHash:
+          const bool.fromEnvironment('dart.vm.product')
+              ? null
+              : _$userProfileRepositoryHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef UserProfileRepositoryRef =
+    AutoDisposeProviderRef<FirestoreRepository<UserProfile>>;
+String _$authStateHash() => r'a3dc8fe7f61b70e8739de8159d32334c8571a35a';
 
 /// See also [authState].
 @ProviderFor(authState)
-final authStateProvider = AutoDisposeStreamProvider<AuthState>.internal(
+final authStateProvider = AutoDisposeStreamProvider<fb_auth.User?>.internal(
   authState,
   name: r'authStateProvider',
   debugGetCreateSourceHash:
@@ -37,27 +74,25 @@ final authStateProvider = AutoDisposeStreamProvider<AuthState>.internal(
 
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
-typedef AuthStateRef = AutoDisposeStreamProviderRef<AuthState>;
-String _$currentSessionHash() => r'b7380f963c5c47c12d2708d534fea38568495a41';
+typedef AuthStateRef = AutoDisposeStreamProviderRef<fb_auth.User?>;
+String _$currentUserHash() => r'97a9b16f692efbcd529bd4393e4d80507bc17b97';
 
-/// See also [currentSession].
-@ProviderFor(currentSession)
-final currentSessionProvider = AutoDisposeProvider<Session?>.internal(
-  currentSession,
-  name: r'currentSessionProvider',
+/// See also [currentUser].
+@ProviderFor(currentUser)
+final currentUserProvider = AutoDisposeProvider<fb_auth.User?>.internal(
+  currentUser,
+  name: r'currentUserProvider',
   debugGetCreateSourceHash:
-      const bool.fromEnvironment('dart.vm.product')
-          ? null
-          : _$currentSessionHash,
+      const bool.fromEnvironment('dart.vm.product') ? null : _$currentUserHash,
   dependencies: null,
   allTransitiveDependencies: null,
 );
 
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
-typedef CurrentSessionRef = AutoDisposeProviderRef<Session?>;
+typedef CurrentUserRef = AutoDisposeProviderRef<fb_auth.User?>;
 String _$currentUserProfileHash() =>
-    r'4ad1a99a91347050e1364aaee1eeec6f9862c54c';
+    r'a624ea6dd41077daac82da115c614d6a25bce8a2';
 
 /// See also [currentUserProfile].
 @ProviderFor(currentUserProfile)
@@ -76,61 +111,27 @@ final currentUserProfileProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef CurrentUserProfileRef = AutoDisposeFutureProviderRef<UserProfile?>;
-String _$currentUserHash() => r'd9fd088c7b682f0ef6552ae684ab448079f97bf0';
+String _$userProfileControllerHash() =>
+    r'56dbea313eba83a6c9d54509778346fdba2cd402';
 
-/// See also [currentUser].
-@ProviderFor(currentUser)
-final currentUserProvider = AutoDisposeProvider<User?>.internal(
-  currentUser,
-  name: r'currentUserProvider',
-  debugGetCreateSourceHash:
-      const bool.fromEnvironment('dart.vm.product') ? null : _$currentUserHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
-
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-typedef CurrentUserRef = AutoDisposeProviderRef<User?>;
-String _$currentUserAsyncHash() => r'0c3146863c936f68538b8dff8ae6de866e156cce';
-
-/// See also [currentUserAsync].
-@ProviderFor(currentUserAsync)
-final currentUserAsyncProvider = AutoDisposeFutureProvider<User?>.internal(
-  currentUserAsync,
-  name: r'currentUserAsyncProvider',
-  debugGetCreateSourceHash:
-      const bool.fromEnvironment('dart.vm.product')
-          ? null
-          : _$currentUserAsyncHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
-
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-typedef CurrentUserAsyncRef = AutoDisposeFutureProviderRef<User?>;
-String _$userProfileProviderHash() =>
-    r'925f207c7912689c9055de783f4358f60614b77e';
-
-/// See also [UserProfileProvider].
-@ProviderFor(UserProfileProvider)
-final userProfileProviderProvider = AutoDisposeAsyncNotifierProvider<
-  UserProfileProvider,
+/// See also [UserProfileController].
+@ProviderFor(UserProfileController)
+final userProfileControllerProvider = AutoDisposeAsyncNotifierProvider<
+  UserProfileController,
   UserProfile?
 >.internal(
-  UserProfileProvider.new,
-  name: r'userProfileProviderProvider',
+  UserProfileController.new,
+  name: r'userProfileControllerProvider',
   debugGetCreateSourceHash:
       const bool.fromEnvironment('dart.vm.product')
           ? null
-          : _$userProfileProviderHash,
+          : _$userProfileControllerHash,
   dependencies: null,
   allTransitiveDependencies: null,
 );
 
-typedef _$UserProfileProvider = AutoDisposeAsyncNotifier<UserProfile?>;
-String _$authServiceHash() => r'51bf4a2155bcb6c6b3766fadcc2f619dd5d31d52';
+typedef _$UserProfileController = AutoDisposeAsyncNotifier<UserProfile?>;
+String _$authServiceHash() => r'42207b1509f3fe14319ac9882b05e7d72530f553';
 
 /// See also [AuthService].
 @ProviderFor(AuthService)

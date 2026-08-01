@@ -1,4 +1,7 @@
 // models/pet.dart
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../utils/firestore_helpers.dart';
+
 class Pet {
   final String id;
   final String ownerId;
@@ -24,38 +27,57 @@ class Pet {
     this.microchipId,
   });
 
-  factory Pet.fromJson(Map<String, dynamic> json) {
+  factory Pet.fromFirestore(Map<String, dynamic> data, String id) {
     return Pet(
-      id: json['id'],
-      ownerId: json['owner_id'],
-      name: json['name'],
-      species: json['species'],
-      breed: json['breed'],
-      age: json['age'],
-      birthDate:
-          json['birth_date'] != null
-              ? DateTime.parse(json['birth_date'])
-              : null,
-      weight: json['weight']?.toDouble(),
-      photoUrl: json['photo_url'],
-      microchipId: json['microchip_id'],
+      id: id,
+      ownerId: data['ownerId'] as String,
+      name: data['name'] as String,
+      species: data['species'] as String,
+      breed: data['breed'] as String?,
+      age: data['age'] as int?,
+      birthDate: timestampToDate(data['birthDate']),
+      weight: (data['weight'] as num?)?.toDouble(),
+      photoUrl: data['photoUrl'] as String?,
+      microchipId: data['microchipId'] as String?,
     );
   }
 
-  get color => null;
-
-  Map<String, dynamic> toJson() {
+  Map<String, dynamic> toFirestore() {
     return {
-      'id': id,
-      'owner_id': ownerId,
+      'ownerId': ownerId,
       'name': name,
       'species': species,
       'breed': breed,
       'age': age,
-      'birth_date': birthDate?.toIso8601String(),
+      'birthDate': dateToTimestamp(birthDate),
       'weight': weight,
-      'photo_url': photoUrl,
-      'microchip_id': microchipId,
+      'photoUrl': photoUrl,
+      'microchipId': microchipId,
+      'updatedAt': FieldValue.serverTimestamp(),
     };
+  }
+
+  Pet copyWith({
+    String? name,
+    String? species,
+    String? breed,
+    int? age,
+    DateTime? birthDate,
+    double? weight,
+    String? photoUrl,
+    String? microchipId,
+  }) {
+    return Pet(
+      id: id,
+      ownerId: ownerId,
+      name: name ?? this.name,
+      species: species ?? this.species,
+      breed: breed ?? this.breed,
+      age: age ?? this.age,
+      birthDate: birthDate ?? this.birthDate,
+      weight: weight ?? this.weight,
+      photoUrl: photoUrl ?? this.photoUrl,
+      microchipId: microchipId ?? this.microchipId,
+    );
   }
 }
