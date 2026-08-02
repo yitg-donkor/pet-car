@@ -5,7 +5,7 @@ import 'package:pet_care/models/medical_record.dart';
 import 'package:pet_care/models/reminder.dart';
 import 'package:pet_care/providers/auth_providers.dart';
 import 'package:pet_care/services/firebase_ai_service.dart';
-import 'package:pet_care/providers/offline_providers.dart';
+import 'package:pet_care/providers/firestore_providers.dart';
 
 import 'package:intl/intl.dart';
 
@@ -40,15 +40,12 @@ class _SmartRemindersScreenState extends ConsumerState<SmartRemindersScreen> {
     });
 
     try {
-      final medicalRecordDB = ref.read(medicalRecordLocalDBProvider);
-      final reminderDB = ref.read(reminderDatabaseProvider);
-
-      final medicalRecords = await medicalRecordDB.getMedicalRecordsForPet(
-        widget.pet.id,
-      );
-      final existingReminders = await reminderDB.getAllReminders();
-      final petReminders =
-          existingReminders.where((r) => r.petId == widget.pet.id).toList();
+      final medicalRecords = await ref
+          .read(medicalRecordRepositoryProvider)
+          .fetch((q) => q.where('petId', isEqualTo: widget.pet.id));
+      final petReminders = await ref
+          .read(reminderRepositoryProvider)
+          .fetch((q) => q.where('petId', isEqualTo: widget.pet.id));
 
       final prompt = _buildPromptFromData(medicalRecords, petReminders);
 
@@ -1324,10 +1321,12 @@ class _SmartRemindersScreenState extends ConsumerState<SmartRemindersScreen> {
 
   Future<void> _addSingleReminder(Map<String, dynamic> reminderData) async {
     try {
-      final reminderDB = ref.read(reminderDatabaseProvider);
+      final user = ref.read(currentUserProvider);
+      if (user == null) throw Exception('Not signed in');
 
       final reminder = Reminder(
         petId: widget.pet.id,
+        ownerId: user.uid,
         title: reminderData['title'],
         description: reminderData['description'],
         reminderDate: reminderData['date'],
@@ -1335,17 +1334,9 @@ class _SmartRemindersScreenState extends ConsumerState<SmartRemindersScreen> {
         importanceLevel: reminderData['priority'] ?? 'medium',
       );
 
-      await reminderDB.createReminder(reminder);
+      await ref.read(reminderRepositoryProvider).add(reminder);
 
-      // Sync to Supabase
-      final syncService = ref.read(unifiedSyncServiceProvider);
-      final user = ref.read(currentUserProvider);
-
-      if (user != null) {
-        await syncService.syncRemindersToSupabase();
-      }
-
-      // Invalidate providers to refresh
+      // Refresh the live reminder streams
       ref.invalidate(allRemindersProvider);
       ref.invalidate(todayRemindersProvider);
       ref.invalidate(weeklyRemindersProvider);
@@ -1444,13 +1435,17 @@ class _SmartRemindersScreenState extends ConsumerState<SmartRemindersScreen> {
         );
       }
 
-      final reminderDB = ref.read(reminderDatabaseProvider);
+      final user = ref.read(currentUserProvider);
+      if (user == null) throw Exception('Not signed in');
+
+      final repo = ref.read(reminderRepositoryProvider);
       int added = 0;
 
       for (var reminderData in _aiGeneratedReminders) {
         try {
           final reminder = Reminder(
             petId: widget.pet.id,
+            ownerId: user.uid,
             title: reminderData['title'],
             description: reminderData['description'],
             reminderDate: reminderData['date'],
@@ -1458,22 +1453,14 @@ class _SmartRemindersScreenState extends ConsumerState<SmartRemindersScreen> {
             importanceLevel: reminderData['priority'] ?? 'medium',
           );
 
-          await reminderDB.createReminder(reminder);
+          await repo.add(reminder);
           added++;
         } catch (e) {
-          print('Error adding reminder: $e');
+          debugPrint('Error adding reminder: $e');
         }
       }
 
-      // Sync to Supabase
-      final syncService = ref.read(unifiedSyncServiceProvider);
-      final user = ref.read(currentUserProvider);
-
-      if (user != null) {
-        await syncService.syncRemindersToSupabase();
-      }
-
-      // Invalidate providers to refresh
+      // Refresh the live reminder streams
       ref.invalidate(allRemindersProvider);
       ref.invalidate(todayRemindersProvider);
       ref.invalidate(weeklyRemindersProvider);

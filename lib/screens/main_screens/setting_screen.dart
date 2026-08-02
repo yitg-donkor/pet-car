@@ -2,8 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pet_care/providers/app_state_provider.dart';
 import 'package:pet_care/providers/auth_providers.dart';
-import 'package:pet_care/providers/offline_providers.dart';
+import 'package:pet_care/providers/firestore_providers.dart';
 import 'package:pet_care/screens/settingsscreens/profile_edit_screen.dart';
 import 'package:pet_care/services/notification_service.dart';
 import 'package:pet_care/theme/theme_manager.dart';
@@ -69,11 +70,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<UserProfile?> _loadProfileFromOfflineDB(String userId) async {
     try {
-      final profileLocalDB = ref.read(profileLocalDBProvider);
-      final profile = await profileLocalDB.getProfileById(userId);
-      return profile;
+      return await ref.read(userProfileRepositoryProvider).get(userId);
     } catch (e) {
-      print('Error loading profile from offline DB: $e');
+      debugPrint('Error loading profile: $e');
       return null;
     }
   }
@@ -143,47 +142,37 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         updatedProfile.notificationPreferences,
       );
 
-      // Save to local DB in the background
+      // Write straight to Firestore - its SDK queues this locally and
+      // syncs automatically if offline, so there's no separate "save
+      // locally, then sync remotely when online" step needed anymore.
       unawaited(
         Future(() async {
           try {
-            final profileLocalDB = ref.read(profileLocalDBProvider);
-            await profileLocalDB.upsertProfile(updatedProfile);
-            debugPrint('✅ Saved to local DB');
+            await ref
+                .read(userProfileProviderProvider.notifier)
+                .updateNotificationPreferences(
+                  updatedProfile.notificationPreferences,
+                );
+            await ref
+                .read(userProfileProviderProvider.notifier)
+                .updateAppSettings(updatedProfile.appSettings);
+            debugPrint('✅ Preferences saved');
           } catch (e) {
-            debugPrint('❌ Error saving to local DB: $e');
+            debugPrint('⚠️ Error saving preferences: $e');
           }
         }),
       );
-
-      // Handle remote sync in the background if online
-      if (!_isOffline) {
-        unawaited(
-          Future(() async {
-            try {
-              await ref
-                  .read(userProfileProviderProvider.notifier)
-                  .updateNotificationPreferences(
-                    updatedProfile.notificationPreferences,
-                  );
-              await ref
-                  .read(userProfileProviderProvider.notifier)
-                  .updateAppSettings(updatedProfile.appSettings);
-              debugPrint('✅ Synced to remote');
-            } catch (e) {
-              debugPrint('⚠️ Remote sync failed: $e');
-            }
-          }),
-        );
-      }
 
       // Update reminders in the background if needed
       if (_notificationsEnabled) {
         unawaited(
           Future(() async {
             try {
-              final reminderDB = ref.read(reminderDatabaseProvider);
-              final reminders = await reminderDB.getAllReminders();
+              final user = ref.read(currentUserProvider);
+              if (user == null) return;
+              final reminders = await ref
+                  .read(reminderRepositoryProvider)
+                  .fetch((q) => q.where('ownerId', isEqualTo: user.uid));
               await _notificationService.rescheduleAllReminders(
                 reminders.where((r) => !r.isCompleted).toList(),
               );

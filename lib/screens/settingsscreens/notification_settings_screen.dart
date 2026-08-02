@@ -2,7 +2,6 @@
 // import 'package:flutter_riverpod/flutter_riverpod.dart';
 // import 'package:pet_care/services/notification_service.dart';
 // import 'package:shared_preferences/shared_preferences.dart';
-// import 'package:pet_care/providers/offline_providers.dart';
 
 // class NotificationSettingsScreen extends ConsumerStatefulWidget {
 //   const NotificationSettingsScreen({Key? key}) : super(key: key);

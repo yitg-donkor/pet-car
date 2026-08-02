@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pet_care/models/pet.dart';
 import 'package:pet_care/models/medical_record.dart';
-import 'package:pet_care/providers/offline_providers.dart';
+import 'package:pet_care/providers/firestore_providers.dart';
 
 import 'package:intl/intl.dart';
 
@@ -633,7 +633,7 @@ class PetDetailsScreen extends ConsumerWidget {
   ) {
     final theme = Theme.of(context);
     final medicalRecordsAsync = ref.watch(
-      petMedicalRecordsOfflineProvider(displayPet.id),
+      petMedicalRecordsProvider(displayPet.id),
     );
 
     return Container(
@@ -1012,7 +1012,7 @@ class PetDetailsScreen extends ConsumerWidget {
                 try {
                   // Delete pet using the notifier
                   await ref
-                      .read(petsOfflineProvider.notifier)
+                      .read(petsControllerProvider.notifier)
                       .deletePet(displayPet.id);
 
                   // Clear selection

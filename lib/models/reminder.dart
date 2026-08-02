@@ -62,6 +62,7 @@ class Reminder {
   }
 
   Reminder copyWith({
+    String? id,
     String? title,
     String? description,
     DateTime? reminderDate,
@@ -71,7 +72,7 @@ class Reminder {
     bool? isSynced,
   }) {
     return Reminder(
-      id: id,
+      id: id ?? this.id, 
       petId: petId,
       ownerId: ownerId,
       title: title ?? this.title,

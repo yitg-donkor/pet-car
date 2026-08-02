@@ -1,25 +1,39 @@
 // providers/app_state_providers.dart
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pet_care/widgets/onboarding.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // ============================================
-// OFFLINE MODE PROVIDER
+// CONNECTIVITY / OFFLINE MODE PROVIDERS
 // ============================================
 
-/// Global offline mode state
-/// This is separate from auth_providers to avoid circular dependencies
-final isOfflineModeProvider = StateProvider<bool>((ref) => false);
+/// True when the device has a network connection.
+final connectivityStatusProvider = StreamProvider<bool>((ref) {
+  return Connectivity().onConnectivityChanged.map(
+    (results) => !results.contains(ConnectivityResult.none),
+  );
+});
+
+/// Derived from [connectivityStatusProvider]. Nothing needs to write to this
+/// manually anymore - Firestore/Firebase Auth work offline on their own, so
+/// this only drives UI (e.g. the offline banner), not functional branching.
+final isOfflineModeProvider = Provider<bool>((ref) {
+  final connectivity = ref.watch(connectivityStatusProvider);
+  return connectivity.maybeWhen(
+    data: (isOnline) => !isOnline,
+    orElse: () => false,
+  );
+});
 
 // ============================================
 // ONBOARDING STATUS PROVIDER
 // ============================================
 
 /// Check if user has seen onboarding
-// final hasSeenOnboardingProvider = FutureProvider<bool>((ref) async {
-//   final prefs = await SharedPreferences.getInstance();
-//   return prefs.getBool('has_seen_onboarding') ?? false;
-// });
+final hasSeenOnboardingProvider = FutureProvider<bool>((ref) async {
+  final prefs = await SharedPreferences.getInstance();
+  return prefs.getBool('has_seen_onboarding') ?? false;
+});
 
 // /// Mark onboarding as seen
 final markOnboardingSeenProvider = Provider<Future<void> Function()>((ref) {

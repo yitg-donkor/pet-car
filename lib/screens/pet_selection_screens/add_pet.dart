@@ -90,7 +90,7 @@ class _AddPet extends ConsumerState<AddPet> {
         throw Exception('User not logged in');
       }
 
-      // Upload to Supabase storage
+      // Upload to Firebase Storage
       final photoUrl = await avatarService.uploadAvatar(
         userId: 'pets/${user.uid}', // Store in pets subfolder
         imageFile: imageFile,

@@ -1,0 +1,1637 @@
+diff --git a/lib/local_db/sqflite_db.dart b/lib/local_db/sqflite_db.dart
+deleted file mode 100644
+index 7dc26ff..0000000
+--- a/lib/local_db/sqflite_db.dart
++++ /dev/null
+@@ -1,38 +0,0 @@
+-import 'package:cloud_firestore/cloud_firestore.dart';
+-
+-import '../models/activity_log.dart';
+-import '../models/medical_record.dart';
+-
+-class ActivityLogLocalDB {
+-  Future<List<ActivityLog>> getActivityLogsForPet(String petId) async {
+-    final collection = FirebaseFirestore.instance
+-        .collection('activity_logs')
+-        .withConverter<ActivityLog>(
+-          fromFirestore:
+-              (snapshot, _) =>
+-                  ActivityLog.fromFirestore(snapshot.data() ?? {}, snapshot.id),
+-          toFirestore: (log, _) => log.toFirestore(),
+-        );
+-
+-    final snap = await collection.where('petId', isEqualTo: petId).get();
+-    return snap.docs.map((doc) => doc.data()).toList();
+-  }
+-}
+-
+-class MedicalRecordLocalDB {
+-  Future<List<MedicalRecord>> getMedicalRecordsForPet(String petId) async {
+-    final collection = FirebaseFirestore.instance
+-        .collection('medical_records')
+-        .withConverter<MedicalRecord>(
+-          fromFirestore:
+-              (snapshot, _) => MedicalRecord.fromFirestore(
+-                snapshot.data() ?? {},
+-                snapshot.id,
+-              ),
+-          toFirestore: (record, _) => record.toFirestore(),
+-        );
+-
+-    final snap = await collection.where('petId', isEqualTo: petId).get();
+-    return snap.docs.map((doc) => doc.data()).toList();
+-  }
+-}
+diff --git a/lib/main.dart b/lib/main.dart
+index a673e1d..973b9d5 100644
+--- a/lib/main.dart
++++ b/lib/main.dart
+@@ -115,7 +115,8 @@ class AuthWrapper extends ConsumerWidget {
+ 
+   @override
+   Widget build(BuildContext context, WidgetRef ref) {
+-    final hasSeenOnboarding = ref.watch(hasSeenOnboardingProvider);
++    final hasSeenOnboarding =
++        ref.watch(hasSeenOnboardingProvider).valueOrNull ?? false;
+     final authStateAsync = ref.watch(authStateProvider);
+ 
+     return authStateAsync.when(
+diff --git a/lib/providers/app_state_provider.dart b/lib/providers/app_state_provider.dart
+index df23195..27fc701 100644
+--- a/lib/providers/app_state_provider.dart
++++ b/lib/providers/app_state_provider.dart
+@@ -1,25 +1,39 @@
+ // providers/app_state_providers.dart
++import 'package:connectivity_plus/connectivity_plus.dart';
+ import 'package:flutter_riverpod/flutter_riverpod.dart';
+-import 'package:pet_care/widgets/onboarding.dart';
+ import 'package:shared_preferences/shared_preferences.dart';
+ 
+ // ============================================
+-// OFFLINE MODE PROVIDER
++// CONNECTIVITY / OFFLINE MODE PROVIDERS
+ // ============================================
+ 
+-/// Global offline mode state
+-/// This is separate from auth_providers to avoid circular dependencies
+-final isOfflineModeProvider = StateProvider<bool>((ref) => false);
++/// True when the device has a network connection.
++final connectivityStatusProvider = StreamProvider<bool>((ref) {
++  return Connectivity().onConnectivityChanged.map(
++    (results) => !results.contains(ConnectivityResult.none),
++  );
++});
++
++/// Derived from [connectivityStatusProvider]. Nothing needs to write to this
++/// manually anymore - Firestore/Firebase Auth work offline on their own, so
++/// this only drives UI (e.g. the offline banner), not functional branching.
++final isOfflineModeProvider = Provider<bool>((ref) {
++  final connectivity = ref.watch(connectivityStatusProvider);
++  return connectivity.maybeWhen(
++    data: (isOnline) => !isOnline,
++    orElse: () => false,
++  );
++});
+ 
+ // ============================================
+ // ONBOARDING STATUS PROVIDER
+ // ============================================
+ 
+ /// Check if user has seen onboarding
+-// final hasSeenOnboardingProvider = FutureProvider<bool>((ref) async {
+-//   final prefs = await SharedPreferences.getInstance();
+-//   return prefs.getBool('has_seen_onboarding') ?? false;
+-// });
++final hasSeenOnboardingProvider = FutureProvider<bool>((ref) async {
++  final prefs = await SharedPreferences.getInstance();
++  return prefs.getBool('has_seen_onboarding') ?? false;
++});
+ 
+ // /// Mark onboarding as seen
+ final markOnboardingSeenProvider = Provider<Future<void> Function()>((ref) {
+diff --git a/lib/providers/firestore_providers.dart b/lib/providers/firestore_providers.dart
+index 097d568..af4e899 100644
+--- a/lib/providers/firestore_providers.dart
++++ b/lib/providers/firestore_providers.dart
+@@ -8,6 +8,8 @@
+ // from the on-device cache instantly and pushes updates as the server
+ // confirms writes or another device changes something. So each provider
+ // here is just a thin `watch(...)` on a FirestoreRepository query.
++export 'auth_providers.dart';
++
+ import 'package:riverpod_annotation/riverpod_annotation.dart';
+ 
+ import '../models/activity_log.dart';
+@@ -214,6 +216,54 @@ Stream<List<ActivityLog>> activityLogsForOwner(ActivityLogsForOwnerRef ref) {
+   );
+ }
+ 
++/// Today's and yesterday's activity logs, split out for the daily log view.
++@riverpod
++Future<Map<String, List<ActivityLog>>> dailyActivityLogs(
++  DailyActivityLogsRef ref,
++) async {
++  final user = ref.watch(currentUserProvider);
++  if (user == null) return {'today': const [], 'yesterday': const []};
++
++  final now = DateTime.now();
++  final today = DateTime(now.year, now.month, now.day);
++  final yesterday = today.subtract(const Duration(days: 1));
++
++  final repo = ref.watch(activityLogRepositoryProvider);
++  final logs = await repo.fetch(
++    (q) => q
++        .where('ownerId', isEqualTo: user.uid)
++        .where('timestamp', isGreaterThanOrEqualTo: yesterday)
++        .orderBy('timestamp', descending: true),
++  );
++
++  return {
++    'today': logs.where((log) => !log.timestamp.isBefore(today)).toList(),
++    'yesterday':
++        logs
++            .where(
++              (log) =>
++                  !log.timestamp.isBefore(yesterday) &&
++                  log.timestamp.isBefore(today),
++            )
++            .toList(),
++  };
++}
++
++/// Activity logs flagged as health-related, across all of the user's pets.
++@riverpod
++Future<List<ActivityLog>> healthActivityLogs(HealthActivityLogsRef ref) {
++  final user = ref.watch(currentUserProvider);
++  if (user == null) return Future.value(const []);
++
++  final repo = ref.watch(activityLogRepositoryProvider);
++  return repo.fetch(
++    (q) => q
++        .where('ownerId', isEqualTo: user.uid)
++        .where('isHealthRelated', isEqualTo: true)
++        .orderBy('timestamp', descending: true),
++  );
++}
++
+ @riverpod
+ class ActivityLogsController extends _$ActivityLogsController {
+   @override
+@@ -226,3 +276,16 @@ class ActivityLogsController extends _$ActivityLogsController {
+   Future<void> deleteLog(String logId) =>
+       ref.read(activityLogRepositoryProvider).delete(logId);
+ }
++
++// ============================================
++// SELECTED PET (local UI state, not persisted)
++// ============================================
++
++@riverpod
++class SelectedPet extends _$SelectedPet {
++  @override
++  Pet? build() => null;
++
++  void selectPet(Pet pet) => state = pet;
++  void clearSelection() => state = null;
++}
+diff --git a/lib/providers/offline_providers.dart b/lib/providers/offline_providers.dart
+deleted file mode 100644
+index b7489c4..0000000
+--- a/lib/providers/offline_providers.dart
++++ /dev/null
+@@ -1,297 +0,0 @@
+-export 'auth_providers.dart';
+-export 'firestore_providers.dart';
+-
+-import 'dart:async';
+-
+-import 'package:cloud_firestore/cloud_firestore.dart';
+-import 'package:connectivity_plus/connectivity_plus.dart';
+-import 'package:flutter_riverpod/flutter_riverpod.dart';
+-import 'package:supabase_flutter/supabase_flutter.dart';
+-
+-import '../models/activity_log.dart';
+-import '../models/medical_record.dart';
+-import '../models/pet.dart';
+-import '../models/reminder.dart';
+-import '../models/user_profile.dart';
+-import 'auth_providers.dart';
+-import 'firestore_providers.dart';
+-
+-class UnifiedSyncService {
+-  UnifiedSyncService(this.ref);
+-
+-  final Ref ref;
+-  final SupabaseClient supabase = Supabase.instance.client;
+-
+-  Future<void> fullSync(String userId) async {
+-    await Future<void>.value();
+-  }
+-
+-  Future<bool> hasInternetConnection() async => true;
+-
+-  Future<void> syncRemindersToSupabase() async {
+-    await Future<void>.value();
+-  }
+-
+-  Future<void> syncMedicalRecordsToSupabase() async {
+-    await Future<void>.value();
+-  }
+-}
+-
+-final unifiedSyncServiceProvider = Provider<UnifiedSyncService>(
+-  (ref) => UnifiedSyncService(ref),
+-);
+-
+-class ProfileLocalDB {
+-  ProfileLocalDB(this.ref);
+-
+-  final Ref ref;
+-
+-  Future<UserProfile?> getProfileById(String userId) async {
+-    return ref.read(userProfileRepositoryProvider).get(userId);
+-  }
+-
+-  Future<void> upsertProfile(UserProfile profile) async {
+-    await ref.read(userProfileRepositoryProvider).set(profile.id, profile);
+-  }
+-}
+-
+-final profileLocalDBProvider = Provider<ProfileLocalDB>(
+-  (ref) => ProfileLocalDB(ref),
+-);
+-
+-class ReminderDatabase {
+-  ReminderDatabase(this.ref);
+-
+-  final Ref ref;
+-
+-  Future<List<Reminder>> getAllReminders() async {
+-    final user = ref.read(currentUserProvider);
+-    if (user == null) return const [];
+-
+-    final repo = ref.read(reminderRepositoryProvider);
+-    return repo.fetch((query) => query.where('ownerId', isEqualTo: user.uid));
+-  }
+-
+-  Future<String> createReminder(Reminder reminder) async {
+-    final repo = ref.read(reminderRepositoryProvider);
+-    return repo.add(reminder);
+-  }
+-
+-  Future<void> deleteReminder(String id) async {
+-    await ref.read(reminderRepositoryProvider).delete(id);
+-  }
+-
+-  Future<void> toggleCompletion(String reminderId, bool isCompleted) async {
+-    await ref.read(reminderRepositoryProvider).update(reminderId, {
+-      'isCompleted': isCompleted,
+-      'isSynced': false,
+-    });
+-  }
+-
+-  Future<void> deleteRecord(String id) => deleteReminder(id);
+-}
+-
+-final reminderDatabaseProvider = Provider<ReminderDatabase>(
+-  (ref) => ReminderDatabase(ref),
+-);
+-
+-class CompatMedicalRecordLocalDB {
+-  CompatMedicalRecordLocalDB(this.ref);
+-
+-  final Ref ref;
+-
+-  Future<List<MedicalRecord>> getMedicalRecordsForPet(String petId) async {
+-    final repo = ref.read(medicalRecordRepositoryProvider);
+-    return repo.fetch((query) => query.where('petId', isEqualTo: petId));
+-  }
+-
+-  Future<void> deleteMedicalRecord(String id) async {
+-    await ref.read(medicalRecordRepositoryProvider).delete(id);
+-  }
+-
+-  Future<String> createMedicalRecord(MedicalRecord record) async {
+-    final repo = ref.read(medicalRecordRepositoryProvider);
+-    return repo.add(record);
+-  }
+-
+-  Future<void> deleteRecord(String id) async {
+-    await ref.read(medicalRecordRepositoryProvider).delete(id);
+-  }
+-}
+-
+-final medicalRecordLocalDBProvider = Provider<CompatMedicalRecordLocalDB>(
+-  (ref) => CompatMedicalRecordLocalDB(ref),
+-);
+-
+-class CompatActivityLogLocalDB {
+-  CompatActivityLogLocalDB(this.ref);
+-
+-  final Ref ref;
+-
+-  Future<List<ActivityLog>> getActivityLogsForPet(String petId) async {
+-    final repo = ref.read(activityLogRepositoryProvider);
+-    return repo.fetch((query) => query.where('petId', isEqualTo: petId));
+-  }
+-
+-  Future<List<ActivityLog>> getAllActivityLogsForOwner(String ownerId) async {
+-    final repo = ref.read(activityLogRepositoryProvider);
+-    return repo.fetch((query) => query.where('ownerId', isEqualTo: ownerId));
+-  }
+-}
+-
+-final activityLogLocalDBProvider = Provider<CompatActivityLogLocalDB>(
+-  (ref) => CompatActivityLogLocalDB(ref),
+-);
+-
+-class PetsOfflineNotifier extends AsyncNotifier<List<Pet>> {
+-  @override
+-  FutureOr<List<Pet>> build() async {
+-    final user = ref.watch(currentUserProvider);
+-    if (user == null) return const [];
+-
+-    final repo = ref.read(petRepositoryProvider);
+-    return repo.fetch(
+-      (query) => query.where('ownerId', isEqualTo: user.uid).orderBy('name'),
+-    );
+-  }
+-
+-  Future<void> addPet(Pet pet) async {
+-    await ref.read(petRepositoryProvider).add(pet);
+-    ref.invalidateSelf();
+-  }
+-
+-  Future<void> updatePet(Pet pet) async {
+-    await ref.read(petRepositoryProvider).set(pet.id, pet);
+-    ref.invalidateSelf();
+-  }
+-
+-  Future<void> deletePet(String petId) async {
+-    await ref.read(petRepositoryProvider).delete(petId);
+-    ref.invalidateSelf();
+-  }
+-}
+-
+-final petsOfflineProvider =
+-    AsyncNotifierProvider<PetsOfflineNotifier, List<Pet>>(
+-      () => PetsOfflineNotifier(),
+-    );
+-
+-class PetMedicalRecordsOfflineNotifier
+-    extends AsyncNotifier<List<MedicalRecord>> {
+-  PetMedicalRecordsOfflineNotifier();
+-
+-  @override
+-  FutureOr<List<MedicalRecord>> build() async {
+-    return const [];
+-  }
+-
+-  Future<void> loadForPet(String petId) async {
+-    final repo = ref.read(medicalRecordRepositoryProvider);
+-    final records = await repo.fetch(
+-      (query) => query.where('petId', isEqualTo: petId),
+-    );
+-    state = AsyncValue.data(records);
+-  }
+-}
+-
+-final petMedicalRecordsOfflineProvider =
+-    FutureProvider.family<List<MedicalRecord>, String>((ref, petId) async {
+-      final repo = ref.watch(medicalRecordRepositoryProvider);
+-      return repo.fetch((query) => query.where('petId', isEqualTo: petId));
+-    });
+-
+-final dailyActivityLogsProvider =
+-    FutureProvider<Map<String, List<ActivityLog>>>((ref) async {
+-      final user = ref.watch(currentUserProvider);
+-      if (user == null) return {'today': const [], 'yesterday': const []};
+-
+-      final repo = ref.watch(activityLogRepositoryProvider);
+-      final logs = await repo.fetch(
+-        (query) => query
+-            .where('ownerId', isEqualTo: user.uid)
+-            .orderBy('timestamp', descending: true),
+-      );
+-
+-      final now = DateTime.now();
+-      final today = DateTime(now.year, now.month, now.day);
+-      final yesterday = today.subtract(const Duration(days: 1));
+-
+-      return {
+-        'today': logs.where((log) => !log.timestamp.isBefore(today)).toList(),
+-        'yesterday':
+-            logs
+-                .where(
+-                  (log) =>
+-                      !log.timestamp.isBefore(yesterday) &&
+-                      log.timestamp.isBefore(today),
+-                )
+-                .toList(),
+-      };
+-    });
+-
+-final healthActivityLogsProvider = FutureProvider<List<ActivityLog>>((
+-  ref,
+-) async {
+-  final user = ref.watch(currentUserProvider);
+-  if (user == null) return const [];
+-
+-  final repo = ref.watch(activityLogRepositoryProvider);
+-  return repo.fetch(
+-    (query) => query
+-        .where('ownerId', isEqualTo: user.uid)
+-        .where('isHealthRelated', isEqualTo: true)
+-        .orderBy('timestamp', descending: true),
+-  );
+-});
+-
+-class ActivityLogsOfflineNotifier extends AsyncNotifier<List<ActivityLog>> {
+-  @override
+-  FutureOr<List<ActivityLog>> build() async {
+-    final user = ref.watch(currentUserProvider);
+-    if (user == null) return const [];
+-
+-    final repo = ref.read(activityLogRepositoryProvider);
+-    return repo.fetch(
+-      (query) => query
+-          .where('ownerId', isEqualTo: user.uid)
+-          .orderBy('timestamp', descending: true),
+-    );
+-  }
+-
+-  Future<void> addLog(ActivityLog log) async {
+-    await ref.read(activityLogRepositoryProvider).add(log);
+-    ref.invalidateSelf();
+-  }
+-}
+-
+-final activityLogsOfflineProvider =
+-    AsyncNotifierProvider<ActivityLogsOfflineNotifier, List<ActivityLog>>(
+-      () => ActivityLogsOfflineNotifier(),
+-    );
+-
+-class SelectedPetController extends Notifier<Pet?> {
+-  @override
+-  Pet? build() => null;
+-
+-  void selectPet(Pet pet) => state = pet;
+-  void clearSelection() => state = null;
+-}
+-
+-final selectedPetProvider = NotifierProvider<SelectedPetController, Pet?>(
+-  SelectedPetController.new,
+-);
+-
+-final connectivityStatusProvider = StreamProvider<bool>((ref) {
+-  return Connectivity().onConnectivityChanged.map((results) {
+-    return !results.contains(ConnectivityResult.none);
+-  });
+-});
+-
+-final medicalRecordLocalDB = medicalRecordLocalDBProvider;
+-final reminderDatabase = reminderDatabaseProvider;
+-final profileLocalDB = profileLocalDBProvider;
+-final activityLogDB = activityLogLocalDBProvider;
+-final petsProvider = petsOfflineProvider;
+-final selectedPetStateProvider = selectedPetProvider;
+-
+-final userProfileControllerCompatProvider = userProfileControllerProvider;
+diff --git a/lib/screens/ai_features/ai_navigation_screen.dart b/lib/screens/ai_features/ai_navigation_screen.dart
+index de40bf6..cbe7211 100644
+--- a/lib/screens/ai_features/ai_navigation_screen.dart
++++ b/lib/screens/ai_features/ai_navigation_screen.dart
+@@ -1,6 +1,6 @@
+ import 'package:flutter/material.dart';
+ import 'package:flutter_riverpod/flutter_riverpod.dart';
+-import 'package:pet_care/providers/offline_providers.dart';
++import 'package:pet_care/providers/firestore_providers.dart';
+ import 'package:pet_care/screens/ai_features/aichatscreen.dart';
+ import 'package:pet_care/screens/ai_features/feeding_schedulescren.dart';
+ import 'package:pet_care/screens/ai_features/health_insights.dart';
+@@ -465,7 +465,7 @@ class _AIDashboardScreenState extends ConsumerState<AIDashboardScreen> {
+ 
+   void _navigateToSymptomChecker(BuildContext context, WidgetRef ref) async {
+     // ✅ Load data FIRST
+-    final pets = await ref.read(petsOfflineProvider.future);
++    final pets = await ref.read(petsControllerProvider.future);
+ 
+     if (!context.mounted) return;
+ 
+@@ -537,7 +537,7 @@ class _AIDashboardScreenState extends ConsumerState<AIDashboardScreen> {
+ 
+   void _navigateToSmartReminders(BuildContext context, WidgetRef ref) async {
+     // ✅ Load data FIRST
+-    final pets = await ref.read(petsOfflineProvider.future);
++    final pets = await ref.read(petsControllerProvider.future);
+ 
+     if (!context.mounted) return;
+ 
+@@ -598,7 +598,7 @@ class _AIDashboardScreenState extends ConsumerState<AIDashboardScreen> {
+ 
+   void _navigateToFeedingSchedule(BuildContext context, WidgetRef ref) async {
+     // ✅ Load data FIRST
+-    final pets = await ref.read(petsOfflineProvider.future);
++    final pets = await ref.read(petsControllerProvider.future);
+ 
+     if (!context.mounted) return;
+ 
+@@ -660,7 +660,7 @@ class _AIDashboardScreenState extends ConsumerState<AIDashboardScreen> {
+ 
+   void _navigateToTrainingTips(BuildContext context, WidgetRef ref) async {
+     // ✅ Load data FIRST
+-    final pets = await ref.read(petsOfflineProvider.future);
++    final pets = await ref.read(petsControllerProvider.future);
+ 
+     if (!context.mounted) return;
+ 
+@@ -721,7 +721,7 @@ class _AIDashboardScreenState extends ConsumerState<AIDashboardScreen> {
+ 
+   void _navigateToAichat(BuildContext context, WidgetRef ref) async {
+     // ✅ Load data FIRST
+-    final pets = await ref.read(petsOfflineProvider.future);
++    final pets = await ref.read(petsControllerProvider.future);
+ 
+     if (!context.mounted) return;
+ 
+@@ -781,7 +781,7 @@ class _AIDashboardScreenState extends ConsumerState<AIDashboardScreen> {
+ 
+   void _navigateToHealthInsights(BuildContext context, WidgetRef ref) async {
+     // ✅ Load data FIRST
+-    final pets = await ref.read(petsOfflineProvider.future);
++    final pets = await ref.read(petsControllerProvider.future);
+ 
+     if (!context.mounted) return;
+ 
+@@ -843,7 +843,7 @@ class _AIDashboardScreenState extends ConsumerState<AIDashboardScreen> {
+ 
+   void _navigateToMonthlyReport(BuildContext context, WidgetRef ref) async {
+     // ✅ Load data FIRST
+-    final pets = await ref.read(petsOfflineProvider.future);
++    final pets = await ref.read(petsControllerProvider.future);
+ 
+     if (!context.mounted) return;
+ 
+@@ -944,7 +944,7 @@ class _AIDashboardScreenState extends ConsumerState<AIDashboardScreen> {
+ 
+ void _navigateToMedicalAnalysis(BuildContext context, WidgetRef ref) async {
+   // ✅ Load data FIRST
+-  final pets = await ref.read(petsOfflineProvider.future);
++  final pets = await ref.read(petsControllerProvider.future);
+ 
+   if (!context.mounted) return;
+ 
+diff --git a/lib/screens/ai_features/health_insights.dart b/lib/screens/ai_features/health_insights.dart
+index c6c6d30..c078c5c 100644
+--- a/lib/screens/ai_features/health_insights.dart
++++ b/lib/screens/ai_features/health_insights.dart
+@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
+ import 'package:pet_care/services/firebase_ai_service.dart';
+ import 'package:pet_care/models/medical_record.dart';
+ import 'package:pet_care/models/activity_log.dart';
+-import 'package:pet_care/providers/offline_providers.dart';
++import 'package:pet_care/providers/firestore_providers.dart';
+ 
+ class HealthInsightsScreen extends ConsumerStatefulWidget {
+   final String petId;
+@@ -42,16 +42,13 @@ class _HealthInsightsScreenState extends ConsumerState<HealthInsightsScreen> {
+     });
+ 
+     try {
+-      // Fetch real data from database
+-      final medicalRecordDB = ref.read(medicalRecordLocalDBProvider);
+-      final activityLogDB = ref.read(activityLogLocalDBProvider);
+-
+-      final medicalRecords = await medicalRecordDB.getMedicalRecordsForPet(
+-        widget.petId,
+-      );
+-      final activityLogs = await activityLogDB.getActivityLogsForPet(
+-        widget.petId,
+-      );
++      // Fetch real data from Firestore
++      final medicalRecords = await ref
++          .read(medicalRecordRepositoryProvider)
++          .fetch((q) => q.where('petId', isEqualTo: widget.petId));
++      final activityLogs = await ref
++          .read(activityLogRepositoryProvider)
++          .fetch((q) => q.where('petId', isEqualTo: widget.petId));
+ 
+       // Check if we have any data at all
+       if (medicalRecords.isEmpty && activityLogs.isEmpty) {
+diff --git a/lib/screens/ai_features/monthly_report_screen.dart b/lib/screens/ai_features/monthly_report_screen.dart
+index 2e732af..635f0e8 100644
+--- a/lib/screens/ai_features/monthly_report_screen.dart
++++ b/lib/screens/ai_features/monthly_report_screen.dart
+@@ -5,7 +5,7 @@ import 'package:pet_care/models/medical_record.dart';
+ import 'package:pet_care/models/activity_log.dart';
+ import 'package:pet_care/models/reminder.dart';
+ import 'package:pet_care/services/firebase_ai_service.dart';
+-import 'package:pet_care/providers/offline_providers.dart';
++import 'package:pet_care/providers/firestore_providers.dart';
+ import 'package:intl/intl.dart';
+ 
+ class MonthlyReportScreen extends ConsumerStatefulWidget {
+@@ -54,11 +54,6 @@ class _MonthlyReportScreenState extends ConsumerState<MonthlyReportScreen> {
+     });
+ 
+     try {
+-      // Fetch real data from database
+-      final medicalRecordDB = ref.read(medicalRecordLocalDBProvider);
+-      final activityLogDB = ref.read(activityLogLocalDBProvider);
+-      final reminderDB = ref.read(reminderDatabaseProvider);
+-
+       // Get date range for selected month
+       final startDate = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
+       final endDate = DateTime(
+@@ -70,14 +65,21 @@ class _MonthlyReportScreenState extends ConsumerState<MonthlyReportScreen> {
+         59,
+       );
+ 
+-      // Fetch data
+-      final allMedicalRecords = await medicalRecordDB.getMedicalRecordsForPet(
+-        widget.pet.id,
+-      );
+-      final allActivityLogs = await activityLogDB.getActivityLogsForPet(
+-        widget.pet.id,
+-      );
+-      final allReminders = await reminderDB.getAllReminders();
++      // Fetch real data from Firestore
++      final allMedicalRecords = await ref
++          .read(medicalRecordRepositoryProvider)
++          .fetch((q) => q.where('petId', isEqualTo: widget.pet.id));
++      final allActivityLogs = await ref
++          .read(activityLogRepositoryProvider)
++          .fetch((q) => q.where('petId', isEqualTo: widget.pet.id));
++
++      final user = ref.read(currentUserProvider);
++      final allReminders =
++          user == null
++              ? <Reminder>[]
++              : await ref
++                  .read(reminderRepositoryProvider)
++                  .fetch((q) => q.where('ownerId', isEqualTo: user.uid));
+ 
+       // Filter for selected month
+       final medicalRecords =
+diff --git a/lib/screens/ai_features/smart_reminder.dart b/lib/screens/ai_features/smart_reminder.dart
+index a8c5c3a..29e4c22 100644
+--- a/lib/screens/ai_features/smart_reminder.dart
++++ b/lib/screens/ai_features/smart_reminder.dart
+@@ -5,7 +5,7 @@ import 'package:pet_care/models/medical_record.dart';
+ import 'package:pet_care/models/reminder.dart';
+ import 'package:pet_care/providers/auth_providers.dart';
+ import 'package:pet_care/services/firebase_ai_service.dart';
+-import 'package:pet_care/providers/offline_providers.dart';
++import 'package:pet_care/providers/firestore_providers.dart';
+ 
+ import 'package:intl/intl.dart';
+ 
+@@ -40,15 +40,12 @@ class _SmartRemindersScreenState extends ConsumerState<SmartRemindersScreen> {
+     });
+ 
+     try {
+-      final medicalRecordDB = ref.read(medicalRecordLocalDBProvider);
+-      final reminderDB = ref.read(reminderDatabaseProvider);
+-
+-      final medicalRecords = await medicalRecordDB.getMedicalRecordsForPet(
+-        widget.pet.id,
+-      );
+-      final existingReminders = await reminderDB.getAllReminders();
+-      final petReminders =
+-          existingReminders.where((r) => r.petId == widget.pet.id).toList();
++      final medicalRecords = await ref
++          .read(medicalRecordRepositoryProvider)
++          .fetch((q) => q.where('petId', isEqualTo: widget.pet.id));
++      final petReminders = await ref
++          .read(reminderRepositoryProvider)
++          .fetch((q) => q.where('petId', isEqualTo: widget.pet.id));
+ 
+       final prompt = _buildPromptFromData(medicalRecords, petReminders);
+ 
+@@ -1324,10 +1321,12 @@ class _SmartRemindersScreenState extends ConsumerState<SmartRemindersScreen> {
+ 
+   Future<void> _addSingleReminder(Map<String, dynamic> reminderData) async {
+     try {
+-      final reminderDB = ref.read(reminderDatabaseProvider);
++      final user = ref.read(currentUserProvider);
++      if (user == null) throw Exception('Not signed in');
+ 
+       final reminder = Reminder(
+         petId: widget.pet.id,
++        ownerId: user.uid,
+         title: reminderData['title'],
+         description: reminderData['description'],
+         reminderDate: reminderData['date'],
+@@ -1335,17 +1334,9 @@ class _SmartRemindersScreenState extends ConsumerState<SmartRemindersScreen> {
+         importanceLevel: reminderData['priority'] ?? 'medium',
+       );
+ 
+-      await reminderDB.createReminder(reminder);
+-
+-      // Sync to Supabase
+-      final syncService = ref.read(unifiedSyncServiceProvider);
+-      final user = ref.read(currentUserProvider);
+-
+-      if (user != null) {
+-        await syncService.syncRemindersToSupabase();
+-      }
++      await ref.read(reminderRepositoryProvider).add(reminder);
+ 
+-      // Invalidate providers to refresh
++      // Refresh the live reminder streams
+       ref.invalidate(allRemindersProvider);
+       ref.invalidate(todayRemindersProvider);
+       ref.invalidate(weeklyRemindersProvider);
+@@ -1444,13 +1435,17 @@ class _SmartRemindersScreenState extends ConsumerState<SmartRemindersScreen> {
+         );
+       }
+ 
+-      final reminderDB = ref.read(reminderDatabaseProvider);
++      final user = ref.read(currentUserProvider);
++      if (user == null) throw Exception('Not signed in');
++
++      final repo = ref.read(reminderRepositoryProvider);
+       int added = 0;
+ 
+       for (var reminderData in _aiGeneratedReminders) {
+         try {
+           final reminder = Reminder(
+             petId: widget.pet.id,
++            ownerId: user.uid,
+             title: reminderData['title'],
+             description: reminderData['description'],
+             reminderDate: reminderData['date'],
+@@ -1458,22 +1453,14 @@ class _SmartRemindersScreenState extends ConsumerState<SmartRemindersScreen> {
+             importanceLevel: reminderData['priority'] ?? 'medium',
+           );
+ 
+-          await reminderDB.createReminder(reminder);
++          await repo.add(reminder);
+           added++;
+         } catch (e) {
+-          print('Error adding reminder: $e');
++          debugPrint('Error adding reminder: $e');
+         }
+       }
+ 
+-      // Sync to Supabase
+-      final syncService = ref.read(unifiedSyncServiceProvider);
+-      final user = ref.read(currentUserProvider);
+-
+-      if (user != null) {
+-        await syncService.syncRemindersToSupabase();
+-      }
+-
+-      // Invalidate providers to refresh
++      // Refresh the live reminder streams
+       ref.invalidate(allRemindersProvider);
+       ref.invalidate(todayRemindersProvider);
+       ref.invalidate(weeklyRemindersProvider);
+diff --git a/lib/screens/main_screens/homescreen.dart b/lib/screens/main_screens/homescreen.dart
+index 44de620..8112e52 100644
+--- a/lib/screens/main_screens/homescreen.dart
++++ b/lib/screens/main_screens/homescreen.dart
+@@ -4,7 +4,7 @@ import 'package:flutter_svg/svg.dart';
+ import 'package:pet_care/models/pet.dart';
+ import 'package:pet_care/models/reminder.dart';
+ import 'package:pet_care/providers/auth_providers.dart';
+-import 'package:pet_care/providers/offline_providers.dart';
++import 'package:pet_care/providers/firestore_providers.dart';
+ import 'package:pet_care/widgets/widgets.dart';
+ import 'package:pet_care/screens/ai_features/ai_navigation_screen.dart';
+ import 'package:pet_care/screens/main_screens/log.dart';
+@@ -13,7 +13,6 @@ import 'package:pet_care/screens/main_screens/resources.dart';
+ import 'package:google_fonts/google_fonts.dart';
+ 
+ import 'package:pet_care/services/notification_service.dart';
+-import 'package:supabase_flutter/supabase_flutter.dart';
+ import 'package:intl/intl.dart';
+ 
+ class MainNavigation extends ConsumerStatefulWidget {
+@@ -206,14 +205,17 @@ class _HomescreenState extends ConsumerState<Homescreen> {
+   @override
+   Widget build(BuildContext context) {
+     final theme = Theme.of(context);
+-    final petsAsync = ref.watch(petsOfflineProvider);
++    final petsAsync = ref.watch(petsControllerProvider);
+     final todayRemindersAsync = ref.watch(todayRemindersProvider);
+     final currentUser = ref.watch(currentUserProvider);
+ 
+-    ref.listen<AsyncValue<List<Pet>>>(petsOfflineProvider, (previous, next) {
++    ref.listen<AsyncValue<List<Pet>>>(petsControllerProvider, (
++      previous,
++      next,
++    ) {
+       next.whenOrNull(
+         error: (error, stack) {
+-          print('Error loading pets: $error');
++          debugPrint('Error loading pets: $error');
+           ScaffoldMessenger.of(context).showSnackBar(
+             SnackBar(
+               content: Text('Error loading pets: $error'),
+@@ -238,16 +240,10 @@ class _HomescreenState extends ConsumerState<Homescreen> {
+                 Expanded(
+                   child: RefreshIndicator(
+                     onRefresh: () async {
+-                      ref.invalidate(petsOfflineProvider);
++                      // Streams are already live; this just forces a fresh
++                      // listener attach for the pull-to-refresh affordance.
++                      ref.invalidate(petsControllerProvider);
+                       ref.invalidate(todayRemindersProvider);
+-
+-                      final user = ref.read(currentUserProvider);
+-                      if (user != null) {
+-                        final syncService = ref.read(
+-                          unifiedSyncServiceProvider,
+-                        );
+-                        await syncService.fullSync(user.uid);
+-                      }
+                     },
+                     child: SingleChildScrollView(
+                       padding: const EdgeInsets.all(20),
+diff --git a/lib/screens/main_screens/log.dart b/lib/screens/main_screens/log.dart
+index 3bfd01f..de0d78f 100644
+--- a/lib/screens/main_screens/log.dart
++++ b/lib/screens/main_screens/log.dart
+@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
+ import 'package:intl/intl.dart';
+ import 'package:pet_care/models/activity_log.dart';
+ 
+-import 'package:pet_care/providers/offline_providers.dart';
++import 'package:pet_care/providers/firestore_providers.dart';
+ 
+ class LogScreen extends ConsumerStatefulWidget {
+   const LogScreen({super.key});
+@@ -152,7 +152,7 @@ class _LogScreenState extends ConsumerState<LogScreen>
+ 
+   Widget _buildAllTab() {
+     final theme = Theme.of(context);
+-    final allLogsAsync = ref.watch(activityLogsOfflineProvider);
++    final allLogsAsync = ref.watch(activityLogsControllerProvider);
+ 
+     return allLogsAsync.when(
+       data: (allLogs) {
+@@ -303,7 +303,7 @@ class _LogScreenState extends ConsumerState<LogScreen>
+     final activityType = ActivityType.fromString(log.activityType);
+ 
+     // Get pet name from pet ID
+-    final petsAsync = ref.watch(petsOfflineProvider);
++    final petsAsync = ref.watch(petsControllerProvider);
+     final petName =
+         petsAsync.whenOrNull(
+           data: (pets) {
+@@ -409,7 +409,7 @@ class _LogScreenState extends ConsumerState<LogScreen>
+   void _showAddLogDialog(BuildContext context) async {
+     // Use .future to wait for pets to load
+     try {
+-      final pets = await ref.read(petsOfflineProvider.future);
++      final pets = await ref.read(petsControllerProvider.future);
+ 
+       if (!mounted) return;
+ 
+@@ -580,9 +580,13 @@ class _LogScreenState extends ConsumerState<LogScreen>
+                         selectedActivityType!,
+                       );
+ 
++                      final user = ref.read(currentUserProvider);
++                      if (user == null) return;
++
+                       final log = ActivityLog(
+                         id: '',
+                         petId: selectedPetId!,
++                        ownerId: user.uid,
+                         activityType: selectedActivityType!,
+                         title: activityType.label,
+                         details:
+@@ -599,12 +603,11 @@ class _LogScreenState extends ConsumerState<LogScreen>
+                                 ? amountController.text
+                                 : null,
+                         isHealthRelated: isHealthRelated,
+-                        lastModified: DateTime.now(),
+                         createdAt: DateTime.now(),
+                       );
+ 
+                       await ref
+-                          .read(activityLogsOfflineProvider.notifier)
++                          .read(activityLogsControllerProvider.notifier)
+                           .addLog(log);
+ 
+                       if (context.mounted) {
+diff --git a/lib/screens/main_screens/medical_records.dart b/lib/screens/main_screens/medical_records.dart
+index 71e7188..74193bf 100644
+--- a/lib/screens/main_screens/medical_records.dart
++++ b/lib/screens/main_screens/medical_records.dart
+@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
+ import 'package:pet_care/models/medical_record.dart';
+ import 'package:pet_care/models/pet.dart';
+ import 'package:pet_care/providers/auth_providers.dart';
+-import 'package:pet_care/providers/offline_providers.dart';
++import 'package:pet_care/providers/firestore_providers.dart';
+ 
+ class MedicalRecordsScreen extends ConsumerStatefulWidget {
+   const MedicalRecordsScreen({Key? key}) : super(key: key);
+@@ -19,7 +19,7 @@ class _MedicalRecordsScreenState extends ConsumerState<MedicalRecordsScreen> {
+ 
+   @override
+   Widget build(BuildContext context) {
+-    final petsAsync = ref.watch(petsOfflineProvider);
++    final petsAsync = ref.watch(petsControllerProvider);
+ 
+     return Scaffold(
+       backgroundColor: const Color(0xFFF5F5F5),
+@@ -159,7 +159,7 @@ class _MedicalRecordsScreenState extends ConsumerState<MedicalRecordsScreen> {
+   }
+ 
+   Widget _buildRecordsList(String petId) {
+-    final recordsAsync = ref.watch(petMedicalRecordsOfflineProvider(petId));
++    final recordsAsync = ref.watch(petMedicalRecordsProvider(petId));
+ 
+     return recordsAsync.when(
+       data: (records) {
+@@ -414,11 +414,8 @@ class _MedicalRecordsScreenState extends ConsumerState<MedicalRecordsScreen> {
+     );
+ 
+     try {
+-      final syncService = ref.read(unifiedSyncServiceProvider);
+-      await syncService.fullSync(user.uid);
+-
+       if (selectedPetId != null) {
+-        ref.invalidate(petMedicalRecordsOfflineProvider(selectedPetId!));
++        ref.invalidate(petMedicalRecordsProvider(selectedPetId!));
+       }
+ 
+       if (mounted) {
+@@ -475,23 +472,10 @@ class _MedicalRecordsScreenState extends ConsumerState<MedicalRecordsScreen> {
+ 
+   Future<void> _deleteRecord(String recordId) async {
+     try {
+-      final medicalRecordDB = ref.read(medicalRecordLocalDBProvider);
+-      await medicalRecordDB.deleteRecord(recordId);
+-
+-      final syncService = ref.read(unifiedSyncServiceProvider);
+-      if (await syncService.hasInternetConnection()) {
+-        try {
+-          await syncService.supabase
+-              .from('medical_records')
+-              .delete()
+-              .eq('id', recordId);
+-        } catch (e) {
+-          print('Error deleting from Supabase: $e');
+-        }
+-      }
++      await ref.read(medicalRecordRepositoryProvider).delete(recordId);
+ 
+       if (selectedPetId != null) {
+-        ref.invalidate(petMedicalRecordsOfflineProvider(selectedPetId!));
++        ref.invalidate(petMedicalRecordsProvider(selectedPetId!));
+       }
+ 
+       if (mounted) {
+@@ -513,12 +497,15 @@ class _MedicalRecordsScreenState extends ConsumerState<MedicalRecordsScreen> {
+ 
+   void _showAddRecordDialog() {
+     if (selectedPetId == null) return;
++    final user = ref.read(currentUserProvider);
++    if (user == null) return;
+ 
+     showDialog(
+       context: context,
+       builder:
+           (context) => _MedicalRecordFormDialog(
+             petId: selectedPetId!,
++            ownerId: user.uid,
+             onSave: (record) async {
+               await _saveRecord(record);
+             },
+@@ -532,6 +519,7 @@ class _MedicalRecordsScreenState extends ConsumerState<MedicalRecordsScreen> {
+       builder:
+           (context) => _MedicalRecordFormDialog(
+             petId: record.petId,
++            ownerId: record.ownerId,
+             existingRecord: record,
+             onSave: (updatedRecord) async {
+               await _updateRecord(updatedRecord);
+@@ -549,14 +537,10 @@ class _MedicalRecordsScreenState extends ConsumerState<MedicalRecordsScreen> {
+ 
+   Future<void> _saveRecord(MedicalRecord record) async {
+     try {
+-      final medicalRecordDB = ref.read(medicalRecordLocalDBProvider);
+-      await medicalRecordDB.createMedicalRecord(record);
+-
+-      final syncService = ref.read(unifiedSyncServiceProvider);
+-      await syncService.syncMedicalRecordsToSupabase();
++      await ref.read(medicalRecordRepositoryProvider).add(record);
+ 
+       if (selectedPetId != null) {
+-        ref.invalidate(petMedicalRecordsOfflineProvider(selectedPetId!));
++        ref.invalidate(petMedicalRecordsProvider(selectedPetId!));
+       }
+ 
+       if (mounted) {
+@@ -578,17 +562,14 @@ class _MedicalRecordsScreenState extends ConsumerState<MedicalRecordsScreen> {
+ 
+   Future<void> _updateRecord(MedicalRecord record) async {
+     try {
+-      final medicalRecordDB = ref.read(medicalRecordLocalDBProvider);
+-
+-      // Delete old and create new (since there's no update method in your DB)
+-      await medicalRecordDB.deleteRecord(record.id);
+-      await medicalRecordDB.createMedicalRecord(record);
+-
+-      final syncService = ref.read(unifiedSyncServiceProvider);
+-      await syncService.syncMedicalRecordsToSupabase();
++      // Firestore repository has a real update - no need for the old
++      // delete-and-recreate workaround.
++      await ref
++          .read(medicalRecordRepositoryProvider)
++          .set(record.id, record);
+ 
+       if (selectedPetId != null) {
+-        ref.invalidate(petMedicalRecordsOfflineProvider(selectedPetId!));
++        ref.invalidate(petMedicalRecordsProvider(selectedPetId!));
+       }
+ 
+       if (mounted) {
+@@ -614,11 +595,13 @@ class _MedicalRecordsScreenState extends ConsumerState<MedicalRecordsScreen> {
+ // ============================================
+ class _MedicalRecordFormDialog extends StatefulWidget {
+   final String petId;
++  final String ownerId;
+   final MedicalRecord? existingRecord;
+   final Function(MedicalRecord) onSave;
+ 
+   const _MedicalRecordFormDialog({
+     required this.petId,
++    required this.ownerId,
+     this.existingRecord,
+     required this.onSave,
+   });
+@@ -835,6 +818,7 @@ class _MedicalRecordFormDialogState extends State<_MedicalRecordFormDialog> {
+     final record = MedicalRecord(
+       id: widget.existingRecord?.id ?? '',
+       petId: widget.petId,
++      ownerId: widget.ownerId,
+       recordType: selectedRecordType,
+       title: titleController.text,
+       description:
+diff --git a/lib/screens/main_screens/petscreen.dart b/lib/screens/main_screens/petscreen.dart
+index da659dd..52b9a7f 100644
+--- a/lib/screens/main_screens/petscreen.dart
++++ b/lib/screens/main_screens/petscreen.dart
+@@ -1,13 +1,13 @@
+ import 'package:flutter/material.dart';
+ import 'package:flutter_riverpod/flutter_riverpod.dart';
+-import 'package:pet_care/providers/offline_providers.dart';
++import 'package:pet_care/providers/firestore_providers.dart';
+ 
+ class PetsScreen extends ConsumerWidget {
+   const PetsScreen({super.key});
+ 
+   @override
+   Widget build(BuildContext context, WidgetRef ref) {
+-    final petsAsync = ref.watch(petsOfflineProvider);
++    final petsAsync = ref.watch(petsControllerProvider);
+ 
+     return Scaffold(
+       backgroundColor: const Color(0xFFF5F5F5),
+diff --git a/lib/screens/main_screens/reminders.dart b/lib/screens/main_screens/reminders.dart
+index 587fd1f..b64d67f 100644
+--- a/lib/screens/main_screens/reminders.dart
++++ b/lib/screens/main_screens/reminders.dart
+@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
+ import 'package:flutter_riverpod/flutter_riverpod.dart';
+ import 'package:pet_care/models/medical_record.dart';
+ import 'package:pet_care/models/reminder.dart';
+-import 'package:pet_care/providers/app_state_provider.dart';
+ import 'package:pet_care/providers/auth_providers.dart';
+-import 'package:pet_care/providers/offline_providers.dart';
++import 'package:pet_care/providers/firestore_providers.dart';
+ 
+ import 'package:pet_care/services/notification_service.dart';
+ 
+@@ -45,20 +44,16 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
+ 
+   Future<void> _performInitialSync() async {
+     final user = ref.read(currentUserProvider);
+-    if (user != null) {
+-      final syncService = ref.read(unifiedSyncServiceProvider);
+-      await syncService.fullSync(user.uid);
+-
+-      if (mounted) {
+-        _invalidateAllProviders();
+-
+-        // Reschedule all notifications after sync
+-        final allReminders =
+-            await ref.read(reminderDatabaseProvider).getAllReminders();
+-        await _notificationService.rescheduleAllReminders(
+-          allReminders.where((r) => !r.isCompleted).toList(),
+-        );
+-      }
++    if (user != null && mounted) {
++      // No manual sync step needed - Firestore keeps its local cache in
++      // sync with the server on its own. Just (re)schedule notifications
++      // from whatever's currently in Firestore.
++      final allReminders = await ref
++          .read(reminderRepositoryProvider)
++          .fetch((q) => q.where('ownerId', isEqualTo: user.uid));
++      await _notificationService.rescheduleAllReminders(
++        allReminders.where((r) => !r.isCompleted).toList(),
++      );
+     }
+   }
+ 
+@@ -136,9 +131,8 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
+     );
+ 
+     try {
+-      final syncService = ref.read(unifiedSyncServiceProvider);
+-      await syncService.fullSync(user.uid);
+-
++      // Nothing to manually sync - Firestore's listeners are already live.
++      // Invalidating just forces a fresh read in case a listener is stale.
+       _invalidateAllProviders();
+ 
+       if (mounted) {
+@@ -598,16 +592,17 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
+   }
+ 
+   Future<void> _toggleCompletion(Reminder reminder) async {
+-    final db = ref.read(reminderDatabaseProvider);
+     final newCompletionState = !reminder.isCompleted;
+ 
+-    // IMMEDIATE: Update local database first (snappy UI response)
+-    await db.toggleCompletion(reminder.id!, newCompletionState);
++    // Firestore's own listeners keep the UI in sync - no separate local
++    // write + background sync step needed, just write straight through.
++    await ref
++        .read(reminderRepositoryProvider)
++        .update(reminder.id!, {'isCompleted': newCompletionState});
+ 
+-    // IMMEDIATE: Invalidate providers to refresh UI instantly
+     _invalidateAllProviders();
+ 
+-    // BACKGROUND: Handle notifications and syncing asynchronously
++    // BACKGROUND: Handle notifications asynchronously
+     Future.microtask(() async {
+       try {
+         // Handle medical record creation dialog if needed
+@@ -629,23 +624,8 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
+             updatedReminder,
+           );
+         }
+-
+-        // BACKGROUND sync to Supabase (only if online)
+-        final isOffline = ref.read(isOfflineModeProvider);
+-        if (!isOffline) {
+-          try {
+-            final syncService = ref.read(unifiedSyncServiceProvider);
+-            if (await syncService.hasInternetConnection()) {
+-              await syncService.syncRemindersToSupabase();
+-              print('✅ Reminder completion synced to Supabase');
+-            }
+-          } catch (e) {
+-            print('⚠️ Error syncing completion to Supabase: $e');
+-            // Not critical - already updated locally
+-          }
+-        }
+       } catch (e) {
+-        print('Background toggle operation failed: $e');
++        debugPrint('Background toggle operation failed: $e');
+         // Optionally show error to user here if needed
+       }
+     });
+@@ -690,11 +670,13 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
+     );
+ 
+     if (result != null) {
+-      final medicalRecordDB = ref.read(medicalRecordLocalDBProvider);
++      final user = ref.read(currentUserProvider);
++      if (user == null) return;
+ 
+       final record = MedicalRecord(
+         id: '',
+         petId: reminder.petId,
++        ownerId: user.uid,
+         recordType: result['recordType'] ?? _inferRecordType(reminder.title),
+         title: result['title'] ?? reminder.title,
+         description: result['description'],
+@@ -704,10 +686,7 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
+         nextDueDate: result['nextDueDate'],
+       );
+ 
+-      await medicalRecordDB.createMedicalRecord(record);
+-
+-      final syncService = ref.read(unifiedSyncServiceProvider);
+-      await syncService.syncMedicalRecordsToSupabase();
++      await ref.read(medicalRecordRepositoryProvider).add(record);
+ 
+       if (mounted) {
+         ScaffoldMessenger.of(context).showSnackBar(
+@@ -739,45 +718,14 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
+ 
+   Future<void> _deleteReminder(String id) async {
+     try {
+-      // ALWAYS delete from local DB first
+-      final db = ref.read(reminderDatabaseProvider);
+-      await db.deleteReminder(id);
+-
+-      // Cancel notification
++      await ref.read(reminderRepositoryProvider).delete(id);
+       await _notificationService.cancelNotification(id);
+ 
+-      // BACKGROUND sync to Supabase (only if online)
+-      final isOffline = ref.read(isOfflineModeProvider);
+-      if (!isOffline) {
+-        Future.microtask(() async {
+-          try {
+-            final syncService = ref.read(unifiedSyncServiceProvider);
+-            if (await syncService.hasInternetConnection()) {
+-              await syncService.supabase
+-                  .from('reminders')
+-                  .delete()
+-                  .eq('id', id);
+-              print('✅ Reminder deleted from Supabase');
+-            }
+-          } catch (e) {
+-            print('⚠️ Error deleting from Supabase: $e');
+-            // Not critical - already deleted locally
+-          }
+-        });
+-      }
+-
+       _invalidateAllProviders();
+ 
+       if (mounted) {
+         ScaffoldMessenger.of(context).showSnackBar(
+-          SnackBar(
+-            content: Text(
+-              isOffline
+-                  ? 'Reminder deleted locally (will sync when online)'
+-                  : 'Reminder deleted',
+-            ),
+-            duration: Duration(seconds: 2),
+-          ),
++          const SnackBar(content: Text('Reminder deleted'), duration: Duration(seconds: 2)),
+         );
+       }
+     } catch (e) {
+@@ -830,7 +778,7 @@ class _AddReminderDialogState extends ConsumerState<_AddReminderDialog> {
+ 
+   @override
+   Widget build(BuildContext context) {
+-    final petsAsync = ref.watch(petsOfflineProvider);
++    final petsAsync = ref.watch(petsControllerProvider);
+ 
+     return AlertDialog(
+       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+@@ -1263,8 +1211,12 @@ class _AddReminderDialogState extends ConsumerState<_AddReminderDialog> {
+         );
+     }
+ 
++    final user = widget.parentRef.read(currentUserProvider);
++    if (user == null) return;
++
+     final reminder = Reminder(
+       petId: selectedPetId,
++      ownerId: user.uid,
+       title: titleController.text,
+       description:
+           descriptionController.text.isEmpty
+@@ -1275,9 +1227,9 @@ class _AddReminderDialogState extends ConsumerState<_AddReminderDialog> {
+       importanceLevel: selectedImportance,
+     );
+ 
+-    // SAVE TO LOCAL DB FIRST (always works offline or online)
+-    final db = widget.parentRef.read(reminderDatabaseProvider);
+-    final reminderId = await db.createReminder(reminder);
++    final reminderId = await widget.parentRef
++        .read(reminderRepositoryProvider)
++        .add(reminder);
+     final reminderWithId = reminder.copyWith(id: reminderId);
+ 
+     // Schedule notification
+@@ -1288,22 +1240,6 @@ class _AddReminderDialogState extends ConsumerState<_AddReminderDialog> {
+     await NotificationService().scheduleReminderNotification(reminderWithId);
+     await NotificationService().scheduleEarlyNotification(reminderWithId);
+ 
+-    // BACKGROUND SYNC (only if online)
+-    final isOffline = ref.read(isOfflineModeProvider);
+-    if (!isOffline) {
+-      // Try to sync in background without blocking UI
+-      Future.microtask(() async {
+-        try {
+-          final syncService = widget.parentRef.read(unifiedSyncServiceProvider);
+-          await syncService.syncRemindersToSupabase();
+-          print('✅ Reminder synced to Supabase');
+-        } catch (e) {
+-          print('⚠️ Background sync failed (will retry later): $e');
+-          // Reminder is already saved locally, so this is not critical
+-        }
+-      });
+-    }
+-
+     // Refresh UI
+     widget.parentRef.invalidate(todayRemindersProvider);
+     widget.parentRef.invalidate(weeklyRemindersProvider);
+@@ -1313,13 +1249,7 @@ class _AddReminderDialogState extends ConsumerState<_AddReminderDialog> {
+     if (context.mounted) {
+       Navigator.of(context).pop();
+       ScaffoldMessenger.of(context).showSnackBar(
+-        SnackBar(
+-          content: Text(
+-            isOffline
+-                ? 'Reminder saved locally (will sync when online)'
+-                : 'Reminder added!',
+-          ),
+-        ),
++        const SnackBar(content: Text('Reminder added!')),
+       );
+     }
+   }
+diff --git a/lib/screens/main_screens/setting_screen.dart b/lib/screens/main_screens/setting_screen.dart
+index bfc6afe..e4546df 100644
+--- a/lib/screens/main_screens/setting_screen.dart
++++ b/lib/screens/main_screens/setting_screen.dart
+@@ -2,8 +2,9 @@ import 'dart:async';
+ 
+ import 'package:flutter/material.dart';
+ import 'package:flutter_riverpod/flutter_riverpod.dart';
++import 'package:pet_care/providers/app_state_provider.dart';
+ import 'package:pet_care/providers/auth_providers.dart';
+-import 'package:pet_care/providers/offline_providers.dart';
++import 'package:pet_care/providers/firestore_providers.dart';
+ import 'package:pet_care/screens/settingsscreens/profile_edit_screen.dart';
+ import 'package:pet_care/services/notification_service.dart';
+ import 'package:pet_care/theme/theme_manager.dart';
+@@ -69,11 +70,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+ 
+   Future<UserProfile?> _loadProfileFromOfflineDB(String userId) async {
+     try {
+-      final profileLocalDB = ref.read(profileLocalDBProvider);
+-      final profile = await profileLocalDB.getProfileById(userId);
+-      return profile;
++      return await ref.read(userProfileRepositoryProvider).get(userId);
+     } catch (e) {
+-      print('Error loading profile from offline DB: $e');
++      debugPrint('Error loading profile: $e');
+       return null;
+     }
+   }
+@@ -143,47 +142,37 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+         updatedProfile.notificationPreferences,
+       );
+ 
+-      // Save to local DB in the background
++      // Write straight to Firestore - its SDK queues this locally and
++      // syncs automatically if offline, so there's no separate "save
++      // locally, then sync remotely when online" step needed anymore.
+       unawaited(
+         Future(() async {
+           try {
+-            final profileLocalDB = ref.read(profileLocalDBProvider);
+-            await profileLocalDB.upsertProfile(updatedProfile);
+-            debugPrint('✅ Saved to local DB');
++            await ref
++                .read(userProfileProviderProvider.notifier)
++                .updateNotificationPreferences(
++                  updatedProfile.notificationPreferences,
++                );
++            await ref
++                .read(userProfileProviderProvider.notifier)
++                .updateAppSettings(updatedProfile.appSettings);
++            debugPrint('✅ Preferences saved');
+           } catch (e) {
+-            debugPrint('❌ Error saving to local DB: $e');
++            debugPrint('⚠️ Error saving preferences: $e');
+           }
+         }),
+       );
+ 
+-      // Handle remote sync in the background if online
+-      if (!_isOffline) {
+-        unawaited(
+-          Future(() async {
+-            try {
+-              await ref
+-                  .read(userProfileProviderProvider.notifier)
+-                  .updateNotificationPreferences(
+-                    updatedProfile.notificationPreferences,
+-                  );
+-              await ref
+-                  .read(userProfileProviderProvider.notifier)
+-                  .updateAppSettings(updatedProfile.appSettings);
+-              debugPrint('✅ Synced to remote');
+-            } catch (e) {
+-              debugPrint('⚠️ Remote sync failed: $e');
+-            }
+-          }),
+-        );
+-      }
+-
+       // Update reminders in the background if needed
+       if (_notificationsEnabled) {
+         unawaited(
+           Future(() async {
+             try {
+-              final reminderDB = ref.read(reminderDatabaseProvider);
+-              final reminders = await reminderDB.getAllReminders();
++              final user = ref.read(currentUserProvider);
++              if (user == null) return;
++              final reminders = await ref
++                  .read(reminderRepositoryProvider)
++                  .fetch((q) => q.where('ownerId', isEqualTo: user.uid));
+               await _notificationService.rescheduleAllReminders(
+                 reminders.where((r) => !r.isCompleted).toList(),
+               );
+diff --git a/lib/screens/onboarding_screens/loginscreen.dart b/lib/screens/onboarding_screens/loginscreen.dart
+index 0469a46..46ae8d4 100644
+--- a/lib/screens/onboarding_screens/loginscreen.dart
++++ b/lib/screens/onboarding_screens/loginscreen.dart
+@@ -72,7 +72,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
+ 
+       String errorMessage = 'Login failed. Please try again.';
+ 
+-      // Handle specific error messages from Supabase
++      // Handle specific error messages from Firebase Auth
+       final errorString = error.toString().toLowerCase();
+       if (errorString.contains('invalid login credentials') ||
+           errorString.contains('invalid credentials')) {
+diff --git a/lib/screens/onboarding_screens/signupscreen.dart b/lib/screens/onboarding_screens/signupscreen.dart
+index fbd625e..82bf9cc 100644
+--- a/lib/screens/onboarding_screens/signupscreen.dart
++++ b/lib/screens/onboarding_screens/signupscreen.dart
+@@ -63,41 +63,13 @@ class _SignupscreenState extends ConsumerState<Signupscreen> {
+       if (response.user != null) {
+         print('User created successfully: ${response.user!.uid}');
+ 
+-        try {
+-          print('Creating profile for user: ${response.user!.uid}');
++        // Note: authService.signUp() already created the Firestore profile
++        // doc above (fullName + username), so there's no separate
++        // "create profile" step needed here anymore.
++        _showSnackBar('Account created successfully!');
+ 
+-          final userProfileProvider = ref.read(
+-            userProfileProviderProvider.notifier,
+-          );
+-
+-          final username = _emailController.text
+-              .trim()
+-              .split('@')[0]
+-              .toLowerCase()
+-              .replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '');
+-
+-          await userProfileProvider.createProfile(
+-            fullName: _nameController.text.trim(),
+-            username: username,
+-          );
+-
+-          print('✅ Profile created successfully');
+-
+-          _showSnackBar('Account created successfully!');
+-
+-          if (mounted) {
+-            Navigator.of(context).pushReplacementNamed('/onboarding');
+-          }
+-        } catch (profileError) {
+-          print('❌ Profile creation failed: $profileError');
+-          _showSnackBar(
+-            'Account created but profile setup failed. Please update your profile in settings.',
+-            isError: true,
+-          );
+-
+-          if (mounted) {
+-            Navigator.of(context).pushReplacementNamed('/');
+-          }
++        if (mounted) {
++          Navigator.of(context).pushReplacementNamed('/onboarding');
+         }
+       } else {
+         print('No user returned from signup');
+@@ -109,7 +81,7 @@ class _SignupscreenState extends ConsumerState<Signupscreen> {
+ 
+       String errorMessage = 'Sign up failed. Please try again.';
+ 
+-      // Handle specific error messages from Supabase
++      // Handle specific error messages from Firebase Auth
+       final errorString = error.toString().toLowerCase();
+       if (errorString.contains('user already registered') ||
+           errorString.contains('already registered')) {
+diff --git a/lib/screens/pet_selection_screens/add_pet.dart b/lib/screens/pet_selection_screens/add_pet.dart
+index 2c561b5..c540c7a 100644
+--- a/lib/screens/pet_selection_screens/add_pet.dart
++++ b/lib/screens/pet_selection_screens/add_pet.dart
+@@ -90,7 +90,7 @@ class _AddPet extends ConsumerState<AddPet> {
+         throw Exception('User not logged in');
+       }
+ 
+-      // Upload to Supabase storage
++      // Upload to Firebase Storage
+       final photoUrl = await avatarService.uploadAvatar(
+         userId: 'pets/${user.uid}', // Store in pets subfolder
+         imageFile: imageFile,
+diff --git a/lib/screens/pet_selection_screens/editpetscreen.dart b/lib/screens/pet_selection_screens/editpetscreen.dart
+index c855b7b..c109211 100644
+--- a/lib/screens/pet_selection_screens/editpetscreen.dart
++++ b/lib/screens/pet_selection_screens/editpetscreen.dart
+@@ -5,7 +5,6 @@ import 'package:pet_care/models/pet.dart';
+ 
+ import 'package:pet_care/providers/auth_providers.dart';
+ import 'package:pet_care/providers/firestore_providers.dart';
+-import 'package:pet_care/providers/offline_providers.dart';
+ import 'package:pet_care/services/avatar_upload_service.dart';
+ 
+ class Editpetscreen extends ConsumerStatefulWidget {
+@@ -130,7 +129,7 @@ class _EditpetscreenState extends ConsumerState<Editpetscreen> {
+         throw Exception('User not logged in');
+       }
+ 
+-      // Upload to Supabase storage
++      // Upload to Firebase Storage
+       final photoUrl = await avatarService.uploadAvatar(
+         userId: 'pets/${user.uid}', // Store in pets subfolder
+         imageFile: imageFile,
+diff --git a/lib/screens/pet_selection_screens/pet_info.dart b/lib/screens/pet_selection_screens/pet_info.dart
+index a095429..7578cbf 100644
+--- a/lib/screens/pet_selection_screens/pet_info.dart
++++ b/lib/screens/pet_selection_screens/pet_info.dart
+@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
+ import 'package:flutter_riverpod/flutter_riverpod.dart';
+ import 'package:pet_care/models/pet.dart';
+ import 'package:pet_care/models/medical_record.dart';
+-import 'package:pet_care/providers/offline_providers.dart';
++import 'package:pet_care/providers/firestore_providers.dart';
+ 
+ import 'package:intl/intl.dart';
+ 
+@@ -633,7 +633,7 @@ class PetDetailsScreen extends ConsumerWidget {
+   ) {
+     final theme = Theme.of(context);
+     final medicalRecordsAsync = ref.watch(
+-      petMedicalRecordsOfflineProvider(displayPet.id),
++      petMedicalRecordsProvider(displayPet.id),
+     );
+ 
+     return Container(
+@@ -1012,7 +1012,7 @@ class PetDetailsScreen extends ConsumerWidget {
+                 try {
+                   // Delete pet using the notifier
+                   await ref
+-                      .read(petsOfflineProvider.notifier)
++                      .read(petsControllerProvider.notifier)
+                       .deletePet(displayPet.id);
+ 
+                   // Clear selection
+diff --git a/lib/screens/settingsscreens/notification_settings_screen.dart b/lib/screens/settingsscreens/notification_settings_screen.dart
+index 9769220..208bdac 100644
+--- a/lib/screens/settingsscreens/notification_settings_screen.dart
++++ b/lib/screens/settingsscreens/notification_settings_screen.dart
+@@ -2,7 +2,6 @@
+ // import 'package:flutter_riverpod/flutter_riverpod.dart';
+ // import 'package:pet_care/services/notification_service.dart';
+ // import 'package:shared_preferences/shared_preferences.dart';
+-// import 'package:pet_care/providers/offline_providers.dart';
+ 
+ // class NotificationSettingsScreen extends ConsumerStatefulWidget {
+ //   const NotificationSettingsScreen({Key? key}) : super(key: key);
+diff --git a/lib/services/storage_service.dart b/lib/services/storage_service.dart
+deleted file mode 100644
+index 2c22e32..0000000
+--- a/lib/services/storage_service.dart
++++ /dev/null
+@@ -1,17 +0,0 @@
+-// services/storage_service.dart
+-import 'dart:io';
+-
+-import 'package:supabase_flutter/supabase_flutter.dart';
+-
+-class StorageService {
+-  static final SupabaseClient _supabase = Supabase.instance.client;
+-
+-  static Future<String?> uploadPetPhoto(File imageFile, String petId) async {
+-    final String fileName =
+-        '${petId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+-
+-    await _supabase.storage.from('pet-photos').upload(fileName, imageFile);
+-
+-    return _supabase.storage.from('pet-photos').getPublicUrl(fileName);
+-  }
+-}
+diff --git a/pubspec.yaml b/pubspec.yaml
+index 1f5e189..5af3431 100644
+--- a/pubspec.yaml
++++ b/pubspec.yaml
+@@ -40,13 +40,8 @@ dependencies:
+   rive: ^0.13.20
+   riverpod: ^2.3.9
+   riverpod_annotation: ^2.0.0
+-  supabase_flutter: ^2.10.1
+   image: ^4.1.3
+-  hive: ^2.2.3
+-  sqflite: ^2.4.2
+-  hive_flutter: ^1.1.0
+   flutter_local_notifications: ^19.4.2
+-  google_generative_ai: ^0.4.7
+   firebase_core: ^4.12.1
+   firebase_ai: ^3.14.1
+   cloud_firestore: ^6.7.1

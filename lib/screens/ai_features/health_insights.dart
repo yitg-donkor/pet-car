@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pet_care/services/firebase_ai_service.dart';
 import 'package:pet_care/models/medical_record.dart';
 import 'package:pet_care/models/activity_log.dart';
-import 'package:pet_care/providers/offline_providers.dart';
+import 'package:pet_care/providers/firestore_providers.dart';
 
 class HealthInsightsScreen extends ConsumerStatefulWidget {
   final String petId;
@@ -42,16 +42,13 @@ class _HealthInsightsScreenState extends ConsumerState<HealthInsightsScreen> {
     });
 
     try {
-      // Fetch real data from database
-      final medicalRecordDB = ref.read(medicalRecordLocalDBProvider);
-      final activityLogDB = ref.read(activityLogLocalDBProvider);
-
-      final medicalRecords = await medicalRecordDB.getMedicalRecordsForPet(
-        widget.petId,
-      );
-      final activityLogs = await activityLogDB.getActivityLogsForPet(
-        widget.petId,
-      );
+      // Fetch real data from Firestore
+      final medicalRecords = await ref
+          .read(medicalRecordRepositoryProvider)
+          .fetch((q) => q.where('petId', isEqualTo: widget.petId));
+      final activityLogs = await ref
+          .read(activityLogRepositoryProvider)
+          .fetch((q) => q.where('petId', isEqualTo: widget.petId));
 
       // Check if we have any data at all
       if (medicalRecords.isEmpty && activityLogs.isEmpty) {

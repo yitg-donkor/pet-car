@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pet_care/providers/offline_providers.dart';
+import 'package:pet_care/providers/firestore_providers.dart';
 import 'package:pet_care/screens/ai_features/aichatscreen.dart';
 import 'package:pet_care/screens/ai_features/feeding_schedulescren.dart';
 import 'package:pet_care/screens/ai_features/health_insights.dart';
@@ -465,7 +465,7 @@ class _AIDashboardScreenState extends ConsumerState<AIDashboardScreen> {
 
   void _navigateToSymptomChecker(BuildContext context, WidgetRef ref) async {
     // ✅ Load data FIRST
-    final pets = await ref.read(petsOfflineProvider.future);
+    final pets = await ref.read(petsControllerProvider.future);
 
     if (!context.mounted) return;
 
@@ -537,7 +537,7 @@ class _AIDashboardScreenState extends ConsumerState<AIDashboardScreen> {
 
   void _navigateToSmartReminders(BuildContext context, WidgetRef ref) async {
     // ✅ Load data FIRST
-    final pets = await ref.read(petsOfflineProvider.future);
+    final pets = await ref.read(petsControllerProvider.future);
 
     if (!context.mounted) return;
 
@@ -598,7 +598,7 @@ class _AIDashboardScreenState extends ConsumerState<AIDashboardScreen> {
 
   void _navigateToFeedingSchedule(BuildContext context, WidgetRef ref) async {
     // ✅ Load data FIRST
-    final pets = await ref.read(petsOfflineProvider.future);
+    final pets = await ref.read(petsControllerProvider.future);
 
     if (!context.mounted) return;
 
@@ -660,7 +660,7 @@ class _AIDashboardScreenState extends ConsumerState<AIDashboardScreen> {
 
   void _navigateToTrainingTips(BuildContext context, WidgetRef ref) async {
     // ✅ Load data FIRST
-    final pets = await ref.read(petsOfflineProvider.future);
+    final pets = await ref.read(petsControllerProvider.future);
 
     if (!context.mounted) return;
 
@@ -721,7 +721,7 @@ class _AIDashboardScreenState extends ConsumerState<AIDashboardScreen> {
 
   void _navigateToAichat(BuildContext context, WidgetRef ref) async {
     // ✅ Load data FIRST
-    final pets = await ref.read(petsOfflineProvider.future);
+    final pets = await ref.read(petsControllerProvider.future);
 
     if (!context.mounted) return;
 
@@ -781,7 +781,7 @@ class _AIDashboardScreenState extends ConsumerState<AIDashboardScreen> {
 
   void _navigateToHealthInsights(BuildContext context, WidgetRef ref) async {
     // ✅ Load data FIRST
-    final pets = await ref.read(petsOfflineProvider.future);
+    final pets = await ref.read(petsControllerProvider.future);
 
     if (!context.mounted) return;
 
@@ -843,7 +843,7 @@ class _AIDashboardScreenState extends ConsumerState<AIDashboardScreen> {
 
   void _navigateToMonthlyReport(BuildContext context, WidgetRef ref) async {
     // ✅ Load data FIRST
-    final pets = await ref.read(petsOfflineProvider.future);
+    final pets = await ref.read(petsControllerProvider.future);
 
     if (!context.mounted) return;
 
@@ -944,7 +944,7 @@ class _AIDashboardScreenState extends ConsumerState<AIDashboardScreen> {
 
 void _navigateToMedicalAnalysis(BuildContext context, WidgetRef ref) async {
   // ✅ Load data FIRST
-  final pets = await ref.read(petsOfflineProvider.future);
+  final pets = await ref.read(petsControllerProvider.future);
 
   if (!context.mounted) return;
 

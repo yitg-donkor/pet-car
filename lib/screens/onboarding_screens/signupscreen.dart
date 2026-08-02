@@ -63,41 +63,13 @@ class _SignupscreenState extends ConsumerState<Signupscreen> {
       if (response.user != null) {
         print('User created successfully: ${response.user!.uid}');
 
-        try {
-          print('Creating profile for user: ${response.user!.uid}');
+        // Note: authService.signUp() already created the Firestore profile
+        // doc above (fullName + username), so there's no separate
+        // "create profile" step needed here anymore.
+        _showSnackBar('Account created successfully!');
 
-          final userProfileProvider = ref.read(
-            userProfileProviderProvider.notifier,
-          );
-
-          final username = _emailController.text
-              .trim()
-              .split('@')[0]
-              .toLowerCase()
-              .replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '');
-
-          await userProfileProvider.createProfile(
-            fullName: _nameController.text.trim(),
-            username: username,
-          );
-
-          print('✅ Profile created successfully');
-
-          _showSnackBar('Account created successfully!');
-
-          if (mounted) {
-            Navigator.of(context).pushReplacementNamed('/onboarding');
-          }
-        } catch (profileError) {
-          print('❌ Profile creation failed: $profileError');
-          _showSnackBar(
-            'Account created but profile setup failed. Please update your profile in settings.',
-            isError: true,
-          );
-
-          if (mounted) {
-            Navigator.of(context).pushReplacementNamed('/');
-          }
+        if (mounted) {
+          Navigator.of(context).pushReplacementNamed('/onboarding');
         }
       } else {
         print('No user returned from signup');
@@ -109,7 +81,7 @@ class _SignupscreenState extends ConsumerState<Signupscreen> {
 
       String errorMessage = 'Sign up failed. Please try again.';
 
-      // Handle specific error messages from Supabase
+      // Handle specific error messages from Firebase Auth
       final errorString = error.toString().toLowerCase();
       if (errorString.contains('user already registered') ||
           errorString.contains('already registered')) {

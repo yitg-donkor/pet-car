@@ -8,6 +8,8 @@
 // from the on-device cache instantly and pushes updates as the server
 // confirms writes or another device changes something. So each provider
 // here is just a thin `watch(...)` on a FirestoreRepository query.
+export 'auth_providers.dart';
+
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../models/activity_log.dart';
@@ -214,6 +216,54 @@ Stream<List<ActivityLog>> activityLogsForOwner(ActivityLogsForOwnerRef ref) {
   );
 }
 
+/// Today's and yesterday's activity logs, split out for the daily log view.
+@riverpod
+Future<Map<String, List<ActivityLog>>> dailyActivityLogs(
+  DailyActivityLogsRef ref,
+) async {
+  final user = ref.watch(currentUserProvider);
+  if (user == null) return {'today': const [], 'yesterday': const []};
+
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final yesterday = today.subtract(const Duration(days: 1));
+
+  final repo = ref.watch(activityLogRepositoryProvider);
+  final logs = await repo.fetch(
+    (q) => q
+        .where('ownerId', isEqualTo: user.uid)
+        .where('timestamp', isGreaterThanOrEqualTo: yesterday)
+        .orderBy('timestamp', descending: true),
+  );
+
+  return {
+    'today': logs.where((log) => !log.timestamp.isBefore(today)).toList(),
+    'yesterday':
+        logs
+            .where(
+              (log) =>
+                  !log.timestamp.isBefore(yesterday) &&
+                  log.timestamp.isBefore(today),
+            )
+            .toList(),
+  };
+}
+
+/// Activity logs flagged as health-related, across all of the user's pets.
+@riverpod
+Future<List<ActivityLog>> healthActivityLogs(HealthActivityLogsRef ref) {
+  final user = ref.watch(currentUserProvider);
+  if (user == null) return Future.value(const []);
+
+  final repo = ref.watch(activityLogRepositoryProvider);
+  return repo.fetch(
+    (q) => q
+        .where('ownerId', isEqualTo: user.uid)
+        .where('isHealthRelated', isEqualTo: true)
+        .orderBy('timestamp', descending: true),
+  );
+}
+
 @riverpod
 class ActivityLogsController extends _$ActivityLogsController {
   @override
@@ -225,4 +275,17 @@ class ActivityLogsController extends _$ActivityLogsController {
 
   Future<void> deleteLog(String logId) =>
       ref.read(activityLogRepositoryProvider).delete(logId);
+}
+
+// ============================================
+// SELECTED PET (local UI state, not persisted)
+// ============================================
+
+@riverpod
+class SelectedPet extends _$SelectedPet {
+  @override
+  Pet? build() => null;
+
+  void selectPet(Pet pet) => state = pet;
+  void clearSelection() => state = null;
 }

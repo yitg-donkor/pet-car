@@ -72,7 +72,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
       String errorMessage = 'Login failed. Please try again.';
 
-      // Handle specific error messages from Supabase
+      // Handle specific error messages from Firebase Auth
       final errorString = error.toString().toLowerCase();
       if (errorString.contains('invalid login credentials') ||
           errorString.contains('invalid credentials')) {

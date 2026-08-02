@@ -5,7 +5,6 @@ import 'package:pet_care/models/pet.dart';
 
 import 'package:pet_care/providers/auth_providers.dart';
 import 'package:pet_care/providers/firestore_providers.dart';
-import 'package:pet_care/providers/offline_providers.dart';
 import 'package:pet_care/services/avatar_upload_service.dart';
 
 class Editpetscreen extends ConsumerStatefulWidget {
@@ -130,7 +129,7 @@ class _EditpetscreenState extends ConsumerState<Editpetscreen> {
         throw Exception('User not logged in');
       }
 
-      // Upload to Supabase storage
+      // Upload to Firebase Storage
       final photoUrl = await avatarService.uploadAvatar(
         userId: 'pets/${user.uid}', // Store in pets subfolder
         imageFile: imageFile,

@@ -198,6 +198,50 @@ final activityLogsForOwnerProvider =
 // ignore: unused_element
 typedef ActivityLogsForOwnerRef =
     AutoDisposeStreamProviderRef<List<ActivityLog>>;
+String _$dailyActivityLogsHash() => r'e08f3428339ceba1dc62ed0ce3e18145b8c8c357';
+
+/// Today's and yesterday's activity logs, split out for the daily log view.
+///
+/// Copied from [dailyActivityLogs].
+@ProviderFor(dailyActivityLogs)
+final dailyActivityLogsProvider =
+    AutoDisposeFutureProvider<Map<String, List<ActivityLog>>>.internal(
+      dailyActivityLogs,
+      name: r'dailyActivityLogsProvider',
+      debugGetCreateSourceHash:
+          const bool.fromEnvironment('dart.vm.product')
+              ? null
+              : _$dailyActivityLogsHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef DailyActivityLogsRef =
+    AutoDisposeFutureProviderRef<Map<String, List<ActivityLog>>>;
+String _$healthActivityLogsHash() =>
+    r'eab8bfcfa73906a07e0c7041be3ee576a0f4118e';
+
+/// Activity logs flagged as health-related, across all of the user's pets.
+///
+/// Copied from [healthActivityLogs].
+@ProviderFor(healthActivityLogs)
+final healthActivityLogsProvider =
+    AutoDisposeFutureProvider<List<ActivityLog>>.internal(
+      healthActivityLogs,
+      name: r'healthActivityLogsProvider',
+      debugGetCreateSourceHash:
+          const bool.fromEnvironment('dart.vm.product')
+              ? null
+              : _$healthActivityLogsHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef HealthActivityLogsRef = AutoDisposeFutureProviderRef<List<ActivityLog>>;
 String _$petsControllerHash() => r'cd9f5d00c2831f35fbe81f2e17e8e667024b6167';
 
 /// See also [PetsController].
@@ -423,5 +467,22 @@ final activityLogsControllerProvider = AutoDisposeStreamNotifierProvider<
 );
 
 typedef _$ActivityLogsController = AutoDisposeStreamNotifier<List<ActivityLog>>;
+String _$selectedPetHash() => r'7809d8eb4de29e8c5fe3a585389c345e7e3ef796';
+
+/// See also [SelectedPet].
+@ProviderFor(SelectedPet)
+final selectedPetProvider =
+    AutoDisposeNotifierProvider<SelectedPet, Pet?>.internal(
+      SelectedPet.new,
+      name: r'selectedPetProvider',
+      debugGetCreateSourceHash:
+          const bool.fromEnvironment('dart.vm.product')
+              ? null
+              : _$selectedPetHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
+
+typedef _$SelectedPet = AutoDisposeNotifier<Pet?>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

@@ -4,7 +4,7 @@ import 'package:flutter_svg/svg.dart';
 import 'package:pet_care/models/pet.dart';
 import 'package:pet_care/models/reminder.dart';
 import 'package:pet_care/providers/auth_providers.dart';
-import 'package:pet_care/providers/offline_providers.dart';
+import 'package:pet_care/providers/firestore_providers.dart';
 import 'package:pet_care/widgets/widgets.dart';
 import 'package:pet_care/screens/ai_features/ai_navigation_screen.dart';
 import 'package:pet_care/screens/main_screens/log.dart';
@@ -13,7 +13,7 @@ import 'package:pet_care/screens/main_screens/resources.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:pet_care/services/notification_service.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 
 class MainNavigation extends ConsumerStatefulWidget {
@@ -206,14 +206,17 @@ class _HomescreenState extends ConsumerState<Homescreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final petsAsync = ref.watch(petsOfflineProvider);
+    final petsAsync = ref.watch(petsControllerProvider);
     final todayRemindersAsync = ref.watch(todayRemindersProvider);
     final currentUser = ref.watch(currentUserProvider);
 
-    ref.listen<AsyncValue<List<Pet>>>(petsOfflineProvider, (previous, next) {
+    ref.listen<AsyncValue<List<Pet>>>(petsControllerProvider, (
+      previous,
+      next,
+    ) {
       next.whenOrNull(
         error: (error, stack) {
-          print('Error loading pets: $error');
+          debugPrint('Error loading pets: $error');
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Error loading pets: $error'),
@@ -238,16 +241,10 @@ class _HomescreenState extends ConsumerState<Homescreen> {
                 Expanded(
                   child: RefreshIndicator(
                     onRefresh: () async {
-                      ref.invalidate(petsOfflineProvider);
+                      // Streams are already live; this just forces a fresh
+                      // listener attach for the pull-to-refresh affordance.
+                      ref.invalidate(petsControllerProvider);
                       ref.invalidate(todayRemindersProvider);
-
-                      final user = ref.read(currentUserProvider);
-                      if (user != null) {
-                        final syncService = ref.read(
-                          unifiedSyncServiceProvider,
-                        );
-                        await syncService.fullSync(user.uid);
-                      }
                     },
                     child: SingleChildScrollView(
                       padding: const EdgeInsets.all(20),

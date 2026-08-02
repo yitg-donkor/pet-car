@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pet_care/providers/offline_providers.dart';
+import 'package:pet_care/providers/firestore_providers.dart';
 
 class PetsScreen extends ConsumerWidget {
   const PetsScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final petsAsync = ref.watch(petsOfflineProvider);
+    final petsAsync = ref.watch(petsControllerProvider);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),

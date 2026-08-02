@@ -5,7 +5,7 @@ import 'package:pet_care/models/medical_record.dart';
 import 'package:pet_care/models/activity_log.dart';
 import 'package:pet_care/models/reminder.dart';
 import 'package:pet_care/services/firebase_ai_service.dart';
-import 'package:pet_care/providers/offline_providers.dart';
+import 'package:pet_care/providers/firestore_providers.dart';
 import 'package:intl/intl.dart';
 
 class MonthlyReportScreen extends ConsumerStatefulWidget {
@@ -54,11 +54,6 @@ class _MonthlyReportScreenState extends ConsumerState<MonthlyReportScreen> {
     });
 
     try {
-      // Fetch real data from database
-      final medicalRecordDB = ref.read(medicalRecordLocalDBProvider);
-      final activityLogDB = ref.read(activityLogLocalDBProvider);
-      final reminderDB = ref.read(reminderDatabaseProvider);
-
       // Get date range for selected month
       final startDate = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
       final endDate = DateTime(
@@ -70,14 +65,21 @@ class _MonthlyReportScreenState extends ConsumerState<MonthlyReportScreen> {
         59,
       );
 
-      // Fetch data
-      final allMedicalRecords = await medicalRecordDB.getMedicalRecordsForPet(
-        widget.pet.id,
-      );
-      final allActivityLogs = await activityLogDB.getActivityLogsForPet(
-        widget.pet.id,
-      );
-      final allReminders = await reminderDB.getAllReminders();
+      // Fetch real data from Firestore
+      final allMedicalRecords = await ref
+          .read(medicalRecordRepositoryProvider)
+          .fetch((q) => q.where('petId', isEqualTo: widget.pet.id));
+      final allActivityLogs = await ref
+          .read(activityLogRepositoryProvider)
+          .fetch((q) => q.where('petId', isEqualTo: widget.pet.id));
+
+      final user = ref.read(currentUserProvider);
+      final allReminders =
+          user == null
+              ? <Reminder>[]
+              : await ref
+                  .read(reminderRepositoryProvider)
+                  .fetch((q) => q.where('ownerId', isEqualTo: user.uid));
 
       // Filter for selected month
       final medicalRecords =

@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pet_care/models/medical_record.dart';
 import 'package:pet_care/models/pet.dart';
 import 'package:pet_care/providers/auth_providers.dart';
-import 'package:pet_care/providers/offline_providers.dart';
+import 'package:pet_care/providers/firestore_providers.dart';
 
 class MedicalRecordsScreen extends ConsumerStatefulWidget {
   const MedicalRecordsScreen({Key? key}) : super(key: key);
@@ -19,7 +19,7 @@ class _MedicalRecordsScreenState extends ConsumerState<MedicalRecordsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final petsAsync = ref.watch(petsOfflineProvider);
+    final petsAsync = ref.watch(petsControllerProvider);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
@@ -159,7 +159,7 @@ class _MedicalRecordsScreenState extends ConsumerState<MedicalRecordsScreen> {
   }
 
   Widget _buildRecordsList(String petId) {
-    final recordsAsync = ref.watch(petMedicalRecordsOfflineProvider(petId));
+    final recordsAsync = ref.watch(petMedicalRecordsProvider(petId));
 
     return recordsAsync.when(
       data: (records) {
@@ -414,11 +414,8 @@ class _MedicalRecordsScreenState extends ConsumerState<MedicalRecordsScreen> {
     );
 
     try {
-      final syncService = ref.read(unifiedSyncServiceProvider);
-      await syncService.fullSync(user.uid);
-
       if (selectedPetId != null) {
-        ref.invalidate(petMedicalRecordsOfflineProvider(selectedPetId!));
+        ref.invalidate(petMedicalRecordsProvider(selectedPetId!));
       }
 
       if (mounted) {
@@ -475,23 +472,10 @@ class _MedicalRecordsScreenState extends ConsumerState<MedicalRecordsScreen> {
 
   Future<void> _deleteRecord(String recordId) async {
     try {
-      final medicalRecordDB = ref.read(medicalRecordLocalDBProvider);
-      await medicalRecordDB.deleteRecord(recordId);
-
-      final syncService = ref.read(unifiedSyncServiceProvider);
-      if (await syncService.hasInternetConnection()) {
-        try {
-          await syncService.supabase
-              .from('medical_records')
-              .delete()
-              .eq('id', recordId);
-        } catch (e) {
-          print('Error deleting from Supabase: $e');
-        }
-      }
+      await ref.read(medicalRecordRepositoryProvider).delete(recordId);
 
       if (selectedPetId != null) {
-        ref.invalidate(petMedicalRecordsOfflineProvider(selectedPetId!));
+        ref.invalidate(petMedicalRecordsProvider(selectedPetId!));
       }
 
       if (mounted) {
@@ -513,12 +497,15 @@ class _MedicalRecordsScreenState extends ConsumerState<MedicalRecordsScreen> {
 
   void _showAddRecordDialog() {
     if (selectedPetId == null) return;
+    final user = ref.read(currentUserProvider);
+    if (user == null) return;
 
     showDialog(
       context: context,
       builder:
           (context) => _MedicalRecordFormDialog(
             petId: selectedPetId!,
+            ownerId: user.uid,
             onSave: (record) async {
               await _saveRecord(record);
             },
@@ -532,6 +519,7 @@ class _MedicalRecordsScreenState extends ConsumerState<MedicalRecordsScreen> {
       builder:
           (context) => _MedicalRecordFormDialog(
             petId: record.petId,
+            ownerId: record.ownerId,
             existingRecord: record,
             onSave: (updatedRecord) async {
               await _updateRecord(updatedRecord);
@@ -549,14 +537,10 @@ class _MedicalRecordsScreenState extends ConsumerState<MedicalRecordsScreen> {
 
   Future<void> _saveRecord(MedicalRecord record) async {
     try {
-      final medicalRecordDB = ref.read(medicalRecordLocalDBProvider);
-      await medicalRecordDB.createMedicalRecord(record);
-
-      final syncService = ref.read(unifiedSyncServiceProvider);
-      await syncService.syncMedicalRecordsToSupabase();
+      await ref.read(medicalRecordRepositoryProvider).add(record);
 
       if (selectedPetId != null) {
-        ref.invalidate(petMedicalRecordsOfflineProvider(selectedPetId!));
+        ref.invalidate(petMedicalRecordsProvider(selectedPetId!));
       }
 
       if (mounted) {
@@ -578,17 +562,14 @@ class _MedicalRecordsScreenState extends ConsumerState<MedicalRecordsScreen> {
 
   Future<void> _updateRecord(MedicalRecord record) async {
     try {
-      final medicalRecordDB = ref.read(medicalRecordLocalDBProvider);
-
-      // Delete old and create new (since there's no update method in your DB)
-      await medicalRecordDB.deleteRecord(record.id);
-      await medicalRecordDB.createMedicalRecord(record);
-
-      final syncService = ref.read(unifiedSyncServiceProvider);
-      await syncService.syncMedicalRecordsToSupabase();
+      // Firestore repository has a real update - no need for the old
+      // delete-and-recreate workaround.
+      await ref
+          .read(medicalRecordRepositoryProvider)
+          .set(record.id, record);
 
       if (selectedPetId != null) {
-        ref.invalidate(petMedicalRecordsOfflineProvider(selectedPetId!));
+        ref.invalidate(petMedicalRecordsProvider(selectedPetId!));
       }
 
       if (mounted) {
@@ -614,11 +595,13 @@ class _MedicalRecordsScreenState extends ConsumerState<MedicalRecordsScreen> {
 // ============================================
 class _MedicalRecordFormDialog extends StatefulWidget {
   final String petId;
+  final String ownerId;
   final MedicalRecord? existingRecord;
   final Function(MedicalRecord) onSave;
 
   const _MedicalRecordFormDialog({
     required this.petId,
+    required this.ownerId,
     this.existingRecord,
     required this.onSave,
   });
@@ -835,6 +818,7 @@ class _MedicalRecordFormDialogState extends State<_MedicalRecordFormDialog> {
     final record = MedicalRecord(
       id: widget.existingRecord?.id ?? '',
       petId: widget.petId,
+      ownerId: widget.ownerId,
       recordType: selectedRecordType,
       title: titleController.text,
       description:

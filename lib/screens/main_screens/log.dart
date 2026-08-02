@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:pet_care/models/activity_log.dart';
 
-import 'package:pet_care/providers/offline_providers.dart';
+import 'package:pet_care/providers/firestore_providers.dart';
 
 class LogScreen extends ConsumerStatefulWidget {
   const LogScreen({super.key});
@@ -152,7 +152,7 @@ class _LogScreenState extends ConsumerState<LogScreen>
 
   Widget _buildAllTab() {
     final theme = Theme.of(context);
-    final allLogsAsync = ref.watch(activityLogsOfflineProvider);
+    final allLogsAsync = ref.watch(activityLogsControllerProvider);
 
     return allLogsAsync.when(
       data: (allLogs) {
@@ -303,7 +303,7 @@ class _LogScreenState extends ConsumerState<LogScreen>
     final activityType = ActivityType.fromString(log.activityType);
 
     // Get pet name from pet ID
-    final petsAsync = ref.watch(petsOfflineProvider);
+    final petsAsync = ref.watch(petsControllerProvider);
     final petName =
         petsAsync.whenOrNull(
           data: (pets) {
@@ -409,7 +409,7 @@ class _LogScreenState extends ConsumerState<LogScreen>
   void _showAddLogDialog(BuildContext context) async {
     // Use .future to wait for pets to load
     try {
-      final pets = await ref.read(petsOfflineProvider.future);
+      final pets = await ref.read(petsControllerProvider.future);
 
       if (!mounted) return;
 
@@ -580,9 +580,13 @@ class _LogScreenState extends ConsumerState<LogScreen>
                         selectedActivityType!,
                       );
 
+                      final user = ref.read(currentUserProvider);
+                      if (user == null) return;
+
                       final log = ActivityLog(
                         id: '',
                         petId: selectedPetId!,
+                        ownerId: user.uid,
                         activityType: selectedActivityType!,
                         title: activityType.label,
                         details:
@@ -599,12 +603,11 @@ class _LogScreenState extends ConsumerState<LogScreen>
                                 ? amountController.text
                                 : null,
                         isHealthRelated: isHealthRelated,
-                        lastModified: DateTime.now(),
                         createdAt: DateTime.now(),
                       );
 
                       await ref
-                          .read(activityLogsOfflineProvider.notifier)
+                          .read(activityLogsControllerProvider.notifier)
                           .addLog(log);
 
                       if (context.mounted) {
