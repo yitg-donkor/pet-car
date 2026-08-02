@@ -6,7 +6,7 @@ class FirebaseAIService {
   late final GenerativeModel _model;
 
   FirebaseAIService() {
-    _model = FirebaseAI.googleAI().generativeModel(model: 'gemini-2.5-flash');
+    _model = FirebaseAI.googleAI().generativeModel(model: 'gemini-3.5-flash');
   }
 
   Future<String> generateText(String prompt) async {

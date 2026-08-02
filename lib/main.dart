@@ -21,6 +21,7 @@ import 'providers/auth_providers.dart';
 import 'package:rive/rive.dart' as rive;
 import 'screens/main_screens/homescreen.dart';
 import 'screens/onboarding_screens/loginscreen.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
 
 // Global theme mode - will be set before app runs
 AppThemeMode _initialThemeMode = AppThemeMode.system;
@@ -44,6 +45,9 @@ Future<void> main() async {
   // offline once initialized, and Firebase Auth persists the signed-in
   // session locally, so there's no "offline mode" branch needed here.
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await FirebaseAppCheck.instance.activate(
+    webProvider: ReCaptchaV3Provider('recaptcha-v3-site-key'),
+  );
 
   // Enable Firestore's on-device persistence explicitly (on by default for
   // mobile, but being explicit avoids surprises and lets you tune cache size).
