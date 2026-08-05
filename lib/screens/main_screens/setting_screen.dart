@@ -210,73 +210,65 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final userProfileAsync = ref.watch(userProfileProviderProvider);
     final connectivityAsync = ref.watch(connectivityStatusProvider);
     final authStateAsync = ref.watch(authStateProvider);
+    final isOnline = connectivityAsync.maybeWhen(
+      data: (value) => value,
+      orElse: () => true,
+    );
+    _isOffline = !isOnline;
 
-    return connectivityAsync.when(
-      data: (isOnline) {
-        _isOffline = !isOnline;
-
-        return userProfileAsync.when(
-          data: (userProfile) {
-            if (userProfile == null) {
-              return authStateAsync.when(
-                data: (authState) {
-                  final userId = ref.read(currentUserProvider)?.uid;
-                  if (userId != null) {
-                    return FutureBuilder<UserProfile?>(
-                      future: _loadProfileFromOfflineDB(userId),
-                      builder: (context, snapshot) {
-                        if (snapshot.hasData && snapshot.data != null) {
-                          final offlineProfile = snapshot.data!;
-                          if (_currentProfile == null) {
-                            _initializeSettingsFromProfile(offlineProfile);
-                            _notificationService.setPreferences(
-                              offlineProfile.notificationPreferences,
-                            );
-                          }
-                          return _buildMainSettings(
-                            context,
-                            theme,
-                            offlineProfile,
-                          );
-                        } else if (snapshot.connectionState ==
-                            ConnectionState.waiting) {
-                          return _buildLoadingScaffold(context, theme);
-                        }
-                        return _buildErrorScaffold(
-                          context,
-                          theme,
-                          'Could not load offline profile',
+    return userProfileAsync.when(
+      data: (userProfile) {
+        if (userProfile == null) {
+          return authStateAsync.when(
+            data: (authState) {
+              final userId = ref.read(currentUserProvider)?.uid;
+              if (userId != null) {
+                return FutureBuilder<UserProfile?>(
+                  future: _loadProfileFromOfflineDB(userId),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasData && snapshot.data != null) {
+                      final offlineProfile = snapshot.data!;
+                      if (_currentProfile == null) {
+                        _initializeSettingsFromProfile(offlineProfile);
+                        _notificationService.setPreferences(
+                          offlineProfile.notificationPreferences,
                         );
-                      },
+                      }
+                      return _buildMainSettings(context, theme, offlineProfile);
+                    } else if (snapshot.connectionState ==
+                        ConnectionState.waiting) {
+                      return _buildLoadingScaffold(context, theme);
+                    }
+                    return _buildErrorScaffold(
+                      context,
+                      theme,
+                      'Could not load offline profile',
                     );
-                  }
-                  return _buildErrorScaffold(context, theme, 'No user session');
-                },
-                loading: () => _buildLoadingScaffold(context, theme),
-                error:
-                    (e, st) =>
-                        _buildErrorScaffold(context, theme, 'Auth error: $e'),
-              );
-            }
+                  },
+                );
+              }
+              return _buildErrorScaffold(context, theme, 'No user session');
+            },
+            loading: () => _buildLoadingScaffold(context, theme),
+            error:
+                (e, st) =>
+                    _buildErrorScaffold(context, theme, 'Auth error: $e'),
+          );
+        }
 
-            if (_currentProfile == null) {
-              _initializeSettingsFromProfile(userProfile);
-              _notificationService.setPreferences(
-                userProfile.notificationPreferences,
-              );
-            }
+        if (_currentProfile == null) {
+          _initializeSettingsFromProfile(userProfile);
+          _notificationService.setPreferences(
+            userProfile.notificationPreferences,
+          );
+        }
 
-            return _buildMainSettings(context, theme, userProfile);
-          },
-          loading: () => _buildLoadingScaffold(context, theme),
-          error:
-              (error, stack) =>
-                  _buildErrorScaffold(context, theme, 'Error: $error'),
-        );
+        return _buildMainSettings(context, theme, userProfile);
       },
       loading: () => _buildLoadingScaffold(context, theme),
       error:
-          (e, st) => _buildErrorScaffold(context, theme, 'Connectivity error'),
+          (error, stack) =>
+              _buildErrorScaffold(context, theme, 'Error: $error'),
     );
   }
 

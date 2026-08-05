@@ -7,10 +7,23 @@ import 'package:shared_preferences/shared_preferences.dart';
 // CONNECTIVITY / OFFLINE MODE PROVIDERS
 // ============================================
 
+bool isConnectivityOnline(dynamic value) {
+  if (value is List) {
+    return value.isNotEmpty && !value.contains(ConnectivityResult.none);
+  }
+
+  return value != ConnectivityResult.none;
+}
+
 /// True when the device has a network connection.
-final connectivityStatusProvider = StreamProvider<bool>((ref) {
-  return Connectivity().onConnectivityChanged.map(
-    (results) => !results.contains(ConnectivityResult.none),
+final connectivityStatusProvider = StreamProvider<bool>((ref) async* {
+  final connectivity = Connectivity();
+
+  final initialResult = await connectivity.checkConnectivity();
+  yield isConnectivityOnline(initialResult);
+
+  yield* connectivity.onConnectivityChanged.map(
+    (result) => isConnectivityOnline(result),
   );
 });
 
