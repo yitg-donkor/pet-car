@@ -1,1 +1,29 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"pet-care07","appId":"1:314690286571:android:ac5d2fd5335491db889fae","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"pet-care07","configurations":{"android":"1:314690286571:android:ac5d2fd5335491db889fae","ios":"1:314690286571:ios:8c8537468c847a64889fae","web":"1:314690286571:web:a76179859b40d355889fae"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "pet-care07",
+          "appId": "1:314690286571:android:ac5d2fd5335491db889fae",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "pet-care07",
+          "configurations": {
+            "android": "1:314690286571:android:ac5d2fd5335491db889fae",
+            "ios": "1:314690286571:ios:8c8537468c847a64889fae",
+            "web": "1:314690286571:web:a76179859b40d355889fae"
+          }
+        }
+      }
+    }
+  },
+  "firestore": {
+    "database": "(default)",
+    "location": "nam5",
+    "rules": "firebase.rules",
+    "indexes": "firestore.indexes.json"
+  }
+}

@@ -922,7 +922,7 @@ class _HomescreenState extends ConsumerState<Homescreen> {
                 icon: Icons.pets,
                 label: 'Add Pet',
                 color: theme.colorScheme.primary,
-                onTap: () => Navigator.pushNamed(context, '/add-pet'),
+                onTap: () => Navigator.pushNamed(context, '/pet_selection'),
               ),
             ),
           ],

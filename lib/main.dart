@@ -7,7 +7,6 @@ import 'package:pet_care/screens/pet_selection_screens/pet_info.dart';
 import 'package:pet_care/screens/main_screens/setting_screen.dart';
 import 'package:pet_care/screens/onboarding_screens/introduction.dart';
 import 'package:pet_care/screens/onboarding_screens/onboarding_flow_screen.dart';
-import 'package:pet_care/screens/onboarding_screens/profile_onboarding.dart';
 import 'package:pet_care/screens/pet_selection_screens/add_pet.dart';
 import 'package:pet_care/screens/pet_selection_screens/editpetscreen.dart';
 import 'package:pet_care/screens/pet_selection_screens/pet_selection.dart';
@@ -98,7 +97,6 @@ class MyApp extends ConsumerWidget {
         '/signup': (context) => const Signupscreen(),
         '/nada': (context) => const Homescreen(),
         '/introduction': (context) => const IntroductionScreen(),
-        '/profile': (context) => const ProfileCreationScreen(),
         '/pet_selection': (context) => const PetSpeciesSelectionScreen(),
         '/onboarding': (context) => const OnboardingFlowScreen(),
         '/home': (context) => const MainNavigation(initialIndex: 0),

@@ -1032,6 +1032,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           },
         ),
         _buildSwitchCard(
+          icon: Icons.alarm,
+          title: 'Reminder Notifications',
+          subtitle: 'Get notified when reminders are due',
+          value: _reminderNotifications,
+          onChanged: (value) {
+            setState(() => _reminderNotifications = value);
+            _debouncedSave();
+          },
+          indent: true,
+        ),
+        _buildSwitchCard(
+          icon: Icons.health_and_safety,
+          title: 'Health Alerts',
+          subtitle: 'Get notified about important health updates',
+          value: _healthAlerts,
+          onChanged: (value) {
+            setState(() => _healthAlerts = value);
+            _debouncedSave();
+          },
+          indent: true,
+        ),
+        _buildSwitchCard(
           icon: Icons.volume_up,
           title: 'Sound',
           subtitle: 'Play sound for notifications',
@@ -1053,6 +1075,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             _debouncedSave();
           },
           indent: true,
+        ),
+        _buildSwitchCard(
+          icon: Icons.mail_outline,
+          title: 'Marketing Emails',
+          subtitle: 'Occasional product news and tips',
+          value: _marketingEmails,
+          onChanged: (value) {
+            setState(() => _marketingEmails = value);
+            _debouncedSave();
+          },
         ),
         _buildSettingCard(
           icon: Icons.send,
@@ -1098,32 +1130,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
-  }
-
-  Widget _buildtestNotificationsSection(UserProfile userProfile) {
-    return Column(
-      children: [
-        const SizedBox(height: 24),
-        _buildSectionHeader('Notifications & Reminders'),
-        _buildSwitchCard(
-          icon: Icons.notifications,
-          title: 'All Notifications',
-          subtitle: 'Turn on/off all notifications',
-          value: _notificationsEnabled,
-          onChanged: (value) {
-            setState(() => _notificationsEnabled = value);
-            _debouncedSave();
-          },
-        ),
-        // ADD TEST NOTIFICATION BUTTON HERE
-        _buildSettingCard(
-          icon: Icons.send,
-          title: 'Send Test Notification',
-          subtitle: 'Test if notifications are working',
-          onTap: () => _sendTestNotification(),
-        ),
-      ],
-    );
   }
 
   // Add this method to your _SettingsScreenState class

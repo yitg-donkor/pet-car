@@ -1,0 +1,31 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // avatars/{uid}/{filename} - only the owning user can write; reads are
+    // public since avatar URLs get displayed to other users (e.g. in shared
+    // views). Tighten `allow read` if avatars should stay private.
+    match /avatars/{userId}/{fileName} {
+      allow read: if true;
+      allow write: if request.auth != null
+                   && request.auth.uid == userId
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+    }
+
+    // pet-photos/{filename} - any signed-in user can write (filenames are
+    // prefixed with petId, and pet-level access is already enforced by the
+    // Firestore rules on the `pets` collection). Reads are public.
+    match /pet-photos/{fileName} {
+      allow read: if true;
+      allow write: if request.auth != null
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
