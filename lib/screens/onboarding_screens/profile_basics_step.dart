@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pet_care/providers/auth_providers.dart';
@@ -152,39 +151,12 @@ class _ProfileBasicsStepState extends ConsumerState<ProfileBasicsStep> {
   }
 
   Future<void> _checkUsernameAvailability(String username) async {
-    if (username.length < 3) return;
-
-    setState(() {
-      _isCheckingUsername = true;
-      _usernameError = null;
-    });
-
-    try {
-      final snapshot =
-          await FirebaseFirestore.instance
-              .collection('users')
-              .where('username', isEqualTo: username.toLowerCase())
-              .limit(1)
-              .get();
-
-      if (mounted) {
-        setState(() {
-          _isCheckingUsername = false;
-          if (snapshot.docs.isNotEmpty) {
-            _usernameError = 'Username is already taken';
-          } else {
-            _usernameError = null;
-          }
-        });
-      }
-    } catch (error) {
-      if (mounted) {
-        setState(() {
-          _isCheckingUsername = false;
-          _usernameError = 'Could not verify username availability';
-        });
-      }
-    }
+    // Username uniqueness isn't enforced. Checking it would require querying
+    // across all users' documents, which the security rules intentionally
+    // don't allow (each user can only read their own profile doc) - and
+    // username isn't used anywhere as a public/lookup handle in this app,
+    // so there's nothing that actually depends on it being unique.
+    return;
   }
 
   String? _validateUsername(String? value) {

@@ -110,8 +110,13 @@ class MyApp extends ConsumerWidget {
   }
 }
 
-/// Routes based on Firebase Auth state. Firestore reads/writes work offline
-/// regardless of this state - this only decides which *screen* to show.
+/// Routes based on Firebase Auth state AND whether a Firestore profile
+/// actually exists. Auth session alone isn't enough - a user can be signed
+/// in (their Firebase Auth account exists) while never having finished
+/// onboarding (their `users/{uid}` profile document doesn't exist yet, or
+/// they got stuck partway through). Sending those users to Home instead of
+/// back into onboarding was the root cause of profiles getting silently
+/// skipped.
 class AuthWrapper extends ConsumerWidget {
   const AuthWrapper({super.key});
 
@@ -122,60 +127,82 @@ class AuthWrapper extends ConsumerWidget {
 
     return authStateAsync.when(
       data: (user) {
-        if (user != null) {
-          return const MainNavigation(initialIndex: 0);
+        if (user == null) {
+          return hasSeenOnboarding
+              ? const LoginScreen()
+              : const IntroductionScreen();
         }
-        return hasSeenOnboarding
-            ? const LoginScreen()
-            : const IntroductionScreen();
+
+        // Signed in - now check whether onboarding actually completed.
+        final profileAsync = ref.watch(currentUserProfileProvider);
+        return profileAsync.when(
+          data: (profile) {
+            if (profile == null) {
+              // Authenticated but no profile doc yet (or onboarding never
+              // finished) - send them back into onboarding instead of Home.
+              return const OnboardingFlowScreen();
+            }
+            return const MainNavigation(initialIndex: 0);
+          },
+          loading:
+              () => const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              ),
+          error: (error, stack) => _buildErrorScreen(context, ref, error),
+        );
       },
       loading:
           () =>
               const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (error, stack) {
-        final isNetworkError =
-            error.toString().contains('SocketException') ||
-            error.toString().contains('network');
+      error: (error, stack) => _buildErrorScreen(context, ref, error),
+    );
+  }
 
-        return Scaffold(
-          body: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    isNetworkError ? Icons.wifi_off : Icons.error_outline,
-                    color: Colors.red,
-                    size: 60,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    isNetworkError
-                        ? 'No Internet Connection'
-                        : 'Something went wrong',
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    isNetworkError
-                        ? 'Please check your internet connection and try again'
-                        : error.toString(),
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 24),
-                  ElevatedButton.icon(
-                    onPressed: () => ref.invalidate(authStateProvider),
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Retry'),
-                  ),
-                ],
+  Widget _buildErrorScreen(BuildContext context, WidgetRef ref, Object error) {
+    final isNetworkError =
+        error.toString().contains('SocketException') ||
+        error.toString().contains('network');
+
+    return Scaffold(
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                isNetworkError ? Icons.wifi_off : Icons.error_outline,
+                color: Colors.red,
+                size: 60,
               ),
-            ),
+              const SizedBox(height: 16),
+              Text(
+                isNetworkError
+                    ? 'No Internet Connection'
+                    : 'Something went wrong',
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                isNetworkError
+                    ? 'Please check your internet connection and try again'
+                    : error.toString(),
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: () {
+                  ref.invalidate(authStateProvider);
+                  ref.invalidate(currentUserProfileProvider);
+                },
+                icon: const Icon(Icons.refresh),
+                label: const Text('Retry'),
+              ),
+            ],
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }

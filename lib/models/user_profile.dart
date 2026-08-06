@@ -64,8 +64,8 @@ class UserProfile {
   factory UserProfile.fromFirestore(Map<String, dynamic> data, String id) {
     return UserProfile(
       id: id,
-      fullName: data['fullName'] as String,
-      username: data['username'] as String,
+      fullName: (data['fullName'] as String?) ?? '',
+      username: (data['username'] as String?) ?? '',
       bio: data['bio'] as String?,
       phoneNumber: data['phoneNumber'] as String?,
       phoneVerified: data['phoneVerified'] as bool? ?? false,
