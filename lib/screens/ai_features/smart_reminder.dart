@@ -40,12 +40,23 @@ class _SmartRemindersScreenState extends ConsumerState<SmartRemindersScreen> {
     });
 
     try {
+      final user = ref.read(currentUserProvider);
+      if (user == null) return;
+
       final medicalRecords = await ref
           .read(medicalRecordRepositoryProvider)
-          .fetch((q) => q.where('petId', isEqualTo: widget.pet.id));
+          .fetch(
+            (q) => q
+                .where('petId', isEqualTo: widget.pet.id)
+                .where('ownerId', isEqualTo: user.uid),
+          );
       final petReminders = await ref
           .read(reminderRepositoryProvider)
-          .fetch((q) => q.where('petId', isEqualTo: widget.pet.id));
+          .fetch(
+            (q) => q
+                .where('petId', isEqualTo: widget.pet.id)
+                .where('ownerId', isEqualTo: user.uid),
+          );
 
       final prompt = _buildPromptFromData(medicalRecords, petReminders);
 

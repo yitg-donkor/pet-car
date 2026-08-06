@@ -65,21 +65,28 @@ class _MonthlyReportScreenState extends ConsumerState<MonthlyReportScreen> {
         59,
       );
 
+      final user = ref.read(currentUserProvider);
+      if (user == null) return;
+
       // Fetch real data from Firestore
       final allMedicalRecords = await ref
           .read(medicalRecordRepositoryProvider)
-          .fetch((q) => q.where('petId', isEqualTo: widget.pet.id));
+          .fetch(
+            (q) => q
+                .where('petId', isEqualTo: widget.pet.id)
+                .where('ownerId', isEqualTo: user.uid),
+          );
       final allActivityLogs = await ref
           .read(activityLogRepositoryProvider)
-          .fetch((q) => q.where('petId', isEqualTo: widget.pet.id));
+          .fetch(
+            (q) => q
+                .where('petId', isEqualTo: widget.pet.id)
+                .where('ownerId', isEqualTo: user.uid),
+          );
 
-      final user = ref.read(currentUserProvider);
-      final allReminders =
-          user == null
-              ? <Reminder>[]
-              : await ref
-                  .read(reminderRepositoryProvider)
-                  .fetch((q) => q.where('ownerId', isEqualTo: user.uid));
+      final allReminders = await ref
+          .read(reminderRepositoryProvider)
+          .fetch((q) => q.where('ownerId', isEqualTo: user.uid));
 
       // Filter for selected month
       final medicalRecords =

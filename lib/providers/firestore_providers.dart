@@ -105,9 +105,15 @@ class PetsController extends _$PetsController {
 class PetMedicalRecords extends _$PetMedicalRecords {
   @override
   Stream<List<MedicalRecord>> build(String petId) {
+    final user = ref.watch(currentUserProvider);
+    if (user == null) return Stream.value([]);
+
     final repo = ref.watch(medicalRecordRepositoryProvider);
     return repo.watch(
-      (q) => q.where('petId', isEqualTo: petId).orderBy('date', descending: true),
+      (q) => q
+          .where('petId', isEqualTo: petId)
+          .where('ownerId', isEqualTo: user.uid)
+          .orderBy('date', descending: true),
     );
   }
 

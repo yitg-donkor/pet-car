@@ -1,0 +1,125 @@
+diff --git a/lib/providers/firestore_providers.dart b/lib/providers/firestore_providers.dart
+index af4e899..2ab3668 100644
+--- a/lib/providers/firestore_providers.dart
++++ b/lib/providers/firestore_providers.dart
+@@ -105,9 +105,15 @@ class PetsController extends _$PetsController {
+ class PetMedicalRecords extends _$PetMedicalRecords {
+   @override
+   Stream<List<MedicalRecord>> build(String petId) {
++    final user = ref.watch(currentUserProvider);
++    if (user == null) return Stream.value([]);
++
+     final repo = ref.watch(medicalRecordRepositoryProvider);
+     return repo.watch(
+-      (q) => q.where('petId', isEqualTo: petId).orderBy('date', descending: true),
++      (q) => q
++          .where('petId', isEqualTo: petId)
++          .where('ownerId', isEqualTo: user.uid)
++          .orderBy('date', descending: true),
+     );
+   }
+ 
+diff --git a/lib/screens/ai_features/health_insights.dart b/lib/screens/ai_features/health_insights.dart
+index c078c5c..beeb76a 100644
+--- a/lib/screens/ai_features/health_insights.dart
++++ b/lib/screens/ai_features/health_insights.dart
+@@ -42,13 +42,24 @@ class _HealthInsightsScreenState extends ConsumerState<HealthInsightsScreen> {
+     });
+ 
+     try {
++      final user = ref.read(currentUserProvider);
++      if (user == null) return;
++
+       // Fetch real data from Firestore
+       final medicalRecords = await ref
+           .read(medicalRecordRepositoryProvider)
+-          .fetch((q) => q.where('petId', isEqualTo: widget.petId));
++          .fetch(
++            (q) => q
++                .where('petId', isEqualTo: widget.petId)
++                .where('ownerId', isEqualTo: user.uid),
++          );
+       final activityLogs = await ref
+           .read(activityLogRepositoryProvider)
+-          .fetch((q) => q.where('petId', isEqualTo: widget.petId));
++          .fetch(
++            (q) => q
++                .where('petId', isEqualTo: widget.petId)
++                .where('ownerId', isEqualTo: user.uid),
++          );
+ 
+       // Check if we have any data at all
+       if (medicalRecords.isEmpty && activityLogs.isEmpty) {
+diff --git a/lib/screens/ai_features/monthly_report_screen.dart b/lib/screens/ai_features/monthly_report_screen.dart
+index 635f0e8..af2f91e 100644
+--- a/lib/screens/ai_features/monthly_report_screen.dart
++++ b/lib/screens/ai_features/monthly_report_screen.dart
+@@ -65,21 +65,28 @@ class _MonthlyReportScreenState extends ConsumerState<MonthlyReportScreen> {
+         59,
+       );
+ 
++      final user = ref.read(currentUserProvider);
++      if (user == null) return;
++
+       // Fetch real data from Firestore
+       final allMedicalRecords = await ref
+           .read(medicalRecordRepositoryProvider)
+-          .fetch((q) => q.where('petId', isEqualTo: widget.pet.id));
++          .fetch(
++            (q) => q
++                .where('petId', isEqualTo: widget.pet.id)
++                .where('ownerId', isEqualTo: user.uid),
++          );
+       final allActivityLogs = await ref
+           .read(activityLogRepositoryProvider)
+-          .fetch((q) => q.where('petId', isEqualTo: widget.pet.id));
+-
+-      final user = ref.read(currentUserProvider);
+-      final allReminders =
+-          user == null
+-              ? <Reminder>[]
+-              : await ref
+-                  .read(reminderRepositoryProvider)
+-                  .fetch((q) => q.where('ownerId', isEqualTo: user.uid));
++          .fetch(
++            (q) => q
++                .where('petId', isEqualTo: widget.pet.id)
++                .where('ownerId', isEqualTo: user.uid),
++          );
++
++      final allReminders = await ref
++          .read(reminderRepositoryProvider)
++          .fetch((q) => q.where('ownerId', isEqualTo: user.uid));
+ 
+       // Filter for selected month
+       final medicalRecords =
+diff --git a/lib/screens/ai_features/smart_reminder.dart b/lib/screens/ai_features/smart_reminder.dart
+index 29e4c22..e3ea95f 100644
+--- a/lib/screens/ai_features/smart_reminder.dart
++++ b/lib/screens/ai_features/smart_reminder.dart
+@@ -40,12 +40,23 @@ class _SmartRemindersScreenState extends ConsumerState<SmartRemindersScreen> {
+     });
+ 
+     try {
++      final user = ref.read(currentUserProvider);
++      if (user == null) return;
++
+       final medicalRecords = await ref
+           .read(medicalRecordRepositoryProvider)
+-          .fetch((q) => q.where('petId', isEqualTo: widget.pet.id));
++          .fetch(
++            (q) => q
++                .where('petId', isEqualTo: widget.pet.id)
++                .where('ownerId', isEqualTo: user.uid),
++          );
+       final petReminders = await ref
+           .read(reminderRepositoryProvider)
+-          .fetch((q) => q.where('petId', isEqualTo: widget.pet.id));
++          .fetch(
++            (q) => q
++                .where('petId', isEqualTo: widget.pet.id)
++                .where('ownerId', isEqualTo: user.uid),
++          );
+ 
+       final prompt = _buildPromptFromData(medicalRecords, petReminders);
+ 

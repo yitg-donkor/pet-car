@@ -42,13 +42,24 @@ class _HealthInsightsScreenState extends ConsumerState<HealthInsightsScreen> {
     });
 
     try {
+      final user = ref.read(currentUserProvider);
+      if (user == null) return;
+
       // Fetch real data from Firestore
       final medicalRecords = await ref
           .read(medicalRecordRepositoryProvider)
-          .fetch((q) => q.where('petId', isEqualTo: widget.petId));
+          .fetch(
+            (q) => q
+                .where('petId', isEqualTo: widget.petId)
+                .where('ownerId', isEqualTo: user.uid),
+          );
       final activityLogs = await ref
           .read(activityLogRepositoryProvider)
-          .fetch((q) => q.where('petId', isEqualTo: widget.petId));
+          .fetch(
+            (q) => q
+                .where('petId', isEqualTo: widget.petId)
+                .where('ownerId', isEqualTo: user.uid),
+          );
 
       // Check if we have any data at all
       if (medicalRecords.isEmpty && activityLogs.isEmpty) {
