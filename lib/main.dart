@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pet_care/firebase_options.dart';
@@ -45,8 +46,11 @@ Future<void> main() async {
   // session locally, so there's no "offline mode" branch needed here.
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await FirebaseAppCheck.instance.activate(
-    webProvider: ReCaptchaV3Provider('recaptcha-v3-site-key'),
-  );
+  webProvider: ReCaptchaV3Provider('6LfW63ktAAAAAKJ6qaQXdo4GGlBulZp2N019Deb3'),
+  androidProvider:
+      kDebugMode ? AndroidProvider.debug : AndroidProvider.playIntegrity,
+  appleProvider: kDebugMode ? AppleProvider.debug : AppleProvider.appAttest,
+);
 
   // Enable Firestore's on-device persistence explicitly (on by default for
   // mobile, but being explicit avoids surprises and lets you tune cache size).
