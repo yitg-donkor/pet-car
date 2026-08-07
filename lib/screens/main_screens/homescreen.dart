@@ -210,10 +210,7 @@ class _HomescreenState extends ConsumerState<Homescreen> {
     final todayRemindersAsync = ref.watch(todayRemindersProvider);
     final currentUser = ref.watch(currentUserProvider);
 
-    ref.listen<AsyncValue<List<Pet>>>(petsControllerProvider, (
-      previous,
-      next,
-    ) {
+    ref.listen<AsyncValue<List<Pet>>>(petsControllerProvider, (previous, next) {
       next.whenOrNull(
         error: (error, stack) {
           debugPrint('Error loading pets: $error');
@@ -251,33 +248,30 @@ class _HomescreenState extends ConsumerState<Homescreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // petsAsync.when(
+                          //   data:
+                          //       (pets) => _buildQuickStats(
+                          //         theme,
+                          //         pets,
+                          //         todayRemindersAsync,
+                          //       ),
+                          //   loading: () => const SizedBox.shrink(),
+                          //   error: (_, __) => const SizedBox.shrink(),
+                          // ),
+                         
+                          
+
+                         
+                          _buildSectionHeader(theme, 'My Pets', Icons.pets),
+                          const SizedBox(height: 15),
                           petsAsync.when(
-                            data:
-                                (pets) => _buildQuickStats(
+                            data: (pets) => _buildPetsSection(theme, pets),
+                            loading: () => _buildLoadingShimmer(theme),
+                            error:
+                                (error, _) => _buildErrorState(
                                   theme,
-                                  pets,
-                                  todayRemindersAsync,
+                                  'Failed to load pets',
                                 ),
-                            loading: () => const SizedBox.shrink(),
-                            error: (_, __) => const SizedBox.shrink(),
-                          ),
-                          const SizedBox(height: 25),
-                          Center(
-                            child: StrokeText(
-                              text: 'Paws-itively Planned!',
-                              textStyle: TextStyle(
-                                fontSize: 32,
-                                fontWeight: FontWeight.w800,
-                                color: Color(0xFFFFF4E6), // Brown fill
-                                fontFamily:
-                                    GoogleFonts.comicNeue()
-                                        .fontFamily, // Rounded playful font
-                              ),
-                              strokeColor: Color(
-                                0xFF8B6B47,
-                              ), // Light cream outline
-                              strokeWidth: 6.0,
-                            ),
                           ),
                           const SizedBox(height: 15),
                           todayRemindersAsync.when(
@@ -292,17 +286,7 @@ class _HomescreenState extends ConsumerState<Homescreen> {
                                 ),
                           ),
                           const SizedBox(height: 30),
-                          _buildSectionHeader(theme, 'Your Pets', Icons.pets),
-                          const SizedBox(height: 15),
-                          petsAsync.when(
-                            data: (pets) => _buildPetsSection(theme, pets),
-                            loading: () => _buildLoadingShimmer(theme),
-                            error:
-                                (error, _) => _buildErrorState(
-                                  theme,
-                                  'Failed to load pets',
-                                ),
-                          ),
+                          
                           const SizedBox(height: 30),
                           _buildQuickActions(theme),
                           const SizedBox(height: 20),
@@ -814,7 +798,7 @@ class _HomescreenState extends ConsumerState<Homescreen> {
     }
 
     return SizedBox(
-      height: 140,
+      height:MediaQuery.of(context).size.height * 0.3,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         itemCount: pets.length,
@@ -833,69 +817,65 @@ class _HomescreenState extends ConsumerState<Homescreen> {
         Navigator.pushNamed(context, '/pet-details', arguments: pet);
       },
       child: Container(
-        width: 120,
-        margin: const EdgeInsets.only(right: 12),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 70,
-              height: 70,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: theme.colorScheme.primary.withOpacity(0.5),
-                  width: 2,
-                ),
-              ),
-              child: ClipOval(
-                child:
-                    pet.photoUrl != null && pet.photoUrl!.isNotEmpty
-                        ? Image.network(
-                          pet.photoUrl!,
-                          fit: BoxFit.cover,
-                          errorBuilder:
-                              (_, __, ___) => Icon(
-                                Icons.pets,
-                                size: 40,
-                                color: theme.colorScheme.primary,
-                              ),
-                        )
-                        : Icon(
-                          Icons.pets,
-                          size: 40,
-                          color: theme.colorScheme.primary,
-                        ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Text(
-                pet.name,
-                style: theme.textTheme.labelLarge,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(pet.species, style: theme.textTheme.bodySmall),
-          ],
-        ),
+  width: MediaQuery.of(context).size.width * 0.4,
+  margin: const EdgeInsets.only(right: 12),
+  decoration: BoxDecoration(
+    color: Colors.white,
+    borderRadius: BorderRadius.circular(20),
+    boxShadow: [
+      BoxShadow(
+        color: Colors.grey.withOpacity(0.1),
+        blurRadius: 10,
+        offset: const Offset(0, 4),
       ),
-    );
+    ],
+  ),
+  clipBehavior: Clip.antiAlias, // clips the image to rounded corners
+  child: Column(
+    children: [
+      SizedBox(
+        height: 140,
+        width: double.infinity,
+        child: pet.photoUrl != null && pet.photoUrl!.isNotEmpty
+            ? Image.network(
+                pet.photoUrl!,
+                fit: BoxFit.cover,
+              )
+            : Image.asset(
+                'assets/images/log.png',
+                fit: BoxFit.cover,
+              ),
+      ),
+
+      const SizedBox(height: 7),
+
+      Text(
+        pet.name,
+        style: theme.textTheme.labelLarge,
+      ),
+
+      Text(
+        pet.species,
+        style: theme.textTheme.bodySmall,
+      ),
+      Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.cake, size: 16, color: theme.colorScheme.primary),
+          const SizedBox(width: 4),
+          Text(
+            pet.birthday != null
+                ? DateFormat('MMM d, yyyy').format(pet.birthday!)
+                : 'Unknown',
+            style: theme.textTheme.bodySmall,
+          ),
+        ],
+      ),
+    ],
+  ),
+),
+      );
+    
   }
 
   Widget _buildQuickActions(ThemeData theme) {
