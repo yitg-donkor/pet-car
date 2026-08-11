@@ -242,6 +242,30 @@ final healthActivityLogsProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef HealthActivityLogsRef = AutoDisposeFutureProviderRef<List<ActivityLog>>;
+String _$weeklyStatsHash() => r'fd9f3cef03b204a9f1c2e019a9d2765d6eda8d03';
+
+/// Walks and vet visits come from logged activity (activityType is a real
+/// field on ActivityLog). Meds given/scheduled come from reminders whose
+/// title matches medication-ish keywords, since Reminder has no dedicated
+/// category field - reminderType is recurrence (daily/weekly/monthly), not
+/// category, so keyword matching on the title is the only signal available
+/// today. AI checks has no tracking yet (nothing currently logs when an AI
+/// feature is used), so it's a placeholder until that's instrumented.
+///
+/// Copied from [weeklyStats].
+@ProviderFor(weeklyStats)
+final weeklyStatsProvider = AutoDisposeFutureProvider<WeeklyStats>.internal(
+  weeklyStats,
+  name: r'weeklyStatsProvider',
+  debugGetCreateSourceHash:
+      const bool.fromEnvironment('dart.vm.product') ? null : _$weeklyStatsHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef WeeklyStatsRef = AutoDisposeFutureProviderRef<WeeklyStats>;
 String _$petsControllerHash() => r'cd9f5d00c2831f35fbe81f2e17e8e667024b6167';
 
 /// See also [PetsController].
@@ -259,7 +283,7 @@ final petsControllerProvider =
     );
 
 typedef _$PetsController = AutoDisposeStreamNotifier<List<Pet>>;
-String _$petMedicalRecordsHash() => r'5846014288b6980d1d36a0e4a32792c8a58ad872';
+String _$petMedicalRecordsHash() => r'b4aa239c6cc13504088bb8753ff7d877f25dc722';
 
 /// Copied from Dart SDK
 class _SystemHash {

@@ -10,6 +10,7 @@
 // here is just a thin `watch(...)` on a FirestoreRepository query.
 export 'auth_providers.dart';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../models/activity_log.dart';
@@ -294,4 +295,100 @@ class SelectedPet extends _$SelectedPet {
 
   void selectPet(Pet pet) => state = pet;
   void clearSelection() => state = null;
+}
+
+/// Which bottom-nav tab is currently showing. Lives here (not as local
+/// State in MainNavigation) so other screens - e.g. Home's "See all" link -
+/// can switch tabs without reaching into MainNavigation's private state.
+final currentTabIndexProvider = StateProvider<int>((ref) => 0);
+
+// ============================================
+// WEEKLY STATS (Home screen "This Week" summary)
+// ============================================
+
+class WeeklyStats {
+  final int walks;
+  final int medsGiven;
+  final int medsScheduled;
+  final int vetVisits;
+  final int aiChecks;
+
+  const WeeklyStats({
+    required this.walks,
+    required this.medsGiven,
+    required this.medsScheduled,
+    required this.vetVisits,
+    required this.aiChecks,
+  });
+}
+
+/// Walks and vet visits come from logged activity (activityType is a real
+/// field on ActivityLog). Meds given/scheduled come from reminders whose
+/// title matches medication-ish keywords, since Reminder has no dedicated
+/// category field - reminderType is recurrence (daily/weekly/monthly), not
+/// category, so keyword matching on the title is the only signal available
+/// today. AI checks has no tracking yet (nothing currently logs when an AI
+/// feature is used), so it's a placeholder until that's instrumented.
+@riverpod
+Future<WeeklyStats> weeklyStats(WeeklyStatsRef ref) async {
+  final user = ref.watch(currentUserProvider);
+  if (user == null) {
+    return const WeeklyStats(
+      walks: 0,
+      medsGiven: 0,
+      medsScheduled: 0,
+      vetVisits: 0,
+      aiChecks: 0,
+    );
+  }
+
+  final now = DateTime.now();
+  final weekStart = DateTime(
+    now.year,
+    now.month,
+    now.day,
+  ).subtract(Duration(days: now.weekday - 1));
+
+  final logs = await ref
+      .watch(activityLogRepositoryProvider)
+      .fetch(
+        (q) => q
+            .where('ownerId', isEqualTo: user.uid)
+            .where('timestamp', isGreaterThanOrEqualTo: weekStart),
+      );
+
+  final reminders = await ref
+      .watch(reminderRepositoryProvider)
+      .fetch((q) => q.where('ownerId', isEqualTo: user.uid));
+
+  final walks = logs.where((l) => l.activityType == 'walk').length;
+  final vetVisits = logs.where((l) => l.activityType == 'vet').length;
+
+  bool looksLikeMedication(String title) {
+    final t = title.toLowerCase();
+    return t.contains('tablet') ||
+        t.contains('med') ||
+        t.contains('pill') ||
+        t.contains('dose') ||
+        t.contains('heartworm') ||
+        t.contains('vaccine') ||
+        t.contains('vaccination');
+  }
+
+  final medsThisWeek = reminders.where(
+    (r) =>
+        looksLikeMedication(r.title) &&
+        !r.reminderDate.isBefore(weekStart) &&
+        r.reminderDate.isBefore(weekStart.add(const Duration(days: 7))),
+  );
+  final medsScheduled = medsThisWeek.length;
+  final medsGiven = medsThisWeek.where((r) => r.isCompleted).length;
+
+  return WeeklyStats(
+    walks: walks,
+    medsGiven: medsGiven,
+    medsScheduled: medsScheduled,
+    vetVisits: vetVisits,
+    aiChecks: 0, // TODO: instrument AI feature usage to populate this
+  );
 }

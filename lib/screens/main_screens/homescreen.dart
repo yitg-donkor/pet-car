@@ -1,989 +1,868 @@
+// screens/main_screens/homescreen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_svg/svg.dart';
+import 'package:intl/intl.dart';
 import 'package:pet_care/models/pet.dart';
 import 'package:pet_care/models/reminder.dart';
-import 'package:pet_care/providers/auth_providers.dart';
 import 'package:pet_care/providers/firestore_providers.dart';
-import 'package:pet_care/widgets/widgets.dart';
 import 'package:pet_care/screens/ai_features/ai_navigation_screen.dart';
 import 'package:pet_care/screens/main_screens/log.dart';
 import 'package:pet_care/screens/main_screens/reminders.dart';
 import 'package:pet_care/screens/main_screens/resources.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:pet_care/screens/pet_selection_screens/add_pet.dart';
+import 'package:pet_care/theme/redesign_tokens.dart';
 
-import 'package:pet_care/services/notification_service.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:intl/intl.dart';
+// ============================================
+// MAIN NAVIGATION SHELL
+// ============================================
 
 class MainNavigation extends ConsumerStatefulWidget {
-  const MainNavigation({super.key, required int initialIndex});
+  const MainNavigation({super.key, required this.initialIndex});
+
+  final int initialIndex;
 
   @override
   ConsumerState<MainNavigation> createState() => _MainNavigationState();
 }
 
 class _MainNavigationState extends ConsumerState<MainNavigation> {
-  int _currentIndex = 0;
-
-  final List<Widget> _screens = [
-    const Homescreen(),
-    const AIDashboardScreen(userId: ''),
-    const RemindersScreen(),
-    const LogScreen(),
-    const ResourcesScreen(),
+  static const _screens = [
+    Homescreen(),
+    AIDashboardScreen(),
+    RemindersScreen(),
+    LogScreen(),
+    ResourcesScreen(),
   ];
 
-  void _onTabTapped(int index) {
-    setState(() {
-      _currentIndex = index;
+  static const _navItems = [
+    (icon: Icons.home_rounded, label: 'Home'),
+    (icon: Icons.auto_awesome_rounded, label: 'AI'),
+    (icon: Icons.favorite_rounded, label: 'Care'),
+    (icon: Icons.edit_note_rounded, label: 'Log'),
+    (icon: Icons.info_rounded, label: 'Info'),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(currentTabIndexProvider.notifier).state = widget.initialIndex;
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final currentIndex = ref.watch(currentTabIndexProvider);
     return Scaffold(
-      body: _screens[_currentIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: _onTabTapped,
-        items: [
-          BottomNavigationBarItem(icon: const Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.auto_awesome),
-            label: 'AI',
-          ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.notifications),
-            label: 'Reminders',
-          ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.edit_note),
-            label: 'Log',
-          ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.library_books),
-            label: 'Resources',
+      backgroundColor: RedesignColors.background,
+      body: IndexedStack(index: currentIndex, children: _screens),
+      bottomNavigationBar: _buildNavBar(currentIndex),
+    );
+  }
+
+  Widget _buildNavBar(int currentIndex) {
+    return Container(
+      decoration: BoxDecoration(
+        color: RedesignColors.surface,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, -2),
           ),
         ],
+      ),
+      child: SafeArea(
+        child: SizedBox(
+          height: 60,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: List.generate(_navItems.length, (index) {
+              final item = _navItems[index];
+              final selected = index == currentIndex;
+              final color =
+                  selected ? RedesignColors.accent : RedesignColors.textMuted;
+
+              return Expanded(
+                child: InkWell(
+                  onTap: () =>
+                      ref.read(currentTabIndexProvider.notifier).state = index,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(item.icon, color: color, size: 24),
+                      const SizedBox(height: 2),
+                      Text(
+                        item.label,
+                        style: TextStyle(
+                          color: color,
+                          fontSize: 11,
+                          fontWeight:
+                              selected ? FontWeight.w600 : FontWeight.w400,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Container(
+                        width: 4,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color:
+                              selected ? RedesignColors.accent : Colors.transparent,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+          ),
+        ),
       ),
     );
   }
 }
 
-// 8. CLOUD PUFFS - Rounded bumpy waves
+// ============================================
+// HOME SCREEN
+// ============================================
 
-class StrokeText extends StatelessWidget {
-  final String text;
-  final TextStyle textStyle;
-  final Color strokeColor;
-  final double strokeWidth;
-
-  const StrokeText({
-    super.key,
-    required this.text,
-    required this.textStyle,
-    this.strokeColor = Colors.white,
-    this.strokeWidth = 4.0,
-  });
+class Homescreen extends ConsumerWidget {
+  const Homescreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        // Stroke (outline) layer
-        Text(
-          text,
-          style: textStyle.copyWith(
-            foreground:
-                Paint()
-                  ..style = PaintingStyle.stroke
-                  ..strokeWidth = strokeWidth
-                  ..color = strokeColor,
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Scaffold(
+      backgroundColor: RedesignColors.background,
+      body: SafeArea(
+        child: RefreshIndicator(
+          color: RedesignColors.accent,
+          onRefresh: () async {
+            ref.invalidate(petsControllerProvider);
+            ref.invalidate(todayRemindersProvider);
+            ref.invalidate(weeklyStatsProvider);
+          },
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(
+              RedesignSpacing.md,
+              RedesignSpacing.md,
+              RedesignSpacing.md,
+              RedesignSpacing.xl,
+            ),
+            children: const [
+              _HomeHeader(),
+              SizedBox(height: RedesignSpacing.lg),
+              _MyPetsSection(),
+              SizedBox(height: RedesignSpacing.lg),
+              _TodaysCareSection(),
+              SizedBox(height: RedesignSpacing.lg),
+              _ThisWeekSection(),
+            ],
           ),
         ),
-        // Fill layer
-        Text(text, style: textStyle),
+      ),
+    );
+  }
+}
+
+// ---------- Header ----------
+
+class _HomeHeader extends ConsumerWidget {
+  const _HomeHeader();
+
+  String _greeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final profileAsync = ref.watch(currentUserProfileProvider);
+    final dateLabel = DateFormat('EEEE, MMM d').format(DateTime.now());
+
+    final firstName = profileAsync.maybeWhen(
+      data: (profile) {
+        final name = profile?.fullName.trim() ?? '';
+        return name.isEmpty ? 'there' : name.split(' ').first;
+      },
+      orElse: () => '',
+    );
+
+    final initial = firstName.isNotEmpty ? firstName[0].toUpperCase() : '?';
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                dateLabel,
+                style: const TextStyle(
+                  color: RedesignColors.textSecondary,
+                  fontSize: 13,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(text: '${_greeting()}, $firstName '),
+                    const TextSpan(text: '\u{1F44B}'),
+                  ],
+                ),
+                style: const TextStyle(
+                  color: RedesignColors.textPrimary,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+        CircleAvatar(
+          radius: 22,
+          backgroundColor: RedesignColors.accent,
+          child: Text(
+            initial,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 18,
+            ),
+          ),
+        ),
       ],
     );
   }
 }
 
-class CloudPuffsClipper extends CustomClipper<Path> {
+// ---------- My Pets ----------
+
+class _MyPetsSection extends ConsumerWidget {
+  const _MyPetsSection();
+
   @override
-  Path getClip(Size size) {
-    Path path = Path();
-    path.lineTo(0, size.height * 0.65);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final petsAsync = ref.watch(petsControllerProvider);
+    final todayRemindersAsync = ref.watch(todayRemindersProvider);
 
-    // Puffy cloud 1
-    path.quadraticBezierTo(
-      size.width * 0.1,
-      size.height * 0.55,
-      size.width * 0.2,
-      size.height * 0.65,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'MY PETS',
+              style: TextStyle(
+                color: RedesignColors.textSecondary,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.6,
+              ),
+            ),
+            TextButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const AddPet(species: 'dog')),
+              ),
+              icon: const Icon(Icons.add, size: 16, color: RedesignColors.accent),
+              label: const Text(
+                'Add',
+                style: TextStyle(
+                  color: RedesignColors.accent,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.zero,
+                minimumSize: const Size(0, 0),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: RedesignSpacing.sm),
+        petsAsync.when(
+          data: (pets) {
+            if (pets.isEmpty) return const _NoPetsCard();
+            final reminders = todayRemindersAsync.valueOrNull ?? [];
+            return SizedBox(
+              height: 168,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: pets.length,
+                separatorBuilder: (_, __) =>
+                    const SizedBox(width: RedesignSpacing.sm),
+                itemBuilder: (context, i) =>
+                    _PetCard(pet: pets[i], todaysReminders: reminders),
+              ),
+            );
+          },
+          loading: () => const SizedBox(
+            height: 168,
+            child: Center(child: CircularProgressIndicator()),
+          ),
+          error: (e, _) => SizedBox(
+            height: 60,
+            child: Center(child: Text('Could not load pets: $e')),
+          ),
+        ),
+      ],
     );
-
-    // Puffy cloud 2
-    path.quadraticBezierTo(
-      size.width * 0.3,
-      size.height * 0.6,
-      size.width * 0.4,
-      size.height * 0.7,
-    );
-
-    // Puffy cloud 3
-    path.quadraticBezierTo(
-      size.width * 0.5,
-      size.height * 0.75,
-      size.width * 0.6,
-      size.height * 0.68,
-    );
-
-    // Puffy cloud 4
-    path.quadraticBezierTo(
-      size.width * 0.75,
-      size.height * 0.62,
-      size.width * 0.85,
-      size.height * 0.7,
-    );
-
-    path.quadraticBezierTo(
-      size.width * 0.92,
-      size.height * 0.75,
-      size.width,
-      size.height * 0.72,
-    );
-
-    path.lineTo(size.width, 0);
-    path.close();
-    return path;
   }
-
-  @override
-  bool shouldReclip(CustomClipper<Path> oldClipper) => false;
 }
 
-class PetDashboardBackground extends StatelessWidget {
-  const PetDashboardBackground({super.key});
+class _NoPetsCard extends StatelessWidget {
+  const _NoPetsCard();
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return ClipPath(
-      clipper: CloudPuffsClipper(),
+    return InkWell(
+      borderRadius: BorderRadius.circular(RedesignSpacing.cardRadius),
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const AddPet(species: 'dog')),
+      ),
       child: Container(
-        height: 400,
-        decoration: BoxDecoration(color: theme.colorScheme.primary),
+        padding: const EdgeInsets.all(RedesignSpacing.lg),
+        decoration: BoxDecoration(
+          color: RedesignColors.surface,
+          borderRadius: BorderRadius.circular(RedesignSpacing.cardRadius),
+          border: Border.all(
+            color: RedesignColors.border,
+            style: BorderStyle.solid,
+          ),
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.pets, color: RedesignColors.accent, size: 28),
+            SizedBox(width: RedesignSpacing.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Add Your First Pet',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: RedesignColors.textPrimary,
+                    ),
+                  ),
+                  Text(
+                    'Tap to get started',
+                    style: TextStyle(
+                      color: RedesignColors.textSecondary,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-class Homescreen extends ConsumerStatefulWidget {
-  const Homescreen({super.key});
+class _PetCard extends StatelessWidget {
+  const _PetCard({required this.pet, required this.todaysReminders});
 
-  @override
-  ConsumerState<Homescreen> createState() => _HomescreenState();
-}
+  final Pet pet;
+  final List<Reminder> todaysReminders;
 
-class _HomescreenState extends ConsumerState<Homescreen> {
-  @override
-  void initState() {
-    super.initState();
-    _initializeNotifications();
-  }
-
-  Future<void> _initializeNotifications() async {
-    final notificationService = NotificationService();
-    await notificationService.initialize();
-    final userProfile = await ref.read(userProfileProviderProvider.future);
-    if (userProfile != null) {
-      notificationService.setPreferences(userProfile.notificationPreferences);
+  String get _ageLabel {
+    if (pet.age != null) return '${pet.age} yrs';
+    if (pet.birthDate != null) {
+      final years = DateTime.now().difference(pet.birthDate!).inDays ~/ 365;
+      return '$years yrs';
     }
+    return '';
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final petsAsync = ref.watch(petsControllerProvider);
-    final todayRemindersAsync = ref.watch(todayRemindersProvider);
-    final currentUser = ref.watch(currentUserProvider);
+    final petReminders =
+        todaysReminders.where((r) => r.petId == pet.id).toList();
+    final hasDue = petReminders.any(
+      (r) => !r.isCompleted && r.reminderDate.isBefore(DateTime.now()),
+    );
+    final hasAny = petReminders.isNotEmpty;
+    final statusLabel = hasDue ? 'Due' : (hasAny ? 'Fed' : 'All good');
+    final statusColor = hasDue ? RedesignColors.due : RedesignColors.success;
+    final statusBg = hasDue ? RedesignColors.dueSoft : RedesignColors.successSoft;
 
-    ref.listen<AsyncValue<List<Pet>>>(petsControllerProvider, (previous, next) {
-      next.whenOrNull(
-        error: (error, stack) {
-          debugPrint('Error loading pets: $error');
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error loading pets: $error'),
-              backgroundColor: theme.colorScheme.error,
-            ),
-          );
-        },
-      );
-    });
-
-    return Scaffold(
-      body: Stack(
-        children: [
-          // Background - placed first so it's behind everything
-          const PetDashboardBackground(),
-
-          // Main content - placed on top of background
-          SafeArea(
-            child: Column(
-              children: [
-                _buildHeader(theme, petsAsync, currentUser),
-                Expanded(
-                  child: RefreshIndicator(
-                    onRefresh: () async {
-                      // Streams are already live; this just forces a fresh
-                      // listener attach for the pull-to-refresh affordance.
-                      ref.invalidate(petsControllerProvider);
-                      ref.invalidate(todayRemindersProvider);
-                    },
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // petsAsync.when(
-                          //   data:
-                          //       (pets) => _buildQuickStats(
-                          //         theme,
-                          //         pets,
-                          //         todayRemindersAsync,
-                          //       ),
-                          //   loading: () => const SizedBox.shrink(),
-                          //   error: (_, __) => const SizedBox.shrink(),
-                          // ),
-                         
-                          
-
-                         
-                          _buildSectionHeader(theme, 'My Pets', Icons.pets),
-                          const SizedBox(height: 15),
-                          petsAsync.when(
-                            data: (pets) => _buildPetsSection(theme, pets),
-                            loading: () => _buildLoadingShimmer(theme),
-                            error:
-                                (error, _) => _buildErrorState(
-                                  theme,
-                                  'Failed to load pets',
-                                ),
-                          ),
-                          const SizedBox(height: 15),
-                          todayRemindersAsync.when(
-                            data:
-                                (reminders) =>
-                                    _buildRemindersSection(theme, reminders),
-                            loading: () => _buildLoadingShimmer(theme),
-                            error:
-                                (error, _) => _buildErrorState(
-                                  theme,
-                                  'Failed to load reminders',
-                                ),
-                          ),
-                          const SizedBox(height: 30),
-                          
-                          const SizedBox(height: 30),
-                          _buildQuickActions(theme),
-                          const SizedBox(height: 20),
-                          universalButton(
-                            context,
-                            ref,
-                            label: "hit me",
-                            onpressed: () {},
-                          ),
-                        ],
+    return InkWell(
+      borderRadius: BorderRadius.circular(RedesignSpacing.cardRadius),
+      onTap: () => Navigator.of(context).pushNamed('/pet-details', arguments: pet),
+      child: Container(
+        width: 150,
+        decoration: BoxDecoration(
+          color: RedesignColors.surface,
+          borderRadius: BorderRadius.circular(RedesignSpacing.cardRadius),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              height: 80,
+              width: double.infinity,
+              child: pet.photoUrl != null
+                  ? Image.network(pet.photoUrl!, fit: BoxFit.cover)
+                  : Container(
+                      color: RedesignColors.accentSoft,
+                      child: const Icon(
+                        Icons.pets,
+                        color: RedesignColors.accent,
+                        size: 32,
                       ),
+                    ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(RedesignSpacing.sm),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    pet.name,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: RedesignColors.textPrimary,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    [pet.breed ?? pet.species, _ageLabel]
+                        .where((s) => s.isNotEmpty)
+                        .join(' \u00b7 '),
+                    style: const TextStyle(
+                      color: RedesignColors.textSecondary,
+                      fontSize: 11,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: statusBg,
+                      borderRadius:
+                          BorderRadius.circular(RedesignSpacing.pillRadius),
+                    ),
+                    child: Text(
+                      statusLabel,
+                      style: TextStyle(
+                        color: statusColor,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------- Today's Care ----------
+
+class _TodaysCareSection extends ConsumerWidget {
+  const _TodaysCareSection();
+
+  IconData _iconFor(String title) {
+    final t = title.toLowerCase();
+    if (t.contains('walk')) return Icons.directions_walk;
+    if (t.contains('feed') || t.contains('meal')) return Icons.restaurant;
+    if (t.contains('tablet') || t.contains('med') || t.contains('pill')) {
+      return Icons.medication;
+    }
+    if (t.contains('vet') || t.contains('appointment')) {
+      return Icons.medical_services;
+    }
+    if (t.contains('groom')) return Icons.content_cut;
+    return Icons.pets;
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final remindersAsync = ref.watch(todayRemindersProvider);
+    final petsAsync = ref.watch(petsControllerProvider);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              "TODAY'S CARE",
+              style: TextStyle(
+                color: RedesignColors.textSecondary,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.6,
+              ),
+            ),
+            TextButton(
+              onPressed: () =>
+                  ref.read(currentTabIndexProvider.notifier).state = 2,
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.zero,
+                minimumSize: const Size(0, 0),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: const Text(
+                'See all',
+                style: TextStyle(
+                  color: RedesignColors.accent,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: RedesignSpacing.sm),
+        remindersAsync.when(
+          data: (reminders) {
+            if (reminders.isEmpty) {
+              return const _EmptyCareCard();
+            }
+            final sorted = [...reminders]
+              ..sort((a, b) => a.reminderDate.compareTo(b.reminderDate));
+            final completed = sorted.where((r) => r.isCompleted).length;
+            final total = sorted.length;
+            final progress = total == 0 ? 0.0 : completed / total;
+            final pets = petsAsync.valueOrNull ?? [];
+
+            String petNameFor(String petId) {
+              for (final p in pets) {
+                if (p.id == petId) return p.name;
+              }
+              return 'Pet';
+            }
+
+            return Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '$completed of $total complete',
+                      style: const TextStyle(
+                        color: RedesignColors.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                    Text(
+                      '${(progress * 100).round()}%',
+                      style: const TextStyle(
+                        color: RedesignColors.accent,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(RedesignSpacing.pillRadius),
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    minHeight: 6,
+                    backgroundColor: RedesignColors.border,
+                    valueColor: const AlwaysStoppedAnimation(
+                      RedesignColors.accent,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: RedesignSpacing.md),
+                ...sorted.map(
+                  (reminder) => Padding(
+                    padding: const EdgeInsets.only(bottom: RedesignSpacing.sm),
+                    child: _CareItemCard(
+                      reminder: reminder,
+                      petName: petNameFor(reminder.petId),
+                      icon: _iconFor(reminder.title),
+                      onToggle: () {
+                        if (reminder.id == null) return;
+                        ref
+                            .read(remindersControllerProvider.notifier)
+                            .completeReminder(reminder.id!, reminder);
+                      },
                     ),
                   ),
                 ),
               ],
+            );
+          },
+          loading: () => const Padding(
+            padding: EdgeInsets.symmetric(vertical: RedesignSpacing.lg),
+            child: Center(child: CircularProgressIndicator()),
+          ),
+          error: (e, _) => Text('Could not load reminders: $e'),
+        ),
+      ],
+    );
+  }
+}
+
+class _EmptyCareCard extends StatelessWidget {
+  const _EmptyCareCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(RedesignSpacing.lg),
+      decoration: BoxDecoration(
+        color: RedesignColors.surface,
+        borderRadius: BorderRadius.circular(RedesignSpacing.cardRadius),
+      ),
+      child: const Column(
+        children: [
+          Icon(Icons.check_circle_outline, color: RedesignColors.success, size: 32),
+          SizedBox(height: 8),
+          Text(
+            'No reminders for today!',
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              color: RedesignColors.textPrimary,
             ),
+          ),
+          Text(
+            'Enjoy your free time',
+            style: TextStyle(color: RedesignColors.textSecondary, fontSize: 13),
           ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildHeader(
-    ThemeData theme,
-    AsyncValue<List<Pet>> petsAsync,
-    User? currentUser,
-  ) {
+class _CareItemCard extends StatelessWidget {
+  const _CareItemCard({
+    required this.reminder,
+    required this.petName,
+    required this.icon,
+    required this.onToggle,
+  });
+
+  final Reminder reminder;
+  final String petName;
+  final IconData icon;
+  final VoidCallback onToggle;
+
+  bool get _isDue =>
+      !reminder.isCompleted && reminder.reminderDate.isBefore(DateTime.now());
+
+  @override
+  Widget build(BuildContext context) {
+    final timeLabel = DateFormat('h:mm a').format(reminder.reminderDate);
+    final bg = _isDue ? RedesignColors.dueSoft : RedesignColors.surface;
+
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(RedesignSpacing.sm + 4),
       decoration: BoxDecoration(
-        borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(30),
-          bottomRight: Radius.circular(30),
-        ),
+        color: bg,
+        borderRadius: BorderRadius.circular(16),
+        border: _isDue ? Border.all(color: RedesignColors.due, width: 1) : null,
       ),
       child: Row(
         children: [
-          petsAsync.when(
-            data: (pets) {
-              if (pets.isEmpty) {
-                return _buildDefaultAvatar(theme);
-              }
-              return _buildPetAvatar(pets[0].photoUrl);
-            },
-            loading: () => _buildDefaultAvatar(theme),
-            error: (_, __) => _buildDefaultAvatar(theme),
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: RedesignColors.surfaceMuted,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, size: 18, color: RedesignColors.textSecondary),
           ),
-          const SizedBox(width: 15),
+          const SizedBox(width: RedesignSpacing.sm),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _greetingCard(theme),
-                const SizedBox(height: 2),
                 Text(
-                  'Buddy!',
-                  style: theme.textTheme.headlineLarge?.copyWith(
-                    color: Color(0xFFFFFBF5),
+                  reminder.title,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: RedesignColors.textPrimary,
+                    decoration: reminder.isCompleted
+                        ? TextDecoration.lineThrough
+                        : null,
+                    decorationColor: RedesignColors.textMuted,
+                  ),
+                ),
+                Text(
+                  '$petName \u00b7 $timeLabel',
+                  style: const TextStyle(
+                    color: RedesignColors.textSecondary,
+                    fontSize: 12,
                   ),
                 ),
               ],
             ),
           ),
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: IconButton(
-              onPressed: () {
-                Navigator.pushNamed(context, '/settings');
-              },
-              icon: const Icon(Icons.auto_awesome, color: Colors.white),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPetAvatar(String? photoUrl) {
-    return Container(
-      width: 50,
-      height: 50,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(25),
-        border: Border.all(color: Colors.white, width: 2),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.2),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(23),
-        child:
-            photoUrl != null && photoUrl.isNotEmpty
-                ? Image.network(
-                  photoUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => _buildDefaultAvatarContent(),
-                )
-                : _buildDefaultAvatarContent(),
-      ),
-    );
-  }
-
-  Widget _buildDefaultAvatar(ThemeData theme) {
-    return Container(
-      width: 50,
-      height: 50,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(25),
-        color: Colors.white,
-        border: Border.all(color: Colors.white, width: 2),
-      ),
-      child: _buildDefaultAvatarContent(),
-    );
-  }
-
-  Widget _buildDefaultAvatarContent() {
-    return Icon(Icons.pets, color: Colors.blue.shade400, size: 28);
-  }
-
-  Widget _greetingCard(ThemeData theme) {
-    final hour = DateTime.now().hour;
-    String greeting;
-    if (hour < 12) {
-      greeting = 'Good Morning';
-    } else if (hour < 17) {
-      greeting = 'Good Afternoon';
-    } else {
-      greeting = 'Good Evening';
-    }
-    return Text(
-      greeting,
-      style: theme.textTheme.headlineLarge?.copyWith(color: Color(0xFFFFFBF5)),
-    );
-  }
-
-  Widget _buildQuickStats(
-    ThemeData theme,
-    List<Pet> pets,
-    AsyncValue<List<Reminder>> remindersAsync,
-  ) {
-    final completedCount = remindersAsync.when(
-      data: (reminders) => reminders.where((r) => r.isCompleted).length,
-      loading: () => 0,
-      error: (_, __) => 0,
-    );
-
-    final totalCount = remindersAsync.when(
-      data: (reminders) => reminders.length,
-      loading: () => 0,
-      error: (_, __) => 0,
-    );
-
-    return Row(
-      children: [
-        Expanded(
-          child: _buildStatCard(
-            theme: theme,
-            svgPath: 'assets/svgs/beige_cloud.svg',
-            // icon: Icons.pets,
-            icon: Icons.pets,
-            label: '${pets.length} Happy Paw',
-            color: theme.colorScheme.primary,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildStatCard(
-            theme: theme,
-            svgPath: 'assets/svgs/blue cloud.svg',
-            // icon: Icons.check_circle,
-            icon: Icons.check_circle,
-            label: '$completedCount Joyful Jumps',
-            color: Colors.green,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildStatCard(
-            theme: theme,
-            svgPath: 'assets/svgs/green cloud.svg',
-            // icon: Icons.pending_actions,
-            icon: Icons.pending_actions,
-
-            label: '${totalCount - completedCount} Paws-pitive Reminders',
-            color: Color(0xFFFAFAF0),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStatCard({
-    required ThemeData theme,
-    required String svgPath, // e.g. 'assets/cloud.svg'
-
-    required String label,
-    required Color color,
-    required IconData icon,
-  }) {
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        SvgPicture.asset(svgPath, width: 160, height: 120, fit: BoxFit.contain),
-        Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color, size: 32),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: GoogleFonts.comicNeue(
-                textStyle: theme.textTheme.bodySmall,
-                fontWeight: FontWeight.w700,
-                fontSize: 14,
-              ),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSectionHeader(ThemeData theme, String title, IconData icon) {
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.primaryContainer,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(icon, color: theme.colorScheme.primary, size: 20),
-        ),
-        const SizedBox(width: 10),
-        Text(title, style: theme.textTheme.headlineLarge),
-      ],
-    );
-  }
-
-  Widget _buildRemindersSection(ThemeData theme, List<Reminder> reminders) {
-    final activeReminders = reminders.where((r) => !r.isCompleted).toList();
-
-    if (activeReminders.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.all(40),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Column(
-          children: [
-            Icon(
-              Icons.check_circle_outline,
-              size: 60,
-              color: const Color(0xFF4CAF50),
-            ),
-            const SizedBox(height: 16),
-            Text('No reminders for today!', style: theme.textTheme.titleLarge),
-            const SizedBox(height: 8),
-            Text('Enjoy your free time', style: theme.textTheme.bodySmall),
-          ],
-        ),
-      );
-    }
-
-    final displayReminders = activeReminders.take(3);
-    final remainingCount = activeReminders.length - 3;
-
-    // return Column(
-    //   children: [
-    //     ...displayReminders.map(
-    //       (reminder) => _buildReminderCard(theme, reminder),
-    //     ),
-    //   ],
-    // );
-
-    return SizedBox(
-      height: 180,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: displayReminders.length,
-        itemBuilder: (context, index) {
-          final reminder = reminders[index];
-          return _buildReminderCard(theme, reminder);
-        },
-      ),
-    );
-  }
-
-  Widget _buildReminderCard(ThemeData theme, Reminder reminder) {
-    return GestureDetector(
-      onTap: () {},
-      child: Container(
-        width: 120,
-        margin: const EdgeInsets.only(right: 12),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
+          if (_isDue)
             Container(
-              width: 70,
-              height: 70,
+              margin: const EdgeInsets.only(right: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: RedesignColors.due,
+                borderRadius: BorderRadius.circular(RedesignSpacing.pillRadius),
+              ),
+              child: const Text(
+                'DUE',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          InkWell(
+            onTap: onToggle,
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              width: 26,
+              height: 26,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
+                color: reminder.isCompleted
+                    ? RedesignColors.success
+                    : Colors.transparent,
                 border: Border.all(
-                  color: theme.colorScheme.primary.withOpacity(0.5),
+                  color: reminder.isCompleted
+                      ? RedesignColors.success
+                      : (_isDue ? RedesignColors.due : RedesignColors.border),
                   width: 2,
                 ),
               ),
-              child: ClipOval(),
+              child: reminder.isCompleted
+                  ? const Icon(Icons.check, size: 16, color: Colors.white)
+                  : null,
             ),
-            const SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Text(
-                reminder.title,
-                style: theme.textTheme.labelLarge,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(DateFormat('h:mm a').format(reminder.reminderDate)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // Widget _buildReminderCard(ThemeData theme, Reminder reminder) {
-  //   final icon = _getIconForReminder(reminder.title);
-
-  //   return Container(
-  //     margin: const EdgeInsets.only(bottom: 12),
-  //     decoration: BoxDecoration(
-  //       color: theme.colorScheme.surface,
-
-  //       borderRadius: BorderRadius.circular(20),
-  //       boxShadow: [
-  //         BoxShadow(
-  //           color: theme.colorScheme.outline,
-  //           blurRadius: 8,
-  //           offset: const Offset(0, 4),
-  //         ),
-  //       ],
-  //     ),
-  //     child: Material(
-  //       color: Colors.transparent,
-  //       child: InkWell(
-  //         onTap: () => Navigator.pushNamed(context, '/reminders'),
-  //         borderRadius: BorderRadius.circular(20),
-  //         child: Padding(
-  //           padding: const EdgeInsets.all(16),
-  //           child: Row(
-  //             children: [
-  //               Container(
-  //                 padding: const EdgeInsets.all(10),
-  //                 decoration: BoxDecoration(
-  //                   borderRadius: BorderRadius.circular(12),
-  //                 ),
-  //                 child: Icon(
-  //                   icon,
-  //                   color: theme.colorScheme.onSurface,
-  //                   size: 24,
-  //                 ),
-  //               ),
-  //               const SizedBox(width: 15),
-  //               Expanded(
-  //                 child: Column(
-  //                   crossAxisAlignment: CrossAxisAlignment.start,
-  //                   children: [
-  //                     Text(
-  //                       reminder.title,
-  //                       // style: TextStyle(
-  //                       //   color: Colors.white,
-  //                       //   fontSize: 16,
-  //                       //   fontWeight: FontWeight.w600,
-  //                       //   decoration:
-  //                       //       reminder.isCompleted
-  //                       //           ? TextDecoration.lineThrough
-  //                       //           : null,
-  //                       // ),
-  //                       style: theme.textTheme.titleMedium?.copyWith(
-  //                         decoration:
-  //                             reminder.isCompleted
-  //                                 ? TextDecoration.lineThrough
-  //                                 : null,
-  //                       ),
-  //                     ),
-  //                     const SizedBox(height: 2),
-  //                     Text(
-  //                       DateFormat('h:mm a').format(reminder.reminderDate),
-  //
-  //                       style: theme.textTheme.bodyMedium,
-  //                     ),
-  //                   ],
-  //                 ),
-  //               ),
-  //               if (!reminder.isCompleted)
-  //                 GestureDetector(
-  //                   onTap: () async {
-  //                     final db = ref.read(reminderDatabaseProvider);
-  //                     await db.toggleCompletion(reminder.id!, true);
-  //                     ref.invalidate(todayRemindersProvider);
-
-  //                     ScaffoldMessenger.of(context).showSnackBar(
-  //                       const SnackBar(
-  //                         content: Text('Marked as complete!'),
-  //                         duration: Duration(seconds: 2),
-  //                       ),
-  //                     );
-  //                   },
-  //                   child: Container(
-  //                     padding: const EdgeInsets.symmetric(
-  //                       horizontal: 16,
-  //                       vertical: 8,
-  //                     ),
-  //                     decoration: BoxDecoration(
-  //                       color: theme.colorScheme.outline,
-  //                       borderRadius: BorderRadius.circular(20),
-  //                     ),
-  //                     child: Text(
-  //                       'Complete',
-  //                       // style: TextStyle(
-  //                       //   color: Colors.white,
-  //                       //   fontSize: 12,
-  //                       //   fontWeight: FontWeight.w600,
-  //                       // ),
-  //                       style: theme.textTheme.bodySmall,
-  //                     ),
-  //                   ),
-  //                 ),
-  //               if (reminder.isCompleted)
-  //                 const Icon(Icons.check_circle, color: Colors.white, size: 32),
-  //             ],
-  //           ),
-  //         ),
-  //       ),
-  //     ),
-  //   );
-  // }
-
-  IconData _getIconForReminder(String title) {
-    final titleLower = title.toLowerCase();
-    if (titleLower.contains('walk')) return Icons.pets;
-    if (titleLower.contains('feed') ||
-        titleLower.contains('food') ||
-        titleLower.contains('feeding')) {
-      return Icons.restaurant_outlined;
-    }
-    if (titleLower.contains('medication') || titleLower.contains('medicine')) {
-      return Icons.medication;
-    }
-    if (titleLower.contains('vet')) return Icons.local_hospital_outlined;
-    if (titleLower.contains('groom')) return Icons.content_cut_outlined;
-    if (titleLower.contains('clean')) return Icons.cleaning_services;
-    return Icons.notifications_outlined;
-  }
-
-  Widget _buildPetsSection(ThemeData theme, List<Pet> pets) {
-    if (pets.isEmpty) {
-      return GestureDetector(
-        onTap: () => Navigator.pushNamed(context, '/add-pet'),
-        child: Container(
-          padding: const EdgeInsets.all(30),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surface,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: theme.colorScheme.primary.withOpacity(0.5),
-              width: 2,
-            ),
-          ),
-          child: Column(
-            children: [
-              Icon(
-                Icons.add_circle_outline,
-                size: 60,
-                color: theme.colorScheme.primary,
-              ),
-              const SizedBox(height: 16),
-              Text('Add Your First Pet', style: theme.textTheme.titleLarge),
-              const SizedBox(height: 8),
-              Text('Tap to get started', style: theme.textTheme.bodySmall),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return SizedBox(
-      height:MediaQuery.of(context).size.height * 0.3,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: pets.length,
-        itemBuilder: (context, index) {
-          final pet = pets[index];
-          return _buildPetCard(theme, pet);
-        },
-      ),
-    );
-  }
-
-  Widget _buildPetCard(ThemeData theme, Pet pet) {
-    return GestureDetector(
-      onTap: () {
-        ref.read(selectedPetProvider.notifier).selectPet(pet);
-        Navigator.pushNamed(context, '/pet-details', arguments: pet);
-      },
-      child: Container(
-  width: MediaQuery.of(context).size.width * 0.4,
-  margin: const EdgeInsets.only(right: 12),
-  decoration: BoxDecoration(
-    color: Colors.white,
-    borderRadius: BorderRadius.circular(20),
-    boxShadow: [
-      BoxShadow(
-        color: Colors.grey.withOpacity(0.1),
-        blurRadius: 10,
-        offset: const Offset(0, 4),
-      ),
-    ],
-  ),
-  clipBehavior: Clip.antiAlias, // clips the image to rounded corners
-  child: Column(
-    children: [
-      SizedBox(
-        height: 140,
-        width: double.infinity,
-        child: pet.photoUrl != null && pet.photoUrl!.isNotEmpty
-            ? Image.network(
-                pet.photoUrl!,
-                fit: BoxFit.cover,
-              )
-            : Image.asset(
-                'assets/images/log.png',
-                fit: BoxFit.cover,
-              ),
-      ),
-
-      const SizedBox(height: 7),
-
-      Text(
-        pet.name,
-        style: theme.textTheme.labelLarge,
-      ),
-
-      Text(
-        pet.species,
-        style: theme.textTheme.bodySmall,
-      ),
-      Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.cake, size: 16, color: theme.colorScheme.primary),
-          const SizedBox(width: 4),
-          Text(
-            pet.birthday != null
-                ? DateFormat('MMM d, yyyy').format(pet.birthday!)
-                : 'Unknown',
-            style: theme.textTheme.bodySmall,
           ),
         ],
       ),
-    ],
-  ),
-),
-      );
-    
+    );
   }
+}
 
-  Widget _buildQuickActions(ThemeData theme) {
+// ---------- This Week ----------
+
+class _ThisWeekSection extends ConsumerWidget {
+  const _ThisWeekSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final statsAsync = ref.watch(weeklyStatsProvider);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionHeader(theme, 'Quick Actions', Icons.flash_on),
-        const SizedBox(height: 15),
-        Row(
-          children: [
-            Expanded(
-              child: _buildActionButton(
-                theme: theme,
-                icon: Icons.add,
-                label: 'Add Reminder',
-                color: theme.colorScheme.secondary,
-                onTap: () => Navigator.pushNamed(context, '/reminders'),
+        const Text(
+          'THIS WEEK',
+          style: TextStyle(
+            color: RedesignColors.textSecondary,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.6,
+          ),
+        ),
+        const SizedBox(height: RedesignSpacing.sm),
+        statsAsync.when(
+          data: (stats) => GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: RedesignSpacing.sm,
+            crossAxisSpacing: RedesignSpacing.sm,
+            childAspectRatio: 1.7,
+            children: [
+              _StatCard(
+                icon: Icons.directions_walk,
+                value: '${stats.walks}',
+                label: 'Walks',
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildActionButton(
-                theme: theme,
-                icon: Icons.pets,
-                label: 'Add Pet',
-                color: theme.colorScheme.primary,
-                onTap: () => Navigator.pushNamed(context, '/pet_selection'),
+              _StatCard(
+                icon: Icons.medication,
+                value: '${stats.medsGiven}/${stats.medsScheduled == 0 ? stats.medsGiven : stats.medsScheduled}',
+                label: 'Meds given',
               ),
-            ),
-          ],
+              _StatCard(
+                icon: Icons.medical_services,
+                value: '${stats.vetVisits}',
+                label: 'Vet visits',
+              ),
+              _StatCard(
+                icon: Icons.auto_awesome,
+                value: '${stats.aiChecks}',
+                label: 'AI checks',
+              ),
+            ],
+          ),
+          loading: () => const SizedBox(
+            height: 120,
+            child: Center(child: CircularProgressIndicator()),
+          ),
+          error: (e, _) => Text('Could not load stats: $e'),
         ),
       ],
     );
   }
+}
 
-  Widget _buildActionButton({
-    required ThemeData theme,
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 20),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [color, color.withOpacity(0.7)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: color.withOpacity(0.3),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: Colors.white, size: 32),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: theme.textTheme.labelLarge?.copyWith(color: Colors.white),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+class _StatCard extends StatelessWidget {
+  const _StatCard({
+    required this.icon,
+    required this.value,
+    required this.label,
+  });
 
-  Widget _buildLoadingShimmer(ThemeData theme) {
-    return Column(
-      children: List.generate(
-        2,
-        (index) => Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          height: 80,
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceVariant,
-            borderRadius: BorderRadius.circular(20),
-          ),
-        ),
-      ),
-    );
-  }
+  final IconData icon;
+  final String value;
+  final String label;
 
-  Widget _buildErrorState(ThemeData theme, String message) {
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(RedesignSpacing.sm + 4),
       decoration: BoxDecoration(
-        color: theme.colorScheme.errorContainer,
-        borderRadius: BorderRadius.circular(16),
+        color: RedesignColors.surface,
+        borderRadius: BorderRadius.circular(RedesignSpacing.cardRadius),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.error_outline, color: theme.colorScheme.error),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              message,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.error,
-              ),
+          Icon(icon, color: RedesignColors.accent, size: 22),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: RedesignColors.textPrimary,
+            ),
+          ),
+          Text(
+            label,
+            style: const TextStyle(
+              color: RedesignColors.textSecondary,
+              fontSize: 12,
             ),
           ),
         ],

@@ -1,5 +1,7 @@
+// screens/ai_features/ai_navigation_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pet_care/models/pet.dart';
 import 'package:pet_care/providers/firestore_providers.dart';
 import 'package:pet_care/screens/ai_features/aichatscreen.dart';
 import 'package:pet_care/screens/ai_features/feeding_schedulescren.dart';
@@ -11,248 +13,272 @@ import 'package:pet_care/screens/ai_features/premium_upgrade_screen.dart';
 import 'package:pet_care/screens/ai_features/smart_reminder.dart';
 import 'package:pet_care/screens/ai_features/symptons_checker.dart';
 import 'package:pet_care/screens/ai_features/training_tips.dart';
+import 'package:pet_care/theme/redesign_tokens.dart';
 
 // ============================================
 // AI DASHBOARD SCREEN
 // ============================================
 
-class AIDashboardScreen extends ConsumerStatefulWidget {
-  final String userId;
-  // Optional: pre-select a pet
-
-  const AIDashboardScreen({Key? key, required this.userId}) : super(key: key);
+class AIDashboardScreen extends ConsumerWidget {
+  const AIDashboardScreen({super.key});
 
   @override
-  ConsumerState<AIDashboardScreen> createState() => _AIDashboardScreenState();
+  Widget build(BuildContext context, WidgetRef ref) {
+    final petsAsync = ref.watch(petsControllerProvider);
+
+    return Scaffold(
+      backgroundColor: RedesignColors.background,
+      body: SafeArea(
+        child: petsAsync.when(
+          data: (pets) {
+            if (pets.isEmpty) return const _NoPetsForAI();
+
+            // Default to the first pet if nothing's selected yet.
+            final selected = ref.watch(selectedPetProvider) ?? pets.first;
+
+            return ListView(
+              padding: const EdgeInsets.fromLTRB(
+                RedesignSpacing.md,
+                RedesignSpacing.md,
+                RedesignSpacing.md,
+                RedesignSpacing.xl,
+              ),
+              children: [
+                const _AIHeader(),
+                const SizedBox(height: RedesignSpacing.md),
+                _PetSelectorRow(pets: pets, selected: selected),
+                const SizedBox(height: RedesignSpacing.md),
+                _AIVetChatCard(pet: selected),
+                const SizedBox(height: RedesignSpacing.lg),
+                const _SectionLabel('INCLUDED FREE'),
+                const SizedBox(height: RedesignSpacing.sm),
+                _FreeFeaturesGrid(pet: selected),
+                const SizedBox(height: RedesignSpacing.lg),
+                const _PremiumHeader(),
+                const SizedBox(height: RedesignSpacing.sm),
+                _PremiumFeaturesGrid(pet: selected),
+              ],
+            );
+          },
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => Center(child: Text('Could not load pets: $e')),
+        ),
+      ),
+    );
+  }
 }
 
-class _AIDashboardScreenState extends ConsumerState<AIDashboardScreen> {
-  bool isPremium =
-      true; // TODO: Set to false, check actual premium status later
+class _NoPetsForAI extends StatelessWidget {
+  const _NoPetsForAI();
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          // App Bar with gradient
-          SliverAppBar(
-            expandedHeight: 200,
-            floating: false,
-            pinned: true,
-            flexibleSpace: FlexibleSpaceBar(
-              title: Text(
-                'AI Assistant',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  shadows: [
-                    Shadow(
-                      offset: Offset(0, 1),
-                      blurRadius: 3.0,
-                      color: Colors.black26,
+    return const Center(
+      child: Padding(
+        padding: EdgeInsets.all(RedesignSpacing.lg),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.pets, size: 48, color: RedesignColors.accent),
+            SizedBox(height: RedesignSpacing.sm),
+            Text(
+              'Add a pet to unlock AI features',
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                color: RedesignColors.textPrimary,
+                fontSize: 16,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AIHeader extends StatelessWidget {
+  const _AIHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'POWERED BY AI',
+          style: TextStyle(
+            color: RedesignColors.textSecondary,
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.6,
+          ),
+        ),
+        SizedBox(height: 2),
+        Text(
+          'AI Assistant',
+          style: TextStyle(
+            color: RedesignColors.textPrimary,
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PetSelectorRow extends ConsumerWidget {
+  const _PetSelectorRow({required this.pets, required this.selected});
+
+  final List<Pet> pets;
+  final Pet selected;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return SizedBox(
+      height: 40,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: pets.length,
+        separatorBuilder: (_, __) => const SizedBox(width: RedesignSpacing.sm),
+        itemBuilder: (context, i) {
+          final pet = pets[i];
+          final isSelected = pet.id == selected.id;
+          return InkWell(
+            borderRadius: BorderRadius.circular(RedesignSpacing.pillRadius),
+            onTap: () =>
+                ref.read(selectedPetProvider.notifier).selectPet(pet),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: isSelected ? RedesignColors.accent : RedesignColors.surface,
+                borderRadius: BorderRadius.circular(RedesignSpacing.pillRadius),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircleAvatar(
+                    radius: 10,
+                    backgroundColor: isSelected
+                        ? Colors.white.withValues(alpha: 0.3)
+                        : RedesignColors.accentSoft,
+                    backgroundImage:
+                        pet.photoUrl != null ? NetworkImage(pet.photoUrl!) : null,
+                    child: pet.photoUrl == null
+                        ? Icon(
+                            Icons.pets,
+                            size: 12,
+                            color: isSelected
+                                ? Colors.white
+                                : RedesignColors.accent,
+                          )
+                        : null,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    pet.name,
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : RedesignColors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _AIVetChatCard extends StatelessWidget {
+  const _AIVetChatCard({required this.pet});
+
+  final Pet pet;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(RedesignSpacing.md),
+      decoration: BoxDecoration(
+        color: RedesignColors.chatCardDark,
+        borderRadius: BorderRadius.circular(RedesignSpacing.cardRadius),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: RedesignColors.accent,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.chat_bubble, color: Colors.white, size: 18),
+              ),
+              const SizedBox(width: RedesignSpacing.sm),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'AI Vet Chat',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    Text(
+                      'Ask any pet health question',
+                      style: TextStyle(color: Colors.white70, fontSize: 12),
                     ),
                   ],
                 ),
               ),
-              background: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Colors.purple.shade400,
-                      Colors.deepPurple.shade600,
-                      Colors.indigo.shade700,
-                    ],
-                  ),
-                ),
-                child: Center(
-                  child: Icon(
-                    Icons.auto_awesome,
-                    size: 80,
-                    color: Colors.white.withOpacity(0.3),
-                  ),
-                ),
+            ],
+          ),
+          const SizedBox(height: RedesignSpacing.md),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(RedesignSpacing.sm + 4),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Text(
+              '"Is it normal for ${pet.name} to eat grass sometimes?"',
+              style: const TextStyle(
+                color: Colors.white70,
+                fontStyle: FontStyle.italic,
+                fontSize: 13,
               ),
             ),
           ),
-
-          // Content
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Premium Badge (if applicable)
-                  if (isPremium)
-                    Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [Colors.amber, Colors.orange],
-                        ),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.star, size: 16, color: Colors.white),
-                          SizedBox(width: 4),
-                          Text(
-                            'Premium Active',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                  SizedBox(height: 24),
-
-                  // Section: Quick Actions
-                  _buildSectionTitle('Quick Actions'),
-                  SizedBox(height: 12),
-
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildQuickActionCard(
-                          icon: Icons.chat_bubble_outline,
-                          color: theme.iconTheme.color!,
-                          title: 'Chat',
-
-                          onTap: () => _navigateToAichat(context, ref),
-                        ),
-                      ),
-                      SizedBox(width: 12),
-                      Expanded(
-                        child: _buildQuickActionCard(
-                          icon: Icons.camera_alt_outlined,
-                          title: 'Scan Photo',
-                          color: theme.iconTheme.color!,
-                          onTap: () => _navigateToPhotoAnalysis(context),
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  SizedBox(height: 24),
-
-                  // Section: Health & Care
-                  _buildSectionTitle('Health & Care'),
-                  SizedBox(height: 12),
-
-                  _buildAIServiceCard(
-                    icon: Icons.local_hospital_outlined,
-                    title: 'Symptom Checker',
-                    description: 'Analyze your pet\'s symptoms',
-                    gradient: [
-                      const Color.fromARGB(150, 239, 83, 80),
-                      const Color.fromARGB(200, 236, 64, 121),
-                    ],
-                    onTap: () => _navigateToSymptomChecker(context, ref),
-                    isPremium: false,
-                  ),
-
-                  _buildAIServiceCard(
-                    icon: Icons.history,
-                    title: 'Medical History Analysis',
-                    description: 'AI summary of health records',
-                    gradient: [
-                      const Color.fromARGB(150, 170, 71, 188),
-                      const Color.fromARGB(200, 126, 87, 194),
-                    ],
-                    // onTap: () => _navigateToMedicalAnalysis(context),
-                    onTap: () => _navigateToMedicalAnalysis(context, ref),
-                    isPremium: false,
-                  ),
-
-                  _buildAIServiceCard(
-                    icon: Icons.calendar_today,
-                    title: 'Smart Reminders',
-                    description: 'AI-powered care scheduling',
-                    gradient: [
-                      const Color.fromARGB(150, 255, 168, 38),
-                      const Color.fromARGB(200, 255, 111, 67),
-                    ],
-                    onTap: () => _navigateToSmartReminders(context, ref),
-                    isPremium: true, // Premium feature
-                  ),
-
-                  SizedBox(height: 24),
-
-                  // Section: Nutrition & Training
-                  _buildSectionTitle('Nutrition & Training'),
-                  SizedBox(height: 12),
-
-                  _buildAIServiceCard(
-                    icon: Icons.restaurant_outlined,
-                    title: 'Feeding Schedule',
-                    description: 'Personalized meal plans',
-                    gradient: [
-                      const Color.fromARGB(150, 38, 166, 153),
-                      const Color.fromARGB(200, 38, 197, 218),
-                    ],
-                    onTap: () => _navigateToFeedingSchedule(context, ref),
-                    isPremium: false,
-                  ),
-
-                  _buildAIServiceCard(
-                    icon: Icons.school_outlined,
-                    title: 'Training Tips',
-                    description: 'Behavior guidance & training',
-                    gradient: [
-                      const Color.fromARGB(150, 92, 107, 192),
-                      const Color.fromARGB(200, 66, 164, 245),
-                    ],
-                    onTap: () => _navigateToTrainingTips(context, ref),
-                    isPremium: false,
-                  ),
-
-                  SizedBox(height: 24),
-
-                  // Section: Insights & Reports
-                  _buildSectionTitle('Insights & Reports'),
-                  SizedBox(height: 12),
-
-                  _buildAIServiceCard(
-                    icon: Icons.insights_outlined,
-                    title: 'Health Insights',
-                    description: 'AI-powered health trends',
-                    gradient: [
-                      const Color.fromARGB(150, 41, 181, 246),
-                      const Color.fromARGB(200, 30, 136, 229),
-                    ],
-                    onTap: () => _navigateToHealthInsights(context, ref),
-                    isPremium: true, // Premium feature
-                  ),
-
-                  _buildAIServiceCard(
-                    icon: Icons.assessment_outlined,
-                    title: 'Monthly Report',
-                    description: 'Comprehensive care summary',
-                    gradient: [
-                      const Color.fromARGB(150, 126, 87, 194),
-                      const Color.fromARGB(200, 141, 36, 170),
-                    ],
-                    onTap: () => _navigateToMonthlyReport(context, ref),
-                    isPremium: true, // Premium feature
-                  ),
-
-                  SizedBox(height: 24),
-
-                  // Premium Upsell Card (if not premium)
-                  if (!isPremium) _buildPremiumUpsellCard(context),
-
-                  SizedBox(height: 40),
-                ],
+          const SizedBox(height: RedesignSpacing.md),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => AIVetChatScreen(pet: pet)),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: RedesignColors.accent,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(RedesignSpacing.pillRadius),
+                ),
+                elevation: 0,
+              ),
+              child: const Text(
+                'Start a Conversation \u2192',
+                style: TextStyle(fontWeight: FontWeight.w700),
               ),
             ),
           ),
@@ -260,41 +286,171 @@ class _AIDashboardScreenState extends ConsumerState<AIDashboardScreen> {
       ),
     );
   }
+}
 
-  // ============================================
-  // UI COMPONENTS
-  // ============================================
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel(this.text);
 
-  Widget _buildSectionTitle(String title) {
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
     return Text(
-      title,
-      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+      text,
+      style: const TextStyle(
+        color: RedesignColors.textSecondary,
+        fontSize: 12,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 0.6,
+      ),
     );
   }
+}
 
-  Widget _buildQuickActionCard({
-    required IconData icon,
-    required String title,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withOpacity(0.3)),
+class _FreeFeaturesGrid extends StatelessWidget {
+  const _FreeFeaturesGrid({required this.pet});
+
+  final Pet pet;
+
+  @override
+  Widget build(BuildContext context) {
+    return GridView.count(
+      crossAxisCount: 2,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      mainAxisSpacing: RedesignSpacing.sm,
+      crossAxisSpacing: RedesignSpacing.sm,
+      childAspectRatio: 1.5,
+      children: [
+        _FeatureCard(
+          icon: Icons.camera_alt,
+          iconColor: RedesignColors.accent,
+          title: 'Scan Photo',
+          subtitle: 'Skin & eye analysis',
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => PhotoAnalysisScreen()),
+          ),
         ),
-        child: Column(
+        _FeatureCard(
+          icon: Icons.medical_information,
+          iconColor: RedesignColors.success,
+          title: 'Symptom Check',
+          subtitle: 'Quick triage',
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => SymptomCheckerScreen(pet: pet)),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PremiumHeader extends ConsumerWidget {
+  const _PremiumHeader();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        const Row(
           children: [
-            Icon(icon, size: 40, color: color),
-            SizedBox(height: 8),
+            Icon(Icons.diamond, size: 14, color: RedesignColors.premium),
+            SizedBox(width: 4),
             Text(
-              title,
-              style: TextStyle(fontWeight: FontWeight.bold, color: color),
+              'PREMIUM',
+              style: TextStyle(
+                color: RedesignColors.premium,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.6,
+              ),
+            ),
+          ],
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => PremiumUpgradeScreen()),
+          ),
+          style: TextButton.styleFrom(
+            backgroundColor: RedesignColors.premium,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(RedesignSpacing.pillRadius),
+            ),
+          ),
+          child: const Text(
+            'Upgrade',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PremiumFeaturesGrid extends StatelessWidget {
+  const _PremiumFeaturesGrid({required this.pet});
+
+  final Pet pet;
+
+  // TODO: no subscription/entitlement system exists yet (no premium field
+  // anywhere in UserProfile or elsewhere). Defaulting to false is the safe
+  // choice - the previous code hardcoded `true` with a TODO admitting it
+  // was a placeholder, which let every user through for free. Wire this to
+  // real entitlement data once billing exists.
+  static const bool _isPremiumUser = false;
+
+  void _handleTap(BuildContext context, Widget destination) {
+    if (_isPremiumUser) {
+      Navigator.of(context)
+          .push(MaterialPageRoute(builder: (_) => destination));
+      return;
+    }
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Padding(
+        padding: const EdgeInsets.all(RedesignSpacing.lg),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.diamond, color: RedesignColors.premium, size: 32),
+            const SizedBox(height: RedesignSpacing.sm),
+            const Text(
+              'This is a Premium feature',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Upgrade to unlock this and 5 more AI tools.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: RedesignColors.textSecondary),
+            ),
+            const SizedBox(height: RedesignSpacing.md),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => PremiumUpgradeScreen()),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: RedesignColors.premium,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius:
+                        BorderRadius.circular(RedesignSpacing.pillRadius),
+                  ),
+                ),
+                child: const Text('Upgrade Now'),
+              ),
             ),
           ],
         ),
@@ -302,710 +458,145 @@ class _AIDashboardScreenState extends ConsumerState<AIDashboardScreen> {
     );
   }
 
-  Widget _buildAIServiceCard({
-    required IconData icon,
-    required String title,
-    required String description,
-    required List<Color> gradient,
-    required VoidCallback onTap,
-    bool isPremium = false,
-  }) {
-    final isLocked = isPremium && !this.isPremium;
+  @override
+  Widget build(BuildContext context) {
+    return GridView.count(
+      crossAxisCount: 2,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      mainAxisSpacing: RedesignSpacing.sm,
+      crossAxisSpacing: RedesignSpacing.sm,
+      childAspectRatio: 1.5,
+      children: [
+        _FeatureCard(
+          icon: Icons.bar_chart,
+          iconColor: RedesignColors.premium,
+          title: 'Medical AI',
+          subtitle: 'History analysis',
+          isPro: true,
+          onTap: () =>
+              _handleTap(context, MedicalHistoryAnalysisScreen(pet: pet)),
+        ),
+        _FeatureCard(
+          icon: Icons.bolt,
+          iconColor: RedesignColors.due,
+          title: 'Smart Schedule',
+          subtitle: 'Auto-reminders',
+          isPro: true,
+          onTap: () => _handleTap(context, SmartRemindersScreen(pet: pet)),
+        ),
+        _FeatureCard(
+          icon: Icons.restaurant_menu,
+          iconColor: RedesignColors.success,
+          title: 'Feeding Plan',
+          subtitle: 'Custom schedule',
+          isPro: true,
+          onTap: () => _handleTap(context, FeedingScheduleScreen(pet: pet)),
+        ),
+        _FeatureCard(
+          icon: Icons.school,
+          iconColor: RedesignColors.accent,
+          title: 'Training Tips',
+          subtitle: 'Personalized advice',
+          isPro: true,
+          onTap: () => _handleTap(context, TrainingTipsScreen(pet: pet)),
+        ),
+        _FeatureCard(
+          icon: Icons.favorite,
+          iconColor: RedesignColors.due,
+          title: 'Health Insights',
+          subtitle: 'Trend analysis',
+          isPro: true,
+          onTap: () =>
+              _handleTap(context, HealthInsightsScreen(petId: pet.id)),
+        ),
+        _FeatureCard(
+          icon: Icons.summarize,
+          iconColor: RedesignColors.premium,
+          title: 'Monthly Report',
+          subtitle: 'Full summary',
+          isPro: true,
+          onTap: () => _handleTap(context, MonthlyReportScreen(pet: pet)),
+        ),
+      ],
+    );
+  }
+}
 
-    return Container(
-      margin: EdgeInsets.only(bottom: 12),
-      child: InkWell(
-        onTap: isLocked ? () => _showPremiumDialog(context) : onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors:
-                  isLocked
-                      ? [Colors.grey.shade300, Colors.grey.shade400]
-                      : gradient,
-            ),
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black12,
-                blurRadius: 8,
-                offset: Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  isLocked ? Icons.lock : icon,
-                  color: Colors.white,
-                  size: 28,
-                ),
-              ),
-              SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          title,
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                        if (isPremium) ...[
-                          SizedBox(width: 8),
-                          Icon(Icons.star, size: 16, color: Colors.amber),
-                        ],
-                      ],
+class _FeatureCard extends StatelessWidget {
+  const _FeatureCard({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    this.isPro = false,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final String subtitle;
+  final bool isPro;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(RedesignSpacing.cardRadius),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(RedesignSpacing.sm + 4),
+        decoration: BoxDecoration(
+          color: isPro ? RedesignColors.premiumSoft : RedesignColors.surface,
+          borderRadius: BorderRadius.circular(RedesignSpacing.cardRadius),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Icon(icon, color: iconColor, size: 22),
+                if (isPro)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: RedesignColors.premium,
+                      borderRadius: BorderRadius.circular(6),
                     ),
-                    SizedBox(height: 4),
-                    Text(
-                      isLocked ? 'Premium Feature' : description,
+                    child: const Text(
+                      'PRO',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.9),
-                        fontSize: 13,
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
-                  ],
-                ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: RedesignSpacing.sm),
+            Text(
+              title,
+              style: const TextStyle(
+                fontWeight: FontWeight.w700,
+                color: RedesignColors.textPrimary,
+                fontSize: 13,
               ),
-              Icon(
-                isLocked ? Icons.lock : Icons.arrow_forward_ios,
-                color: Colors.white,
-                size: 16,
+            ),
+            Text(
+              subtitle,
+              style: const TextStyle(
+                color: RedesignColors.textSecondary,
+                fontSize: 11,
               ),
-            ],
-          ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
         ),
       ),
-    );
-  }
-
-  Widget _buildPremiumUpsellCard(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Colors.amber.shade400, Colors.orange.shade500],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.orange.withOpacity(0.3),
-            blurRadius: 12,
-            offset: Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Icon(Icons.workspace_premium, size: 48, color: Colors.white),
-          SizedBox(height: 12),
-          Text(
-            'Unlock Premium AI Features',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Get smart reminders, health insights, and monthly reports',
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.9),
-              fontSize: 14,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: () => _navigateToPremium(context),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white,
-              foregroundColor: Colors.orange,
-              padding: EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
-              ),
-            ),
-            child: Text(
-              'Upgrade Now',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ============================================
-  // NAVIGATION METHODS
-  // ============================================
-
-  void _navigateToPhotoAnalysis(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => PhotoAnalysisScreen()),
-    );
-  }
-
-  void _navigateToSymptomChecker(BuildContext context, WidgetRef ref) async {
-    // ✅ Load data FIRST
-    final pets = await ref.read(petsControllerProvider.future);
-
-    if (!context.mounted) return;
-
-    // Show bottom sheet with already-loaded data
-    showModalBottomSheet(
-      context: context,
-      builder:
-          (context) => Container(
-            padding: EdgeInsets.all(16),
-            child: Column(
-              children: [
-                Text(
-                  'Select a Pet',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                Divider(),
-                if (pets.isEmpty)
-                  Text('No pets available')
-                else
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: pets.length,
-                      itemBuilder: (context, index) {
-                        final pet = pets[index];
-                        return ListTile(
-                          leading: CircleAvatar(
-                            backgroundImage:
-                                pet.photoUrl != null
-                                    ? NetworkImage(pet.photoUrl!)
-                                    : AssetImage(
-                                          'assets/images/pet_placeholder.png',
-                                        )
-                                        as ImageProvider,
-                          ),
-                          title: Text(pet.name),
-                          subtitle: Text(
-                            '${pet.species} - ${pet.breed ?? 'Unknown'}',
-                          ),
-                          onTap: () {
-                            Navigator.pop(context);
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder:
-                                    (context) => SymptomCheckerScreen(pet: pet),
-                              ),
-                            );
-                          },
-                        );
-                      },
-                    ),
-                  ),
-              ],
-            ),
-          ),
-    );
-  }
-
-  // void _navigateToMedicalAnalysis(BuildContext context) {
-  //   Navigator.push(
-  //     context,
-  //     MaterialPageRoute(
-  //       builder:
-  //           (context) =>
-  //               MedicalHistoryAnalysisScreen(petId: widget.currentPetId ?? ''),
-  //     ),
-  //   );
-  // }
-
-  void _navigateToSmartReminders(BuildContext context, WidgetRef ref) async {
-    // ✅ Load data FIRST
-    final pets = await ref.read(petsControllerProvider.future);
-
-    if (!context.mounted) return;
-
-    // Show bottom sheet with already-loaded data
-    showModalBottomSheet(
-      context: context,
-      builder:
-          (context) => Container(
-            padding: EdgeInsets.all(16),
-            child: Column(
-              children: [
-                Text(
-                  'Select a Pet',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                Divider(),
-                if (pets.isEmpty)
-                  Text('No pets available')
-                else
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: pets.length,
-                      itemBuilder: (context, index) {
-                        final pet = pets[index];
-                        return ListTile(
-                          leading: CircleAvatar(
-                            backgroundImage:
-                                pet.photoUrl != null
-                                    ? NetworkImage(pet.photoUrl!)
-                                    : AssetImage(
-                                          'assets/images/pet_placeholder.png',
-                                        )
-                                        as ImageProvider,
-                          ),
-                          title: Text(pet.name),
-                          subtitle: Text(
-                            '${pet.species} - ${pet.breed ?? 'Unknown'}',
-                          ),
-                          onTap: () {
-                            Navigator.pop(context);
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder:
-                                    (context) => SmartRemindersScreen(pet: pet),
-                              ),
-                            );
-                          },
-                        );
-                      },
-                    ),
-                  ),
-              ],
-            ),
-          ),
-    );
-  }
-
-  void _navigateToFeedingSchedule(BuildContext context, WidgetRef ref) async {
-    // ✅ Load data FIRST
-    final pets = await ref.read(petsControllerProvider.future);
-
-    if (!context.mounted) return;
-
-    // Show bottom sheet with already-loaded data
-    showModalBottomSheet(
-      context: context,
-      builder:
-          (context) => Container(
-            padding: EdgeInsets.all(16),
-            child: Column(
-              children: [
-                Text(
-                  'Select a Pet',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                Divider(),
-                if (pets.isEmpty)
-                  Text('No pets available')
-                else
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: pets.length,
-                      itemBuilder: (context, index) {
-                        final pet = pets[index];
-                        return ListTile(
-                          leading: CircleAvatar(
-                            backgroundImage:
-                                pet.photoUrl != null
-                                    ? NetworkImage(pet.photoUrl!)
-                                    : AssetImage(
-                                          'assets/images/pet_placeholder.png',
-                                        )
-                                        as ImageProvider,
-                          ),
-                          title: Text(pet.name),
-                          subtitle: Text(
-                            '${pet.species} - ${pet.breed ?? 'Unknown'}',
-                          ),
-                          onTap: () {
-                            Navigator.pop(context);
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder:
-                                    (context) =>
-                                        FeedingScheduleScreen(pet: pet),
-                              ),
-                            );
-                          },
-                        );
-                      },
-                    ),
-                  ),
-              ],
-            ),
-          ),
-    );
-  }
-
-  void _navigateToTrainingTips(BuildContext context, WidgetRef ref) async {
-    // ✅ Load data FIRST
-    final pets = await ref.read(petsControllerProvider.future);
-
-    if (!context.mounted) return;
-
-    // Show bottom sheet with already-loaded data
-    showModalBottomSheet(
-      context: context,
-      builder:
-          (context) => Container(
-            padding: EdgeInsets.all(16),
-            child: Column(
-              children: [
-                Text(
-                  'Select a Pet',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                Divider(),
-                if (pets.isEmpty)
-                  Text('No pets available')
-                else
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: pets.length,
-                      itemBuilder: (context, index) {
-                        final pet = pets[index];
-                        return ListTile(
-                          leading: CircleAvatar(
-                            backgroundImage:
-                                pet.photoUrl != null
-                                    ? NetworkImage(pet.photoUrl!)
-                                    : AssetImage(
-                                          'assets/images/pet_placeholder.png',
-                                        )
-                                        as ImageProvider,
-                          ),
-                          title: Text(pet.name),
-                          subtitle: Text(
-                            '${pet.species} - ${pet.breed ?? 'Unknown'}',
-                          ),
-                          onTap: () {
-                            Navigator.pop(context);
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder:
-                                    (context) => TrainingTipsScreen(pet: pet),
-                              ),
-                            );
-                          },
-                        );
-                      },
-                    ),
-                  ),
-              ],
-            ),
-          ),
-    );
-  }
-
-  void _navigateToAichat(BuildContext context, WidgetRef ref) async {
-    // ✅ Load data FIRST
-    final pets = await ref.read(petsControllerProvider.future);
-
-    if (!context.mounted) return;
-
-    // Show bottom sheet with already-loaded data
-    showModalBottomSheet(
-      context: context,
-      builder:
-          (context) => Container(
-            padding: EdgeInsets.all(16),
-            child: Column(
-              children: [
-                Text(
-                  'Select a Pet',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                Divider(),
-                if (pets.isEmpty)
-                  Text('No pets available')
-                else
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: pets.length,
-                      itemBuilder: (context, index) {
-                        final pet = pets[index];
-                        return ListTile(
-                          leading: CircleAvatar(
-                            backgroundImage:
-                                pet.photoUrl != null
-                                    ? NetworkImage(pet.photoUrl!)
-                                    : AssetImage(
-                                          'assets/images/pet_placeholder.png',
-                                        )
-                                        as ImageProvider,
-                          ),
-                          title: Text(pet.name),
-                          subtitle: Text(
-                            '${pet.species} - ${pet.breed ?? 'Unknown'}',
-                          ),
-                          onTap: () {
-                            Navigator.pop(context);
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => AIVetChatScreen(pet: pet),
-                              ),
-                            );
-                          },
-                        );
-                      },
-                    ),
-                  ),
-              ],
-            ),
-          ),
-    );
-  }
-
-  void _navigateToHealthInsights(BuildContext context, WidgetRef ref) async {
-    // ✅ Load data FIRST
-    final pets = await ref.read(petsControllerProvider.future);
-
-    if (!context.mounted) return;
-
-    // Show bottom sheet with already-loaded data
-    showModalBottomSheet(
-      context: context,
-      builder:
-          (context) => Container(
-            padding: EdgeInsets.all(16),
-            child: Column(
-              children: [
-                Text(
-                  'Select a Pet',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                Divider(),
-                if (pets.isEmpty)
-                  Text('No pets available')
-                else
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: pets.length,
-                      itemBuilder: (context, index) {
-                        final pet = pets[index];
-                        return ListTile(
-                          leading: CircleAvatar(
-                            backgroundImage:
-                                pet.photoUrl != null
-                                    ? NetworkImage(pet.photoUrl!)
-                                    : AssetImage(
-                                          'assets/images/pet_placeholder.png',
-                                        )
-                                        as ImageProvider,
-                          ),
-                          title: Text(pet.name),
-                          subtitle: Text(
-                            '${pet.species} - ${pet.breed ?? 'Unknown'}',
-                          ),
-                          onTap: () {
-                            Navigator.pop(context);
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder:
-                                    (context) =>
-                                        HealthInsightsScreen(petId: pet.id),
-                              ),
-                            );
-                          },
-                        );
-                      },
-                    ),
-                  ),
-              ],
-            ),
-          ),
-    );
-  }
-
-  void _navigateToMonthlyReport(BuildContext context, WidgetRef ref) async {
-    // ✅ Load data FIRST
-    final pets = await ref.read(petsControllerProvider.future);
-
-    if (!context.mounted) return;
-
-    // Show bottom sheet with already-loaded data
-    showModalBottomSheet(
-      context: context,
-      builder:
-          (context) => Container(
-            padding: EdgeInsets.all(16),
-            child: Column(
-              children: [
-                Text(
-                  'Select a Pet',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                Divider(),
-                if (pets.isEmpty)
-                  Text('No pets available')
-                else
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: pets.length,
-                      itemBuilder: (context, index) {
-                        final pet = pets[index];
-                        return ListTile(
-                          leading: CircleAvatar(
-                            backgroundImage:
-                                pet.photoUrl != null
-                                    ? NetworkImage(pet.photoUrl!)
-                                    : AssetImage(
-                                          'assets/images/pet_placeholder.png',
-                                        )
-                                        as ImageProvider,
-                          ),
-                          title: Text(pet.name),
-                          subtitle: Text(
-                            '${pet.species} - ${pet.breed ?? 'Unknown'}',
-                          ),
-                          onTap: () {
-                            Navigator.pop(context);
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder:
-                                    (context) => MonthlyReportScreen(pet: pet),
-                              ),
-                            );
-                          },
-                        );
-                      },
-                    ),
-                  ),
-              ],
-            ),
-          ),
-    );
-  }
-
-  void _navigateToPremium(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => PremiumUpgradeScreen()),
-    );
-  }
-
-  void _showPremiumDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: Row(
-              children: [
-                Icon(Icons.workspace_premium, color: Colors.amber),
-                SizedBox(width: 8),
-                Text('Premium Feature'),
-              ],
-            ),
-            content: Text(
-              'This feature is available for premium users. Upgrade now to unlock all AI features!',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text('Maybe Later'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  _navigateToPremium(context);
-                },
-                child: Text('Upgrade Now'),
-              ),
-            ],
-          ),
     );
   }
 }
-
-void _navigateToMedicalAnalysis(BuildContext context, WidgetRef ref) async {
-  // ✅ Load data FIRST
-  final pets = await ref.read(petsControllerProvider.future);
-
-  if (!context.mounted) return;
-
-  // Show bottom sheet with already-loaded data
-  showModalBottomSheet(
-    context: context,
-    builder:
-        (context) => Container(
-          padding: EdgeInsets.all(16),
-          child: Column(
-            children: [
-              Text(
-                'Select a Pet',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              Divider(),
-              if (pets.isEmpty)
-                Text('No pets available')
-              else
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: pets.length,
-                    itemBuilder: (context, index) {
-                      final pet = pets[index];
-                      return ListTile(
-                        leading: CircleAvatar(
-                          backgroundImage:
-                              pet.photoUrl != null
-                                  ? NetworkImage(pet.photoUrl!)
-                                  : AssetImage(
-                                        'assets/images/pet_placeholder.png',
-                                      )
-                                      as ImageProvider,
-                        ),
-                        title: Text(pet.name),
-                        subtitle: Text(
-                          '${pet.species} - ${pet.breed ?? 'Unknown'}',
-                        ),
-                        onTap: () {
-                          Navigator.pop(context);
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder:
-                                  (context) =>
-                                      MedicalHistoryAnalysisScreen(pet: pet),
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  ),
-                ),
-            ],
-          ),
-        ),
-  );
-}
-
-// ============================================
-// PLACEHOLDER SCREENS (Create these next)
-// ============================================
-
-// Already created in previous artifact
