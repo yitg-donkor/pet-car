@@ -85,8 +85,10 @@ class _MainNavigationState extends ConsumerState<MainNavigation> {
 
               return Expanded(
                 child: InkWell(
-                  onTap: () =>
-                      ref.read(currentTabIndexProvider.notifier).state = index,
+                  onTap:
+                      () =>
+                          ref.read(currentTabIndexProvider.notifier).state =
+                              index,
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -107,7 +109,9 @@ class _MainNavigationState extends ConsumerState<MainNavigation> {
                         height: 4,
                         decoration: BoxDecoration(
                           color:
-                              selected ? RedesignColors.accent : Colors.transparent,
+                              selected
+                                  ? RedesignColors.accent
+                                  : Colors.transparent,
                           shape: BoxShape.circle,
                         ),
                       ),
@@ -226,15 +230,26 @@ class _HomeHeader extends ConsumerWidget {
         CircleAvatar(
           radius: 22,
           backgroundColor: RedesignColors.accent,
-          child: Text(
-            initial,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
+          child: TextButton(
+            onPressed: () {
+              // Navigate to profile screen
+              Navigator.of(context).pushNamed('/settings');
+            }, child: Text(
+              initial,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+              ),
+            ),
+            // initial,
+            // style: const TextStyle(
+            //   color: Colors.white,
+            //   fontWeight: FontWeight.bold,
+            //   fontSize: 18,
             ),
           ),
-        ),
+        
       ],
     );
   }
@@ -266,10 +281,17 @@ class _MyPetsSection extends ConsumerWidget {
               ),
             ),
             TextButton.icon(
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const AddPet(species: 'dog')),
+              onPressed:
+                  () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const AddPet(species: 'dog'),
+                    ),
+                  ),
+              icon: const Icon(
+                Icons.add,
+                size: 16,
+                color: RedesignColors.accent,
               ),
-              icon: const Icon(Icons.add, size: 16, color: RedesignColors.accent),
               label: const Text(
                 'Add',
                 style: TextStyle(
@@ -295,21 +317,24 @@ class _MyPetsSection extends ConsumerWidget {
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: pets.length,
-                separatorBuilder: (_, __) =>
-                    const SizedBox(width: RedesignSpacing.sm),
-                itemBuilder: (context, i) =>
-                    _PetCard(pet: pets[i], todaysReminders: reminders),
+                separatorBuilder:
+                    (_, __) => const SizedBox(width: RedesignSpacing.sm),
+                itemBuilder:
+                    (context, i) =>
+                        _PetCard(pet: pets[i], todaysReminders: reminders),
               ),
             );
           },
-          loading: () => const SizedBox(
-            height: 168,
-            child: Center(child: CircularProgressIndicator()),
-          ),
-          error: (e, _) => SizedBox(
-            height: 60,
-            child: Center(child: Text('Could not load pets: $e')),
-          ),
+          loading:
+              () => const SizedBox(
+                height: 168,
+                child: Center(child: CircularProgressIndicator()),
+              ),
+          error:
+              (e, _) => SizedBox(
+                height: 60,
+                child: Center(child: Text('Could not load pets: $e')),
+              ),
         ),
       ],
     );
@@ -323,9 +348,10 @@ class _NoPetsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       borderRadius: BorderRadius.circular(RedesignSpacing.cardRadius),
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const AddPet(species: 'dog')),
-      ),
+      onTap:
+          () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const AddPet(species: 'dog')),
+          ),
       child: Container(
         padding: const EdgeInsets.all(RedesignSpacing.lg),
         decoration: BoxDecoration(
@@ -393,11 +419,13 @@ class _PetCard extends StatelessWidget {
     final hasAny = petReminders.isNotEmpty;
     final statusLabel = hasDue ? 'Due' : (hasAny ? 'Fed' : 'All good');
     final statusColor = hasDue ? RedesignColors.due : RedesignColors.success;
-    final statusBg = hasDue ? RedesignColors.dueSoft : RedesignColors.successSoft;
+    final statusBg =
+        hasDue ? RedesignColors.dueSoft : RedesignColors.successSoft;
 
     return InkWell(
       borderRadius: BorderRadius.circular(RedesignSpacing.cardRadius),
-      onTap: () => Navigator.of(context).pushNamed('/pet-details', arguments: pet),
+      onTap:
+          () => Navigator.of(context).pushNamed('/pet-details', arguments: pet),
       child: Container(
         width: 150,
         decoration: BoxDecoration(
@@ -411,15 +439,16 @@ class _PetCard extends StatelessWidget {
             SizedBox(
               height: 80,
               width: double.infinity,
-              child: pet.photoUrl != null
-                  ? Image.network(pet.photoUrl!, fit: BoxFit.cover)
-                  : Container(
-                      color: RedesignColors.accentSoft,
-                      child:Image.asset(  
-                        'assets/images/images.jpg',
-                        fit: BoxFit.cover,
+              child:
+                  pet.photoUrl != null
+                      ? Image.network(pet.photoUrl!, fit: BoxFit.cover)
+                      : Container(
+                        color: RedesignColors.accentSoft,
+                        child: Image.asset(
+                          'assets/images/images.jpg',
+                          fit: BoxFit.cover,
+                        ),
                       ),
-                    ),
             ),
             Padding(
               padding: const EdgeInsets.all(RedesignSpacing.sm),
@@ -435,9 +464,10 @@ class _PetCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   Text(
-                    [pet.breed ?? pet.species, _ageLabel]
-                        .where((s) => s.isNotEmpty)
-                        .join(' \u00b7 '),
+                    [
+                      pet.breed ?? pet.species,
+                      _ageLabel,
+                    ].where((s) => s.isNotEmpty).join(' \u00b7 '),
                     style: const TextStyle(
                       color: RedesignColors.textSecondary,
                       fontSize: 11,
@@ -452,8 +482,9 @@ class _PetCard extends StatelessWidget {
                     ),
                     decoration: BoxDecoration(
                       color: statusBg,
-                      borderRadius:
-                          BorderRadius.circular(RedesignSpacing.pillRadius),
+                      borderRadius: BorderRadius.circular(
+                        RedesignSpacing.pillRadius,
+                      ),
                     ),
                     child: Text(
                       statusLabel,
@@ -514,8 +545,8 @@ class _TodaysCareSection extends ConsumerWidget {
               ),
             ),
             TextButton(
-              onPressed: () =>
-                  ref.read(currentTabIndexProvider.notifier).state = 2,
+              onPressed:
+                  () => ref.read(currentTabIndexProvider.notifier).state = 2,
               style: TextButton.styleFrom(
                 padding: EdgeInsets.zero,
                 minimumSize: const Size(0, 0),
@@ -575,7 +606,9 @@ class _TodaysCareSection extends ConsumerWidget {
                 ),
                 const SizedBox(height: 6),
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(RedesignSpacing.pillRadius),
+                  borderRadius: BorderRadius.circular(
+                    RedesignSpacing.pillRadius,
+                  ),
                   child: LinearProgressIndicator(
                     value: progress,
                     minHeight: 6,
@@ -605,10 +638,11 @@ class _TodaysCareSection extends ConsumerWidget {
               ],
             );
           },
-          loading: () => const Padding(
-            padding: EdgeInsets.symmetric(vertical: RedesignSpacing.lg),
-            child: Center(child: CircularProgressIndicator()),
-          ),
+          loading:
+              () => const Padding(
+                padding: EdgeInsets.symmetric(vertical: RedesignSpacing.lg),
+                child: Center(child: CircularProgressIndicator()),
+              ),
           error: (e, _) => Text('Could not load reminders: $e'),
         ),
       ],
@@ -630,7 +664,11 @@ class _EmptyCareCard extends StatelessWidget {
       ),
       child: const Column(
         children: [
-          Icon(Icons.check_circle_outline, color: RedesignColors.success, size: 32),
+          Icon(
+            Icons.check_circle_outline,
+            color: RedesignColors.success,
+            size: 32,
+          ),
           SizedBox(height: 8),
           Text(
             'No reminders for today!',
@@ -698,9 +736,10 @@ class _CareItemCard extends StatelessWidget {
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     color: RedesignColors.textPrimary,
-                    decoration: reminder.isCompleted
-                        ? TextDecoration.lineThrough
-                        : null,
+                    decoration:
+                        reminder.isCompleted
+                            ? TextDecoration.lineThrough
+                            : null,
                     decorationColor: RedesignColors.textMuted,
                   ),
                 ),
@@ -739,19 +778,24 @@ class _CareItemCard extends StatelessWidget {
               height: 26,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: reminder.isCompleted
-                    ? RedesignColors.success
-                    : Colors.transparent,
+                color:
+                    reminder.isCompleted
+                        ? RedesignColors.success
+                        : Colors.transparent,
                 border: Border.all(
-                  color: reminder.isCompleted
-                      ? RedesignColors.success
-                      : (_isDue ? RedesignColors.due : RedesignColors.border),
+                  color:
+                      reminder.isCompleted
+                          ? RedesignColors.success
+                          : (_isDue
+                              ? RedesignColors.due
+                              : RedesignColors.border),
                   width: 2,
                 ),
               ),
-              child: reminder.isCompleted
-                  ? const Icon(Icons.check, size: 16, color: Colors.white)
-                  : null,
+              child:
+                  reminder.isCompleted
+                      ? const Icon(Icons.check, size: 16, color: Colors.white)
+                      : null,
             ),
           ),
         ],
@@ -783,40 +827,43 @@ class _ThisWeekSection extends ConsumerWidget {
         ),
         const SizedBox(height: RedesignSpacing.sm),
         statsAsync.when(
-          data: (stats) => GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: RedesignSpacing.sm,
-            crossAxisSpacing: RedesignSpacing.sm,
-            childAspectRatio: 1.7,
-            children: [
-              _StatCard(
-                icon: Icons.directions_walk,
-                value: '${stats.walks}',
-                label: 'Walks',
+          data:
+              (stats) => GridView.count(
+                crossAxisCount: 2,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                mainAxisSpacing: RedesignSpacing.sm,
+                crossAxisSpacing: RedesignSpacing.sm,
+                childAspectRatio: 1.7,
+                children: [
+                  _StatCard(
+                    icon: Icons.directions_walk,
+                    value: '${stats.walks}',
+                    label: 'Walks',
+                  ),
+                  _StatCard(
+                    icon: Icons.medication,
+                    value:
+                        '${stats.medsGiven}/${stats.medsScheduled == 0 ? stats.medsGiven : stats.medsScheduled}',
+                    label: 'Meds given',
+                  ),
+                  _StatCard(
+                    icon: Icons.medical_services,
+                    value: '${stats.vetVisits}',
+                    label: 'Vet visits',
+                  ),
+                  _StatCard(
+                    icon: Icons.auto_awesome,
+                    value: '${stats.aiChecks}',
+                    label: 'AI checks',
+                  ),
+                ],
               ),
-              _StatCard(
-                icon: Icons.medication,
-                value: '${stats.medsGiven}/${stats.medsScheduled == 0 ? stats.medsGiven : stats.medsScheduled}',
-                label: 'Meds given',
+          loading:
+              () => const SizedBox(
+                height: 120,
+                child: Center(child: CircularProgressIndicator()),
               ),
-              _StatCard(
-                icon: Icons.medical_services,
-                value: '${stats.vetVisits}',
-                label: 'Vet visits',
-              ),
-              _StatCard(
-                icon: Icons.auto_awesome,
-                value: '${stats.aiChecks}',
-                label: 'AI checks',
-              ),
-            ],
-          ),
-          loading: () => const SizedBox(
-            height: 120,
-            child: Center(child: CircularProgressIndicator()),
-          ),
           error: (e, _) => Text('Could not load stats: $e'),
         ),
       ],
