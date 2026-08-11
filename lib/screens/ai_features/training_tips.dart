@@ -2,6 +2,7 @@
 // ============================================
 
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:pet_care/services/firebase_ai_service.dart';
 import 'package:pet_care/models/pet.dart'; // Import your Pet model
 
@@ -191,10 +192,31 @@ class _TrainingTipsScreenState extends State<TrainingTipsScreen> {
                           ],
                         ),
                         Divider(height: 24),
-                        Text(
-                          _tips!,
-                          style: TextStyle(fontSize: 16, height: 1.5),
-                        ),
+                        MarkdownBody( 
+                          data: _tips!, styleSheet: MarkdownStyleSheet(
+                          p: TextStyle(
+                            color: Colors.black,
+                            fontSize: 14,
+                          ),
+                          h1: TextStyle(
+                            color: Colors.black,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                          ),
+                          h2: TextStyle(
+                            color: Colors.black,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                          h3: TextStyle(
+                            color: Colors.black,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                          ),
+                          listBullet: TextStyle(
+                            color: Colors.black,
+                          ),
+                        ),)
                       ],
                     ),
                   ),

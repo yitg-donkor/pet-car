@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:pet_care/models/pet.dart';
 import 'package:pet_care/services/firebase_ai_service.dart';
 
@@ -95,10 +96,38 @@ class _AIVetChatScreenState extends State<AIVetChatScreen> {
                     constraints: BoxConstraints(
                       maxWidth: MediaQuery.of(context).size.width * 0.7,
                     ),
-                    child: Text(
-                      message['text'] ?? '',
-                      style: TextStyle(
-                        color: isUser ? Colors.white : Colors.black,
+                    child: MarkdownBody(
+                      data: message['text'] ?? '',
+                      styleSheet: MarkdownStyleSheet(
+                        p: TextStyle(
+                          color: isUser ? Colors.white : Colors.black,
+                        ),
+                        strong: TextStyle(
+                          color: isUser ? Colors.white : Colors.black,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        em: TextStyle(
+                          color: isUser ? Colors.white : Colors.black,
+                          fontStyle: FontStyle.italic,
+                        ),
+                        h1: TextStyle(
+                          color: isUser ? Colors.white : Colors.black,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
+                        h2: TextStyle(
+                          color: isUser ? Colors.white : Colors.black,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                        h3: TextStyle(
+                          color: isUser ? Colors.white : Colors.black,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
+                        listBullet: TextStyle(
+                          color: isUser ? Colors.white : Colors.black,
+                        ),
                       ),
                     ),
                   ),

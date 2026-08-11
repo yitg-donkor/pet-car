@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:pet_care/models/pet.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:pet_care/services/firebase_ai_service.dart';
 
 class SymptomCheckerScreen extends StatefulWidget {
@@ -117,7 +118,34 @@ class _SymptomCheckerScreenState extends State<SymptomCheckerScreen> {
                         ],
                       ),
                       SizedBox(height: 12),
-                      Text(_analysis!),
+                      //Text(_analysis!),
+                      MarkdownBody(
+                        data: _analysis!,
+                        styleSheet: MarkdownStyleSheet(
+                          p: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                          ),
+                          h1: TextStyle(
+                            color: Colors.black,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                          ),
+                          h2: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 17,
+                          ),
+                          h3: TextStyle(
+                            color: Colors.black,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                          listBullet: TextStyle(
+                            color: Colors.black,
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),

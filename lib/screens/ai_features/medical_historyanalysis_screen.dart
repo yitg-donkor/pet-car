@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:pet_care/models/pet.dart';
 import 'package:pet_care/services/firebase_ai_service.dart';
 
@@ -338,23 +339,56 @@ class _MedicalHistoryAnalysisScreenState
                                       style: TextStyle(
                                         fontSize: 20,
                                         fontWeight: FontWeight.bold,
-                                        color: Colors.grey[800],
+                                        color: Colors.white,
                                       ),
                                     ),
                                   ),
                                 ],
                               ),
                               Divider(height: 32, thickness: 1),
-                              Text(
-                                _summary.isEmpty
-                                    ? 'No analysis available. Click "Refresh Analysis" to generate insights from your pet\'s medical records.'
-                                    : _summary,
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  height: 1.6,
-                                  color: Colors.grey[800],
+                              MarkdownBody(
+                                data:
+                                    _summary.isEmpty
+                                        ? 'No analysis available. Click "Refresh Analysis" to generate insights from your pet\'s medical records.'
+                                        : _summary,
+                                styleSheet: MarkdownStyleSheet(
+                                  p: TextStyle(
+                                    fontSize: 16,
+                                    height: 1.6,
+                                    color: Colors.black,
+                                  ),
+                                  strong: TextStyle(
+                                    color: Colors.black,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  h1: TextStyle(
+                                    color: Colors.black,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 18,
+                                  ),
+                                  h2: TextStyle(
+                                    color: Colors.black,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 17,
+                                  ),
+                                  h3: TextStyle(
+                                    color: Colors.black,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
+                                  listBullet: TextStyle(color: Colors.black),
                                 ),
                               ),
+                              // Text(
+                              //   _summary.isEmpty
+                              //       ? 'No analysis available. Click "Refresh Analysis" to generate insights from your pet\'s medical records.'
+                              //       : _summary,
+                              //   style: TextStyle(
+                              //     fontSize: 16,
+                              //     height: 1.6,
+                              //     color: Colors.grey[800],
+                              //   ),
+                              // ),
                             ],
                           ),
                         ),
