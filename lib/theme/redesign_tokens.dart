@@ -37,13 +37,13 @@ class RedesignColors {
   // ============================================================
 
   /// Main background from the reference design.
-  static const Color background = Color(0xFFC8E6F5);
+  static const Color background = Color.fromARGB(255, 253, 254, 255);
 
   /// Slightly lighter background for sections.
   static const Color backgroundLight = Color(0xFFEAF7FC);
 
   /// Main white surface.
-  static const Color surface = Color(0xFFFFFFFF);
+  static const Color surface = Color.fromARGB(255, 211, 236, 249);
 
   /// Very subtle blue-tinted surface.
   static const Color surfaceMuted = Color(0xFFF3FAFD);
