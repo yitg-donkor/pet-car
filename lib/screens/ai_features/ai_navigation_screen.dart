@@ -400,7 +400,7 @@ class _PremiumFeaturesGrid extends StatelessWidget {
   // choice - the previous code hardcoded `true` with a TODO admitting it
   // was a placeholder, which let every user through for free. Wire this to
   // real entitlement data once billing exists.
-  static const bool _isPremiumUser = false;
+  static const bool _isPremiumUser = true;
 
   void _handleTap(BuildContext context, Widget destination) {
     if (_isPremiumUser) {

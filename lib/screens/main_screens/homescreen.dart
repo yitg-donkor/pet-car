@@ -415,10 +415,9 @@ class _PetCard extends StatelessWidget {
                   ? Image.network(pet.photoUrl!, fit: BoxFit.cover)
                   : Container(
                       color: RedesignColors.accentSoft,
-                      child: const Icon(
-                        Icons.pets,
-                        color: RedesignColors.accent,
-                        size: 32,
+                      child:Image.asset(  
+                        'assets/images/images.jpg',
+                        fit: BoxFit.cover,
                       ),
                     ),
             ),

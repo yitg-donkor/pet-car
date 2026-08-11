@@ -894,7 +894,7 @@ class _AddReminderDialogState extends ConsumerState<_AddReminderDialog> {
               ],
               onChanged:
                   (value) =>
-                      setState(() => selectedFrequency = value ?? 'once'),
+                      setState(() => selectedFrequency = value ?? 'daily'),
             ),
             const SizedBox(height: 15),
 
@@ -928,7 +928,7 @@ class _AddReminderDialogState extends ConsumerState<_AddReminderDialog> {
           child: const Text('Cancel'),
         ),
         ElevatedButton(
-          onPressed: () => _saveReminder(context),
+          onPressed: (){_saveReminder(context); Navigator.of(context).pop();},
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF4CAF50),
             shape: RoundedRectangleBorder(
