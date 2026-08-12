@@ -13,7 +13,8 @@ import 'package:pet_care/screens/ai_features/premium_upgrade_screen.dart';
 import 'package:pet_care/screens/ai_features/smart_reminder.dart';
 import 'package:pet_care/screens/ai_features/symptons_checker.dart';
 import 'package:pet_care/screens/ai_features/training_tips.dart';
-import 'package:pet_care/theme/redesign_tokens.dart';
+import 'package:pet_care/theme/app_theme.dart';
+import 'package:pet_care/widgets/widgets.dart';
 
 // ============================================
 // AI DASHBOARD SCREEN
@@ -27,41 +28,43 @@ class AIDashboardScreen extends ConsumerWidget {
     final petsAsync = ref.watch(petsControllerProvider);
 
     return Scaffold(
-      backgroundColor: RedesignColors.background,
-      body: SafeArea(
-        child: petsAsync.when(
-          data: (pets) {
-            if (pets.isEmpty) return const _NoPetsForAI();
+      body: petsAsync.when(
+        data: (pets) {
+          if (pets.isEmpty) return const _NoPetsForAI();
 
-            // Default to the first pet if nothing's selected yet.
-            final selected = ref.watch(selectedPetProvider) ?? pets.first;
+          // Default to the first pet if nothing's selected yet.
+          final selected = ref.watch(selectedPetProvider) ?? pets.first;
 
-            return ListView(
-              padding: const EdgeInsets.fromLTRB(
-                RedesignSpacing.md,
-                RedesignSpacing.md,
-                RedesignSpacing.md,
-                RedesignSpacing.xl,
+          return ListView(
+            padding: EdgeInsets.zero,
+            children: [
+              _AIHeader(pets: pets, selected: selected),
+              const SizedBox(height: 20),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  children: [
+                    _AIVetChatCard(pet: selected),
+                    const SizedBox(height: 24),
+                    SkySectionHeader(label: 'Included Free'),
+                    const SizedBox(height: 12),
+                    _FreeFeaturesGrid(pet: selected),
+                    const SizedBox(height: 24),
+                    _PremiumHeader(),
+                    const SizedBox(height: 12),
+                    _PremiumFeaturesGrid(pet: selected),
+                    const SizedBox(height: 8),
+                  ],
+                ),
               ),
-              children: [
-                const _AIHeader(),
-                const SizedBox(height: RedesignSpacing.md),
-                _PetSelectorRow(pets: pets, selected: selected),
-                const SizedBox(height: RedesignSpacing.md),
-                _AIVetChatCard(pet: selected),
-                const SizedBox(height: RedesignSpacing.lg),
-                const _SectionLabel('INCLUDED FREE'),
-                const SizedBox(height: RedesignSpacing.sm),
-                _FreeFeaturesGrid(pet: selected),
-                const SizedBox(height: RedesignSpacing.lg),
-                const _PremiumHeader(),
-                const SizedBox(height: RedesignSpacing.sm),
-                _PremiumFeaturesGrid(pet: selected),
-              ],
-            );
-          },
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(child: Text('Could not load pets: $e')),
+            ],
+          );
+        },
+        loading: () => const SafeArea(
+          child: Center(child: CircularProgressIndicator()),
+        ),
+        error: (e, _) => SafeArea(
+          child: Center(child: Text('Could not load pets: $e')),
         ),
       ),
     );
@@ -73,56 +76,61 @@ class _NoPetsForAI extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      child: Padding(
-        padding: EdgeInsets.all(RedesignSpacing.lg),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.pets, size: 48, color: RedesignColors.accent),
-            SizedBox(height: RedesignSpacing.sm),
-            Text(
-              'Add a pet to unlock AI features',
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                color: RedesignColors.textPrimary,
-                fontSize: 16,
-              ),
-            ),
-          ],
+    final sky = SkyColors.of(context);
+    return SafeArea(
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: SkyEmptyState(
+            icon: Icons.pets,
+            iconColor: sky.header,
+            title: 'Add a pet to unlock AI features',
+          ),
         ),
       ),
     );
   }
 }
 
+// ---------- Header ----------
+
+/// Sky-blue wave header for the AI Hub - greeting/eyebrow text plus the
+/// pet selector, so switching pets happens right where the "AI Assistant"
+/// title lives rather than as a separate row below it.
 class _AIHeader extends StatelessWidget {
-  const _AIHeader();
+  const _AIHeader({required this.pets, required this.selected});
+
+  final List<Pet> pets;
+  final Pet selected;
 
   @override
   Widget build(BuildContext context) {
-    return const Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'POWERED BY AI',
-          style: TextStyle(
-            color: RedesignColors.textSecondary,
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.6,
+    return SkyHeader(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'POWERED BY AI',
+            style: TextStyle(
+              color: SkyColors.skyOnHeaderMuted,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.6,
+            ),
           ),
-        ),
-        SizedBox(height: 2),
-        Text(
-          'AI Assistant',
-          style: TextStyle(
-            color: RedesignColors.textPrimary,
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
+          const SizedBox(height: 2),
+          const Text(
+            'AI Assistant',
+            style: TextStyle(
+              color: SkyColors.skyOnHeader,
+              fontSize: 24,
+              fontWeight: FontWeight.w900,
+            ),
           ),
-        ),
-      ],
+          const SizedBox(height: 16),
+          _PetSelectorRow(pets: pets, selected: selected),
+        ],
+      ),
     );
   }
 }
@@ -136,62 +144,85 @@ class _PetSelectorRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return SizedBox(
-      height: 40,
+      height: 32,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: pets.length,
-        separatorBuilder: (_, __) => const SizedBox(width: RedesignSpacing.sm),
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (context, i) {
           final pet = pets[i];
           final isSelected = pet.id == selected.id;
-          return InkWell(
-            borderRadius: BorderRadius.circular(RedesignSpacing.pillRadius),
-            onTap: () =>
-                ref.read(selectedPetProvider.notifier).selectPet(pet),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              decoration: BoxDecoration(
-                color: isSelected ? RedesignColors.accent : RedesignColors.surface,
-                borderRadius: BorderRadius.circular(RedesignSpacing.pillRadius),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  CircleAvatar(
-                    radius: 10,
-                    backgroundColor: isSelected
-                        ? Colors.white.withValues(alpha: 0.3)
-                        : RedesignColors.accentSoft,
-                    backgroundImage:
-                        pet.photoUrl != null ? NetworkImage(pet.photoUrl!) : null,
-                    child: pet.photoUrl == null
-                        ? Icon(
-                            Icons.pets,
-                            size: 12,
-                            color: isSelected
-                                ? Colors.white
-                                : RedesignColors.accent,
-                          )
-                        : null,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    pet.name,
-                    style: TextStyle(
-                      color: isSelected ? Colors.white : RedesignColors.textPrimary,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+          return _OnHeaderPetChip(
+            name: pet.name,
+            imageUrl: pet.photoUrl,
+            selected: isSelected,
+            onTap: () => ref.read(selectedPetProvider.notifier).selectPet(pet),
           );
         },
       ),
     );
   }
 }
+
+/// A pet chip styled for the header context specifically: unselected chips
+/// sit as translucent-white pills on the blue header (matching
+/// [SkyStatChip]'s onHeader treatment) rather than [SkyPetChip]'s
+/// surface-colored default, which would look washed out against the wave.
+class _OnHeaderPetChip extends StatelessWidget {
+  const _OnHeaderPetChip({
+    required this.name,
+    required this.imageUrl,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String name;
+  final String? imageUrl;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(100),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected ? Colors.white : Colors.white.withValues(alpha: 0.16),
+          borderRadius: BorderRadius.circular(100),
+          border: selected
+              ? null
+              : Border.all(color: Colors.white.withValues(alpha: 0.25)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AppAvatar(
+              imageUrl: imageUrl,
+              fallbackText: name,
+              radius: 10,
+              backgroundColor: selected
+                  ? SkyColors.of(context).header
+                  : Colors.white.withValues(alpha: 0.3),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              name,
+              style: TextStyle(
+                color: selected ? SkyColors.of(context).header : Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------- AI Vet Chat ----------
 
 class _AIVetChatCard extends StatelessWidget {
   const _AIVetChatCard({required this.pet});
@@ -200,112 +231,20 @@ class _AIVetChatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(RedesignSpacing.md),
-      decoration: BoxDecoration(
-        color: RedesignColors.chatCardDark,
-        borderRadius: BorderRadius.circular(RedesignSpacing.cardRadius),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: RedesignColors.accent,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(Icons.chat_bubble, color: Colors.white, size: 18),
-              ),
-              const SizedBox(width: RedesignSpacing.sm),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'AI Vet Chat',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                    Text(
-                      'Ask any pet health question',
-                      style: TextStyle(color: Colors.white70, fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: RedesignSpacing.md),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(RedesignSpacing.sm + 4),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Text(
-              '"Is it normal for ${pet.name} to eat grass sometimes?"',
-              style: const TextStyle(
-                color: Colors.white70,
-                fontStyle: FontStyle.italic,
-                fontSize: 13,
-              ),
-            ),
-          ),
-          const SizedBox(height: RedesignSpacing.md),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => AIVetChatScreen(pet: pet)),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: RedesignColors.accent,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(RedesignSpacing.pillRadius),
-                ),
-                elevation: 0,
-              ),
-              child: const Text(
-                'Start a Conversation \u2192',
-                style: TextStyle(fontWeight: FontWeight.w700),
-              ),
-            ),
-          ),
-        ],
+    return SkyDarkFeatureCard(
+      icon: Icons.chat_bubble,
+      title: 'AI Vet Chat',
+      subtitle: 'Ask any pet health question',
+      exampleText: '"Is it normal for ${pet.name} to eat grass sometimes?"',
+      buttonLabel: 'Start a Conversation \u2192',
+      onPressed: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => AIVetChatScreen(pet: pet)),
       ),
     );
   }
 }
 
-class _SectionLabel extends StatelessWidget {
-  const _SectionLabel(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: const TextStyle(
-        color: RedesignColors.textSecondary,
-        fontSize: 12,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 0.6,
-      ),
-    );
-  }
-}
+// ---------- Free features ----------
 
 class _FreeFeaturesGrid extends StatelessWidget {
   const _FreeFeaturesGrid({required this.pet});
@@ -314,26 +253,27 @@ class _FreeFeaturesGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final sky = SkyColors.of(context);
     return GridView.count(
       crossAxisCount: 2,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: RedesignSpacing.sm,
-      crossAxisSpacing: RedesignSpacing.sm,
+      mainAxisSpacing: 10,
+      crossAxisSpacing: 10,
       childAspectRatio: 1.5,
       children: [
-        _FeatureCard(
+        SkyFeatureTile(
           icon: Icons.camera_alt,
-          iconColor: RedesignColors.accent,
+          iconColor: sky.header,
           title: 'Scan Photo',
           subtitle: 'Skin & eye analysis',
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute(builder: (_) => PhotoAnalysisScreen()),
           ),
         ),
-        _FeatureCard(
+        SkyFeatureTile(
           icon: Icons.medical_information,
-          iconColor: RedesignColors.success,
+          iconColor: SkyColors.success,
           title: 'Symptom Check',
           subtitle: 'Quick triage',
           onTap: () => Navigator.of(context).push(
@@ -345,47 +285,19 @@ class _FreeFeaturesGrid extends StatelessWidget {
   }
 }
 
-class _PremiumHeader extends ConsumerWidget {
+// ---------- Premium features ----------
+
+class _PremiumHeader extends StatelessWidget {
   const _PremiumHeader();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        const Row(
-          children: [
-            Icon(Icons.diamond, size: 14, color: RedesignColors.premium),
-            SizedBox(width: 4),
-            Text(
-              'PREMIUM',
-              style: TextStyle(
-                color: RedesignColors.premium,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.6,
-              ),
-            ),
-          ],
-        ),
-        TextButton(
-          onPressed: () => Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => PremiumUpgradeScreen()),
-          ),
-          style: TextButton.styleFrom(
-            backgroundColor: RedesignColors.premium,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(RedesignSpacing.pillRadius),
-            ),
-          ),
-          child: const Text(
-            'Upgrade',
-            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
-          ),
-        ),
-      ],
+  Widget build(BuildContext context) {
+    return SkySectionHeader(
+      label: 'Premium',
+      actionLabel: 'Upgrade',
+      onAction: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => PremiumUpgradeScreen()),
+      ),
     );
   }
 }
@@ -414,43 +326,33 @@ class _PremiumFeaturesGrid extends StatelessWidget {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) => Padding(
-        padding: const EdgeInsets.all(RedesignSpacing.lg),
+        padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.diamond, color: RedesignColors.premium, size: 32),
-            const SizedBox(height: RedesignSpacing.sm),
+            const Icon(Icons.diamond, color: SkyColors.premium, size: 32),
+            const SizedBox(height: 10),
             const Text(
               'This is a Premium feature',
               style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
             ),
             const SizedBox(height: 4),
-            const Text(
+            Text(
               'Upgrade to unlock this and 5 more AI tools.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: RedesignColors.textSecondary),
+              style: TextStyle(color: SkyColors.of(context).textSecondary),
             ),
-            const SizedBox(height: RedesignSpacing.md),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => PremiumUpgradeScreen()),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: RedesignColors.premium,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius:
-                        BorderRadius.circular(RedesignSpacing.pillRadius),
-                  ),
-                ),
-                child: const Text('Upgrade Now'),
-              ),
+            const SizedBox(height: 16),
+            SkyPillButton(
+              label: 'Upgrade Now',
+              tone: SkyButtonTone.premium,
+              expand: true,
+              onPressed: () {
+                Navigator.of(context).pop();
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => PremiumUpgradeScreen()),
+                );
+              },
             ),
           ],
         ),
@@ -464,139 +366,61 @@ class _PremiumFeaturesGrid extends StatelessWidget {
       crossAxisCount: 2,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: RedesignSpacing.sm,
-      crossAxisSpacing: RedesignSpacing.sm,
+      mainAxisSpacing: 10,
+      crossAxisSpacing: 10,
       childAspectRatio: 1.5,
       children: [
-        _FeatureCard(
+        SkyFeatureTile(
           icon: Icons.bar_chart,
-          iconColor: RedesignColors.premium,
+          iconColor: SkyColors.premium,
           title: 'Medical AI',
           subtitle: 'History analysis',
           isPro: true,
           onTap: () =>
               _handleTap(context, MedicalHistoryAnalysisScreen(pet: pet)),
         ),
-        _FeatureCard(
+        SkyFeatureTile(
           icon: Icons.bolt,
-          iconColor: RedesignColors.due,
+          iconColor: SkyColors.due,
           title: 'Smart Schedule',
           subtitle: 'Auto-reminders',
           isPro: true,
           onTap: () => _handleTap(context, SmartRemindersScreen(pet: pet)),
         ),
-        _FeatureCard(
+        SkyFeatureTile(
           icon: Icons.restaurant_menu,
-          iconColor: RedesignColors.success,
+          iconColor: SkyColors.success,
           title: 'Feeding Plan',
           subtitle: 'Custom schedule',
           isPro: true,
           onTap: () => _handleTap(context, FeedingScheduleScreen(pet: pet)),
         ),
-        _FeatureCard(
+        SkyFeatureTile(
           icon: Icons.school,
-          iconColor: RedesignColors.accent,
+          iconColor: SkyColors.of(context).header,
           title: 'Training Tips',
           subtitle: 'Personalized advice',
           isPro: true,
           onTap: () => _handleTap(context, TrainingTipsScreen(pet: pet)),
         ),
-        _FeatureCard(
+        SkyFeatureTile(
           icon: Icons.favorite,
-          iconColor: RedesignColors.due,
+          iconColor: SkyColors.due,
           title: 'Health Insights',
           subtitle: 'Trend analysis',
           isPro: true,
           onTap: () =>
               _handleTap(context, HealthInsightsScreen(petId: pet.id)),
         ),
-        _FeatureCard(
+        SkyFeatureTile(
           icon: Icons.summarize,
-          iconColor: RedesignColors.premium,
+          iconColor: SkyColors.premium,
           title: 'Monthly Report',
           subtitle: 'Full summary',
           isPro: true,
           onTap: () => _handleTap(context, MonthlyReportScreen(pet: pet)),
         ),
       ],
-    );
-  }
-}
-
-class _FeatureCard extends StatelessWidget {
-  const _FeatureCard({
-    required this.icon,
-    required this.iconColor,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-    this.isPro = false,
-  });
-
-  final IconData icon;
-  final Color iconColor;
-  final String title;
-  final String subtitle;
-  final bool isPro;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(RedesignSpacing.cardRadius),
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(RedesignSpacing.sm + 4),
-        decoration: BoxDecoration(
-          color: isPro ? RedesignColors.premiumSoft : RedesignColors.surface,
-          borderRadius: BorderRadius.circular(RedesignSpacing.cardRadius),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Icon(icon, color: iconColor, size: 22),
-                if (isPro)
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: RedesignColors.premium,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: const Text(
-                      'PRO',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 9,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: RedesignSpacing.sm),
-            Text(
-              title,
-              style: const TextStyle(
-                fontWeight: FontWeight.w700,
-                color: RedesignColors.textPrimary,
-                fontSize: 13,
-              ),
-            ),
-            Text(
-              subtitle,
-              style: const TextStyle(
-                color: RedesignColors.textSecondary,
-                fontSize: 11,
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

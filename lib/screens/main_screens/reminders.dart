@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:pet_care/models/medical_record.dart';
 import 'package:pet_care/models/reminder.dart';
 import 'package:pet_care/providers/auth_providers.dart';
 import 'package:pet_care/providers/firestore_providers.dart';
+import 'package:pet_care/theme/app_theme.dart';
+import 'package:pet_care/widgets/widgets.dart';
 
 import 'package:pet_care/services/notification_service.dart';
 
@@ -72,49 +75,76 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final sky = SkyColors.of(context);
     return Scaffold(
-      appBar: AppBar(
-        elevation: 0,
-        title: Text(
-          'Reminders',
-          // style: TextStyle(
-          //   color: Colors.black,
-          //   fontSize: 22,
-          //   fontWeight: FontWeight.bold,
-          // ),
-          style: theme.appBarTheme.titleTextStyle,
-        ),
-        actions: [
+      backgroundColor: sky.pageBackground,
+      body: Column(
+        children: [
+          _buildHeader(context),
+          _buildTabBar(context),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildTodayTab(),
+                _buildWeeklyTab(),
+                _buildMonthlyTab(),
+                _buildAllTab(),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context) {
+    return SkyHeader(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              'Reminders',
+              style: GoogleFonts.nunito(
+                color: SkyColors.skyOnHeader,
+                fontSize: 24,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
           IconButton(
             onPressed: _manualSync,
-            icon: Icon(Icons.sync, color: theme.colorScheme.onSurface),
+            icon: const Icon(Icons.sync, color: SkyColors.skyOnHeader),
           ),
           IconButton(
             onPressed: () => _showAddReminderDialog(context),
-            icon: Icon(Icons.add, color: theme.colorScheme.onSurface),
+            icon: const Icon(Icons.add, color: SkyColors.skyOnHeader),
           ),
         ],
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: const Color(0xFF4CAF50),
-          unselectedLabelColor: Colors.grey,
-          indicatorColor: const Color(0xFF4CAF50),
-          tabs: const [
-            Tab(text: 'Today'),
-            Tab(text: 'Weekly'),
-            Tab(text: 'Monthly'),
-            Tab(text: 'All'),
-          ],
-        ),
       ),
-      body: TabBarView(
+    );
+  }
+
+  Widget _buildTabBar(BuildContext context) {
+    final sky = SkyColors.of(context);
+    return Container(
+      color: sky.pageBackground,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: TabBar(
         controller: _tabController,
-        children: [
-          _buildTodayTab(),
-          _buildWeeklyTab(),
-          _buildMonthlyTab(),
-          _buildAllTab(),
+        labelColor: sky.header,
+        unselectedLabelColor: sky.textSecondary,
+        indicatorColor: sky.header,
+        indicatorSize: TabBarIndicatorSize.label,
+        labelStyle: GoogleFonts.dmSans(fontWeight: FontWeight.w700, fontSize: 13),
+        unselectedLabelStyle:
+            GoogleFonts.dmSans(fontWeight: FontWeight.w500, fontSize: 13),
+        tabs: const [
+          Tab(text: 'Today'),
+          Tab(text: 'Weekly'),
+          Tab(text: 'Monthly'),
+          Tab(text: 'All'),
         ],
       ),
     );
@@ -160,6 +190,7 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
           return _buildEmptyState('No reminders for today');
         }
         return RefreshIndicator(
+          color: SkyColors.of(context).header,
           onRefresh: _manualSync,
           child: ListView.builder(
             padding: const EdgeInsets.all(20),
@@ -189,6 +220,7 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
           return _buildEmptyState('No weekly reminders');
         }
         return RefreshIndicator(
+          color: SkyColors.of(context).header,
           onRefresh: _manualSync,
           child: ListView.builder(
             padding: const EdgeInsets.all(20),
@@ -218,6 +250,7 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
           return _buildEmptyState('No monthly reminders');
         }
         return RefreshIndicator(
+          color: SkyColors.of(context).header,
           onRefresh: _manualSync,
           child: ListView.builder(
             padding: const EdgeInsets.all(20),
@@ -272,6 +305,7 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
         }
 
         return RefreshIndicator(
+          color: SkyColors.of(context).header,
           onRefresh: _manualSync,
           child: ListView(
             padding: const EdgeInsets.all(20),
@@ -333,32 +367,22 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
   }
 
   Widget _buildSectionHeader(String title) {
-    final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Text(
-        title,
-        // style: const TextStyle(
-        //   fontSize: 18,
-        //   fontWeight: FontWeight.bold,
-        //   color: Colors.black,
-        style: theme.textTheme.titleLarge,
-      ),
+      padding: const EdgeInsets.only(bottom: 12),
+      child: SkySectionHeader(label: title),
     );
   }
 
   Widget _buildEmptyState(String message) {
+    final sky = SkyColors.of(context);
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.notifications_none, size: 80, color: Colors.grey[400]),
-          const SizedBox(height: 16),
-          Text(
-            message,
-            style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-          ),
-        ],
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: SkyEmptyState(
+          icon: Icons.notifications_none,
+          title: message,
+          iconColor: sky.textSecondary,
+        ),
       ),
     );
   }
@@ -371,7 +395,7 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
   }) {
     final icon = _getIconForReminder(reminder.title);
     final color = _getColorForImportance(reminder.importanceLevel);
-    final theme = Theme.of(context);
+    final sky = SkyColors.of(context);
 
     return Dismissible(
       key: key ?? Key(reminder.id!),
@@ -381,123 +405,112 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
         return false;
       },
       background: Container(
-        margin: const EdgeInsets.only(bottom: 15),
+        margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.only(right: 20),
         alignment: Alignment.centerRight,
         decoration: BoxDecoration(
-          color: Colors.red,
-          borderRadius: BorderRadius.circular(15),
+          color: AppTheme.error,
+          borderRadius: BorderRadius.circular(20),
         ),
         child: const Icon(Icons.delete, color: Colors.white),
       ),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 15),
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
-          borderRadius: BorderRadius.circular(15),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
-              spreadRadius: 1,
-              blurRadius: 5,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: SkyCard(
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: color, size: 22),
               ),
-              child: Icon(icon, color: color, size: 24),
-            ),
-            const SizedBox(width: 15),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          reminder.title,
-                          // style: TextStyle(
-                          //   fontSize: 16,
-                          //   fontWeight: FontWeight.w600,
-                          //   color: Colors.black,
-                          //   decoration:
-                          //       reminder.isCompleted
-                          //           ? TextDecoration.lineThrough
-                          //           : null,
-                          // ),
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            decoration:
-                                reminder.isCompleted
-                                    ? TextDecoration.lineThrough
-                                    : null,
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            reminder.title,
+                            style: GoogleFonts.dmSans(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15,
+                              color: sky.textPrimary,
+                              decoration:
+                                  reminder.isCompleted
+                                      ? TextDecoration.lineThrough
+                                      : null,
+                              decorationColor: sky.textSecondary,
+                            ),
                           ),
+                        ),
+                        if (!reminder.isSynced)
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: SkyColors.due,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                      ],
+                    ),
+                    if (reminder.description != null) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        reminder.description!,
+                        style: GoogleFonts.dmSans(
+                          fontSize: 13,
+                          color: sky.textSecondary,
                         ),
                       ),
-                      if (!reminder.isSynced)
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: const BoxDecoration(
-                            color: Colors.orange,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
                     ],
-                  ),
-                  if (reminder.description != null) ...[
                     const SizedBox(height: 3),
                     Text(
-                      reminder.description!,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey.shade600,
+                      _formatReminderTime(reminder),
+                      style: GoogleFonts.dmSans(
+                        fontSize: 12,
+                        color: sky.textSecondary,
                       ),
                     ),
                   ],
-                  const SizedBox(height: 3),
-                  Text(
-                    _formatReminderTime(reminder),
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-                  ),
-                ],
+                ),
               ),
-            ),
-            GestureDetector(
-              onTap: onToggle,
-              child: Container(
-                width: 24,
-                height: 24,
-                decoration: BoxDecoration(
-                  color:
-                      reminder.isCompleted
-                          ? const Color(0xFF4CAF50)
-                          : Colors.transparent,
-                  border: Border.all(
+              const SizedBox(width: 8),
+              InkWell(
+                onTap: onToggle,
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  width: 26,
+                  height: 26,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
                     color:
                         reminder.isCompleted
-                            ? const Color(0xFF4CAF50)
-                            : Colors.grey.shade400,
-                    width: 2,
+                            ? SkyColors.success
+                            : Colors.transparent,
+                    border: Border.all(
+                      color:
+                          reminder.isCompleted
+                              ? SkyColors.success
+                              : sky.border,
+                      width: 2,
+                    ),
                   ),
-                  borderRadius: BorderRadius.circular(12),
+                  child:
+                      reminder.isCompleted
+                          ? const Icon(Icons.check, color: Colors.white, size: 16)
+                          : null,
                 ),
-                child:
-                    reminder.isCompleted
-                        ? const Icon(Icons.check, color: Colors.white, size: 16)
-                        : null,
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -523,13 +536,13 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
   Color _getColorForImportance(String? importance) {
     switch (importance) {
       case 'high':
-        return Colors.red;
+        return AppTheme.error;
       case 'medium':
-        return Colors.orange;
+        return SkyColors.due;
       case 'low':
-        return Colors.blue;
+        return SkyColors.of(context).header;
       default:
-        return const Color(0xFF4CAF50);
+        return SkyColors.success;
     }
   }
 
@@ -648,15 +661,9 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
                 onPressed: () => Navigator.pop(context, false),
                 child: const Text('Skip'),
               ),
-              ElevatedButton(
+              SkyPillButton(
+                label: 'Create Record',
                 onPressed: () => Navigator.pop(context, true),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF4CAF50),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                child: const Text('Create Record'),
               ),
             ],
           ),
@@ -733,7 +740,7 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to delete reminder: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppTheme.error,
           ),
         );
       }
@@ -868,12 +875,12 @@ class _AddReminderDialogState extends ConsumerState<_AddReminderDialog> {
                   (e, s) => Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      border: Border.all(color: Colors.red),
+                      border: Border.all(color: AppTheme.error),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
                       'Error loading pets: $e',
-                      style: const TextStyle(color: Colors.red),
+                      style: const TextStyle(color: AppTheme.error),
                     ),
                   ),
             ),
@@ -927,15 +934,12 @@ class _AddReminderDialogState extends ConsumerState<_AddReminderDialog> {
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),
-        ElevatedButton(
-          onPressed: (){_saveReminder(context); Navigator.of(context).pop();},
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF4CAF50),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-          child: const Text('Add Reminder'),
+        SkyPillButton(
+          label: 'Add Reminder',
+          onPressed: () {
+            _saveReminder(context);
+            Navigator.of(context).pop();
+          },
         ),
       ],
     );
@@ -1428,7 +1432,8 @@ class _MedicalRecordFormDialogState extends State<_MedicalRecordFormDialog> {
           onPressed: () => Navigator.pop(context),
           child: const Text('Cancel'),
         ),
-        ElevatedButton(
+        SkyPillButton(
+          label: 'Save Record',
           onPressed: () {
             Navigator.pop(context, {
               'title': titleController.text,
@@ -1448,13 +1453,6 @@ class _MedicalRecordFormDialogState extends State<_MedicalRecordFormDialog> {
               'nextDueDate': nextDueDate,
             });
           },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF4CAF50),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-          child: const Text('Save Record'),
         ),
       ],
     );
