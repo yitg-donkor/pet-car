@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import 'package:pet_care/models/medical_record.dart';
 import 'package:pet_care/models/pet.dart';
 import 'package:pet_care/providers/auth_providers.dart';
 import 'package:pet_care/providers/firestore_providers.dart';
+import 'package:pet_care/theme/app_theme.dart';
+import 'package:pet_care/widgets/widgets.dart';
 
 class MedicalRecordsScreen extends ConsumerStatefulWidget {
   const MedicalRecordsScreen({Key? key}) : super(key: key);
@@ -19,94 +23,159 @@ class _MedicalRecordsScreenState extends ConsumerState<MedicalRecordsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final sky = SkyColors.of(context);
     final petsAsync = ref.watch(petsControllerProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        title: const Text(
-          'Medical Records',
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        actions: [
-          IconButton(
-            onPressed: _manualSync,
-            icon: const Icon(Icons.sync, color: Colors.black),
-          ),
-        ],
-      ),
+      backgroundColor: sky.pageBackground,
       body: Column(
         children: [
-          // Pet Selector & Filter
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                // Pet Dropdown
-                petsAsync.when(
-                  data: (pets) {
-                    if (pets.isEmpty) {
-                      return Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Text(
-                          'No pets available. Add a pet first.',
-                        ),
-                      );
+          SkyHeader(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+            child: petsAsync.when(
+              data: (pets) {
+                if (pets.isEmpty) {
+                  return Text(
+                    'Add a pet to track medical records',
+                    style: GoogleFonts.dmSans(color: Colors.white),
+                  );
+                }
+                if (selectedPetId == null && pets.isNotEmpty) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) {
+                      setState(() => selectedPetId = pets.first.id);
                     }
+                  });
+                }
+                final selectedPet =
+                    pets.where((p) => p.id == selectedPetId).firstOrNull ??
+                    pets.first;
+                final recordsAsync = selectedPetId != null
+                    ? ref.watch(petMedicalRecordsProvider(selectedPetId!))
+                    : null;
+                final records = recordsAsync?.valueOrNull ?? [];
 
-                    // Set initial pet if not selected
-                    if (selectedPetId == null && pets.isNotEmpty) {
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        if (mounted) {
-                          setState(() {
-                            selectedPetId = pets.first.id;
-                          });
-                        }
-                      });
-                    }
+                final totalSpent = records.fold<double>(
+                  0,
+                  (sum, r) => sum + (r.cost ?? 0),
+                );
+                final sortedByDate = [...records]
+                  ..sort((a, b) => b.date.compareTo(a.date));
+                final lastVisit =
+                    sortedByDate.isNotEmpty ? sortedByDate.first.date : null;
+                final upcoming = records
+                    .where(
+                      (r) =>
+                          r.nextDueDate != null &&
+                          r.nextDueDate!.isAfter(DateTime.now()),
+                    )
+                    .toList()
+                  ..sort((a, b) => a.nextDueDate!.compareTo(b.nextDueDate!));
+                final nextDue =
+                    upcoming.isNotEmpty ? upcoming.first.nextDueDate : null;
 
-                    return DropdownButtonFormField<String>(
-                      value: selectedPetId,
-                      decoration: InputDecoration(
-                        labelText: 'Select Pet',
-                        prefixIcon: const Icon(Icons.pets),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'Paw Care',
+                          style: GoogleFonts.dmSans(
+                            color: Colors.white70,
+                            fontSize: 13,
+                          ),
                         ),
+                        const Spacer(),
+                        _PetPickerButton(
+                          pets: pets,
+                          selectedPetId: selectedPetId,
+                          onChanged: (value) =>
+                              setState(() => selectedPetId = value),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      selectedPet.name,
+                      style: GoogleFonts.dmSans(
+                        color: Colors.white70,
+                        fontSize: 14,
                       ),
-                      items:
-                          pets.map((pet) {
-                            return DropdownMenuItem(
-                              value: pet.id,
-                              child: Text(pet.name),
-                            );
-                          }).toList(),
-                      onChanged: (value) {
-                        setState(() {
-                          selectedPetId = value;
-                        });
-                      },
-                    );
-                  },
-                  loading:
-                      () => const Center(child: CircularProgressIndicator()),
-                  error: (e, s) => Text('Error: $e'),
+                    ),
+                    Text(
+                      'Medical Records',
+                      style: GoogleFonts.nunito(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 24,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: SkyStatChip(
+                            icon: Icons.attach_money,
+                            value: '\$${totalSpent.toStringAsFixed(0)}',
+                            label: 'Total spent',
+                            variant: SkyStatChipVariant.onHeader,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: SkyStatChip(
+                            icon: Icons.event_available,
+                            value: lastVisit != null
+                                ? DateFormat('MMM d').format(lastVisit)
+                                : '\u2014',
+                            label: 'Last visit',
+                            variant: SkyStatChipVariant.onHeader,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: SkyStatChip(
+                            icon: Icons.event_repeat,
+                            value: nextDue != null
+                                ? DateFormat('MMM d').format(nextDue)
+                                : '\u2014',
+                            label: 'Next due',
+                            variant: SkyStatChipVariant.onHeader,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                );
+              },
+              loading: () => const SizedBox(
+                height: 60,
+                child: Center(
+                  child: CircularProgressIndicator(color: Colors.white),
                 ),
-                const SizedBox(height: 12),
-                // Filter Chips
+              ),
+              error: (e, _) =>
+                  Text('Error: $e', style: const TextStyle(color: Colors.white)),
+            ),
+          ),
+          Container(
+            color: sky.pageBackground,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                Text(
+                  'ALL RECORDS',
+                  style: GoogleFonts.dmSans(
+                    color: sky.textSecondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+                const Spacer(),
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
+                  reverse: true,
                   child: Row(
                     children: [
                       _buildFilterChip('All', 'all'),
@@ -122,18 +191,16 @@ class _MedicalRecordsScreenState extends ConsumerState<MedicalRecordsScreen> {
               ],
             ),
           ),
-          // Records List
           Expanded(
-            child:
-                selectedPetId == null
-                    ? _buildEmptyState('Select a pet to view records')
-                    : _buildRecordsList(selectedPetId!),
+            child: selectedPetId == null
+                ? _buildEmptyState('Select a pet to view records')
+                : _buildRecordsList(selectedPetId!),
           ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: selectedPetId != null ? () => _showAddRecordDialog() : null,
-        backgroundColor: const Color(0xFF4CAF50),
+        backgroundColor: sky.header,
         icon: const Icon(Icons.add),
         label: const Text('Add Record'),
       ),
@@ -142,19 +209,33 @@ class _MedicalRecordsScreenState extends ConsumerState<MedicalRecordsScreen> {
 
   Widget _buildFilterChip(String label, String value) {
     final isSelected = selectedFilter == value;
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: FilterChip(
-        label: Text(label),
-        selected: isSelected,
-        onSelected: (selected) {
-          setState(() {
-            selectedFilter = value;
-          });
-        },
-        selectedColor: const Color(0xFF4CAF50).withOpacity(0.2),
-        checkmarkColor: const Color(0xFF4CAF50),
-      ),
+    return Builder(
+      builder: (context) {
+        final sky = SkyColors.of(context);
+        return Padding(
+          padding: const EdgeInsets.only(left: 8),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(100),
+            onTap: () => setState(() => selectedFilter = value),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: isSelected ? sky.header : sky.surface,
+                borderRadius: BorderRadius.circular(100),
+                border: isSelected ? null : Border.all(color: sky.border),
+              ),
+              child: Text(
+                label,
+                style: GoogleFonts.dmSans(
+                  color: isSelected ? Colors.white : sky.textSecondary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -907,5 +988,75 @@ class _RecordDetailsDialog extends StatelessWidget {
 
   String _formatDate(DateTime date) {
     return '${date.day}/${date.month}/${date.year}';
+  }
+}
+
+/// Small pill button in the header that opens a sheet to switch which pet's
+/// records are showing.
+class _PetPickerButton extends StatelessWidget {
+  const _PetPickerButton({
+    required this.pets,
+    required this.selectedPetId,
+    required this.onChanged,
+  });
+
+  final List<Pet> pets;
+  final String? selectedPetId;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(100),
+      onTap: () {
+        showModalBottomSheet(
+          context: context,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          builder: (context) => SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: pets
+                  .map(
+                    (pet) => ListTile(
+                      leading: AppAvatar(
+                        imageUrl: pet.photoUrl,
+                        fallbackText: pet.name,
+                      ),
+                      title: Text(pet.name),
+                      trailing: pet.id == selectedPetId
+                          ? const Icon(Icons.check)
+                          : null,
+                      onTap: () {
+                        onChanged(pet.id);
+                        Navigator.of(context).pop();
+                      },
+                    ),
+                  )
+                  .toList(),
+            ),
+          ),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.2),
+          borderRadius: BorderRadius.circular(100),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.swap_horiz, color: Colors.white, size: 16),
+            SizedBox(width: 4),
+            Text(
+              'Switch',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

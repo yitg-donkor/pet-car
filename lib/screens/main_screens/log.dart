@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:pet_care/models/activity_log.dart';
+import 'package:pet_care/theme/app_theme.dart';
+import 'package:pet_care/widgets/widgets.dart';
 
 import 'package:pet_care/providers/firestore_providers.dart';
 
@@ -33,40 +36,143 @@ class _LogScreenState extends ConsumerState<LogScreen>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final sky = SkyColors.of(context);
+    final dailyLogsAsync = ref.watch(dailyActivityLogsProvider);
+    final todayLogs = dailyLogsAsync.valueOrNull?['today'] ?? [];
+
+    int countOf(String type) =>
+        todayLogs.where((l) => l.activityType == type).length;
+    final walkMinutes = todayLogs
+        .where((l) => l.activityType == 'walk')
+        .fold<int>(0, (sum, l) => sum + (l.duration ?? 0));
+
     return Scaffold(
-      appBar: AppBar(
-        elevation: 0,
-        title: Text(
-          'Activity Log',
-          // style: TextStyle(
-          //   color: Colors.black,
-          //   fontSize: 22,
-          //   fontWeight: FontWeight.bold,
-          // ),
-          style: theme.textTheme.headlineLarge,
-        ),
-        actions: [
-          IconButton(
-            onPressed: () => _showAddLogDialog(context),
-            icon: Icon(Icons.add, color: theme.colorScheme.onSurface),
+      backgroundColor: sky.pageBackground,
+      body: NestedScrollView(
+        headerSliverBuilder: (context, innerBoxIsScrolled) => [
+          SliverToBoxAdapter(
+            child: SkyHeader(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Today',
+                        style: GoogleFonts.dmSans(
+                          color: Colors.white70,
+                          fontSize: 13,
+                        ),
+                      ),
+                      InkWell(
+                        onTap: () => _showAddLogDialog(context),
+                        borderRadius: BorderRadius.circular(100),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(100),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.add, color: Colors.white, size: 16),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Log',
+                                style: GoogleFonts.dmSans(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Activity Log',
+                    style: GoogleFonts.nunito(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 26,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: SkyStatChip(
+                          icon: Icons.directions_walk,
+                          value: '${countOf('walk')}',
+                          label: 'today \u00b7 Walks',
+                          variant: SkyStatChipVariant.onHeader,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: SkyStatChip(
+                          icon: Icons.restaurant,
+                          value: '${countOf('meal')}',
+                          label: 'fed \u00b7 Meals',
+                          variant: SkyStatChipVariant.onHeader,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: SkyStatChip(
+                          icon: Icons.toys,
+                          value: '$walkMinutes',
+                          label: 'min \u00b7 Play',
+                          variant: SkyStatChipVariant.onHeader,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: SkyStatChip(
+                          icon: Icons.medication,
+                          value: '${countOf('medication')}',
+                          label: 'given \u00b7 Meds',
+                          variant: SkyStatChipVariant.onHeader,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: _TabBarDelegate(
+              TabBar(
+                controller: _tabController,
+                labelColor: sky.header,
+                unselectedLabelColor: sky.textSecondary,
+                indicatorColor: sky.header,
+                labelStyle: GoogleFonts.dmSans(fontWeight: FontWeight.w700),
+                unselectedLabelStyle: GoogleFonts.dmSans(),
+                tabs: const [
+                  Tab(text: 'Daily'),
+                  Tab(text: 'Health'),
+                  Tab(text: 'All'),
+                ],
+              ),
+              backgroundColor: sky.pageBackground,
+            ),
           ),
         ],
-        bottom: TabBar(
+        body: TabBarView(
           controller: _tabController,
-          labelColor: const Color(0xFF4CAF50),
-          unselectedLabelColor: Colors.grey,
-          indicatorColor: const Color(0xFF4CAF50),
-          tabs: const [
-            Tab(text: 'Daily'),
-            Tab(text: 'Health'),
-            Tab(text: 'All'),
-          ],
+          children: [_buildDailyTab(), _buildHealthTab(), _buildAllTab()],
         ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [_buildDailyTab(), _buildHealthTab(), _buildAllTab()],
       ),
     );
   }
@@ -151,7 +257,6 @@ class _LogScreenState extends ConsumerState<LogScreen>
   }
 
   Widget _buildAllTab() {
-    final theme = Theme.of(context);
     final allLogsAsync = ref.watch(activityLogsControllerProvider);
 
     return allLogsAsync.when(
@@ -190,51 +295,50 @@ class _LogScreenState extends ConsumerState<LogScreen>
             Row(
               children: [
                 Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 15),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.surface,
-                      borderRadius: BorderRadius.circular(25),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.grey.withOpacity(0.1),
-                          spreadRadius: 1,
-                          blurRadius: 5,
-                          offset: const Offset(0, 2),
+                  child: Builder(
+                    builder: (context) {
+                      final sky = SkyColors.of(context);
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 15),
+                        decoration: BoxDecoration(
+                          color: sky.surface,
+                          borderRadius: BorderRadius.circular(25),
+                          border: Border.all(color: sky.border),
                         ),
-                      ],
-                    ),
-                    child: TextField(
-                      controller: _searchController,
-                      decoration: const InputDecoration(
-                        hintText: 'Search logs...',
-                        prefixIcon: Icon(Icons.search, color: Colors.grey),
-                        border: InputBorder.none,
-                      ),
-                      onChanged: (value) {
-                        setState(() {
-                          _searchQuery = value;
-                        });
-                      },
-                    ),
+                        child: TextField(
+                          controller: _searchController,
+                          style: GoogleFonts.dmSans(),
+                          decoration: InputDecoration(
+                            hintText: 'Search logs...',
+                            hintStyle: GoogleFonts.dmSans(color: sky.textSecondary),
+                            prefixIcon:
+                                Icon(Icons.search, color: sky.textSecondary),
+                            border: InputBorder.none,
+                          ),
+                          onChanged: (value) {
+                            setState(() {
+                              _searchQuery = value;
+                            });
+                          },
+                        ),
+                      );
+                    },
                   ),
                 ),
                 const SizedBox(width: 10),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surface,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.grey.withOpacity(0.1),
-                        spreadRadius: 1,
-                        blurRadius: 5,
-                        offset: const Offset(0, 2),
+                Builder(
+                  builder: (context) {
+                    final sky = SkyColors.of(context);
+                    return Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: sky.surface,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: sky.border),
                       ),
-                    ],
-                  ),
-                  child: const Icon(Icons.filter_list, color: Colors.grey),
+                      child: Icon(Icons.filter_list, color: sky.textSecondary),
+                    );
+                  },
                 ),
               ],
             ),
@@ -262,47 +366,23 @@ class _LogScreenState extends ConsumerState<LogScreen>
 
   Widget _buildEmptyState(String message) {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.pets, size: 80, color: Colors.grey.shade300),
-          const SizedBox(height: 16),
-          Text(
-            message,
-            style: TextStyle(fontSize: 16, color: Colors.grey.shade500),
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: () => _showAddLogDialog(context),
-            icon: const Icon(Icons.add),
-            label: const Text('Add Log Entry'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF4CAF50),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          ),
-        ],
+      child: SkyEmptyState(
+        icon: Icons.pets,
+        title: message,
+        subtitle: 'Tap + to add your first entry',
       ),
     );
   }
 
   Widget _buildDateHeader(String date) {
-    final theme = Theme.of(context);
-    return Container(
-      margin: const EdgeInsets.only(bottom: 15),
-      child: Text(date, style: theme.textTheme.titleLarge),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: SkySectionHeader(label: date),
     );
   }
 
   Widget _buildLogEntryFromData(ActivityLog log) {
-    final theme = Theme.of(context);
     final activityType = ActivityType.fromString(log.activityType);
-
-    // Get pet name from pet ID
     final petsAsync = ref.watch(petsControllerProvider);
     final petName =
         petsAsync.whenOrNull(
@@ -313,77 +393,18 @@ class _LogScreenState extends ConsumerState<LogScreen>
         ) ??
         'Loading...';
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(15),
-        border:
-            log.isHealthRelated
-                ? Border.all(color: Colors.red.shade200, width: 1)
-                : null,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 5,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: activityType.color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(activityType.icon, color: activityType.color, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(log.title, style: theme.textTheme.titleLarge),
-                    const Spacer(),
-                    Text(
-                      _formatTime(log.timestamp),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade500,
-                      ),
-                    ),
-                    if (log.isHealthRelated) ...[
-                      const SizedBox(width: 5),
-                      Icon(
-                        Icons.health_and_safety,
-                        size: 16,
-                        color: Colors.red.shade400,
-                      ),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  '$petName${log.duration != null ? ' • ${log.duration} min' : ''}${log.amount != null ? ' • ${log.amount}' : ''}',
-                  style: theme.textTheme.bodyMedium,
-                ),
-                if (log.details != null && log.details!.isNotEmpty) ...[
-                  const SizedBox(height: 5),
-                  Text(log.details!, style: theme.textTheme.bodyMedium),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
+    final subtitleParts = [
+      petName,
+      if (log.duration != null) '${log.duration} min',
+      if (log.amount != null) log.amount!,
+      if (log.details != null && log.details!.isNotEmpty) log.details!,
+    ];
+
+    return SkyTimelineItem(
+      icon: activityType.icon,
+      title: log.title,
+      subtitle: subtitleParts.join(' \u00b7 '),
+      time: _formatTime(log.timestamp),
     );
   }
 
@@ -642,4 +663,26 @@ class _LogScreenState extends ConsumerState<LogScreen>
       ).showSnackBar(SnackBar(content: Text('Error loading pets: $e')));
     }
   }
+}
+
+/// Wraps a TabBar so it can pin below the SkyHeader in a NestedScrollView.
+class _TabBarDelegate extends SliverPersistentHeaderDelegate {
+  _TabBarDelegate(this.tabBar, {required this.backgroundColor});
+
+  final TabBar tabBar;
+  final Color backgroundColor;
+
+  @override
+  double get minExtent => tabBar.preferredSize.height;
+  @override
+  double get maxExtent => tabBar.preferredSize.height;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return Container(color: backgroundColor, child: tabBar);
+  }
+
+  @override
+  bool shouldRebuild(covariant _TabBarDelegate oldDelegate) =>
+      oldDelegate.tabBar != tabBar || oldDelegate.backgroundColor != backgroundColor;
 }

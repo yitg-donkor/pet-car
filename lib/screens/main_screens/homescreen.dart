@@ -6,7 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:pet_care/models/pet.dart';
 import 'package:pet_care/models/reminder.dart';
 import 'package:pet_care/providers/firestore_providers.dart';
-import 'package:pet_care/screens/ai_features/ai_navigation_screen.dart';
+import 'package:pet_care/screens/main_screens/ai_navigation_screen.dart';
 import 'package:pet_care/screens/main_screens/log.dart';
 import 'package:pet_care/screens/main_screens/reminders.dart';
 import 'package:pet_care/screens/main_screens/resources.dart';

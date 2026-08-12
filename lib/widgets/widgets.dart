@@ -125,22 +125,25 @@ class AppAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final sky = SkyColors.of(context);
     final initial =
-        fallbackText.trim().isEmpty ? '?' : fallbackText.trim()[0].toUpperCase();
+        fallbackText.trim().isEmpty
+            ? '?'
+            : fallbackText.trim()[0].toUpperCase();
 
     return CircleAvatar(
       radius: radius,
       backgroundColor: backgroundColor ?? sky.header,
       backgroundImage: imageUrl != null ? NetworkImage(imageUrl!) : null,
-      child: imageUrl == null
-          ? Text(
-              initial,
-              style: GoogleFonts.nunito(
-                color: foregroundColor,
-                fontWeight: FontWeight.w900,
-                fontSize: radius * 0.8,
-              ),
-            )
-          : null,
+      child:
+          imageUrl == null
+              ? Text(
+                initial,
+                style: GoogleFonts.nunito(
+                  color: foregroundColor,
+                  fontWeight: FontWeight.w900,
+                  fontSize: radius * 0.8,
+                ),
+              )
+              : null,
     );
   }
 }
@@ -178,9 +181,10 @@ class SkyStatChip extends StatelessWidget {
       decoration: BoxDecoration(
         color: onHeader ? Colors.white.withValues(alpha: 0.16) : sky.surface,
         borderRadius: BorderRadius.circular(16),
-        border: onHeader
-            ? Border.all(color: Colors.white.withValues(alpha: 0.25))
-            : null,
+        border:
+            onHeader
+                ? Border.all(color: Colors.white.withValues(alpha: 0.25))
+                : null,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -204,9 +208,10 @@ class SkyStatChip extends StatelessWidget {
             label,
             style: GoogleFonts.dmSans(
               fontSize: 11,
-              color: onHeader
-                  ? Colors.white.withValues(alpha: 0.85)
-                  : sky.textSecondary,
+              color:
+                  onHeader
+                      ? Colors.white.withValues(alpha: 0.85)
+                      : sky.textSecondary,
             ),
           ),
         ],
@@ -347,9 +352,10 @@ class SkySectionHeader extends StatelessWidget {
         if (actionLabel != null)
           TextButton.icon(
             onPressed: onAction,
-            icon: actionIcon != null
-                ? Icon(actionIcon, size: 16, color: SkyColors.due)
-                : const SizedBox.shrink(),
+            icon:
+                actionIcon != null
+                    ? Icon(actionIcon, size: 16, color: SkyColors.due)
+                    : const SizedBox.shrink(),
             label: Text(
               actionLabel!,
               style: GoogleFonts.dmSans(
@@ -488,9 +494,10 @@ class SkyPillButton extends StatelessWidget {
     final sky = SkyColors.of(context);
     final button = ElevatedButton.icon(
       onPressed: onPressed,
-      icon: icon != null
-          ? Icon(icon, size: 18, color: Colors.white)
-          : const SizedBox.shrink(),
+      icon:
+          icon != null
+              ? Icon(icon, size: 18, color: Colors.white)
+              : const SizedBox.shrink(),
       label: Text(
         label,
         style: GoogleFonts.dmSans(fontWeight: FontWeight.w700),
@@ -499,9 +506,7 @@ class SkyPillButton extends StatelessWidget {
         backgroundColor: _background(sky),
         foregroundColor: Colors.white,
         padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(100),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
         elevation: 0,
       ),
     );
@@ -663,11 +668,7 @@ class SkyDarkFeatureCard extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 14),
-          SkyPillButton(
-            label: buttonLabel,
-            onPressed: onPressed,
-            expand: true,
-          ),
+          SkyPillButton(label: buttonLabel, onPressed: onPressed, expand: true),
         ],
       ),
     );
@@ -827,9 +828,8 @@ class SkyPetChip extends StatelessWidget {
               imageUrl: imageUrl,
               fallbackText: name,
               radius: 12,
-              backgroundColor: selected
-                  ? Colors.white.withValues(alpha: 0.3)
-                  : sky.header,
+              backgroundColor:
+                  selected ? Colors.white.withValues(alpha: 0.3) : sky.header,
             ),
             if (showLabel) ...[
               const SizedBox(width: 6),
@@ -889,13 +889,32 @@ class SkyEmptyState extends StatelessWidget {
             const SizedBox(height: 2),
             Text(
               subtitle!,
-              style: GoogleFonts.dmSans(
-                color: sky.textSecondary,
-                fontSize: 13,
-              ),
+              style: GoogleFonts.dmSans(color: sky.textSecondary, fontSize: 13),
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class SKyGradient extends StatelessWidget {
+  const SKyGradient({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            theme.colorScheme.primary,
+            theme.colorScheme.primaryContainer,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
       ),
     );
   }

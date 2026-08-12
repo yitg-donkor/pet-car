@@ -5,6 +5,7 @@ import 'package:pet_care/models/medical_record.dart';
 import 'package:pet_care/providers/firestore_providers.dart';
 
 import 'package:intl/intl.dart';
+import 'package:pet_care/widgets/widgets.dart';
 
 class PetDetailsScreen extends ConsumerWidget {
   const PetDetailsScreen({super.key});
@@ -30,6 +31,7 @@ class PetDetailsScreen extends ConsumerWidget {
           SliverToBoxAdapter(
             child: Column(
               children: [
+                const SizedBox(height: 5),
                 _buildPetInfoCard(context, displayPet),
                 const SizedBox(height: 20),
                 _buildHealthStatsCard(context, displayPet),
@@ -52,6 +54,7 @@ class PetDetailsScreen extends ConsumerWidget {
     final theme = Theme.of(context);
     return SliverAppBar(
       expandedHeight: 300,
+
       pinned: true,
       leading: IconButton(
         onPressed: () => Navigator.pop(context),
@@ -136,10 +139,10 @@ class PetDetailsScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${displayPet.species} • ${displayPet.breed ?? "Mixed"}',
+                    '${displayPet.species} • ${displayPet.breed ?? "Mixed"} • ${displayPet.age ?? 0} ${displayPet.age == 1 ? "year" : "years"}',
                     style: Theme.of(
                       context,
-                    ).textTheme.headlineSmall?.copyWith(color: Colors.white),
+                    ).textTheme.labelSmall?.copyWith(color: Colors.white70),
                   ),
                 ],
               ),
@@ -152,9 +155,11 @@ class PetDetailsScreen extends ConsumerWidget {
 
   Widget _buildDefaultPetImage() {
     return Container(
-      color: Colors.blue.shade100,
-      child: Center(
-        child: Icon(Icons.pets, size: 100, color: Colors.blue.shade300),
+      child: Image.asset(
+        'assets/images/images.jpg',
+        fit: BoxFit.cover,
+        color: Colors.white.withOpacity(0.7),
+        colorBlendMode: BlendMode.modulate,
       ),
     );
   }
@@ -169,9 +174,9 @@ class PetDetailsScreen extends ConsumerWidget {
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
-      padding: const EdgeInsets.all(20),
+      // padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
+        //theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
@@ -181,86 +186,79 @@ class PetDetailsScreen extends ConsumerWidget {
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        //crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Basic Information', style: theme.textTheme.headlineMedium),
-          const SizedBox(height: 16),
-          _buildInfoRow(
-            Icons.cake,
-            'Age',
-            '$age ${age == 1 ? "year" : "years"} old',
-            theme,
-          ),
-          _buildInfoRow(Icons.calendar_today, 'Birth Date', birthDate, theme),
-          _buildInfoRow(
-            Icons.monitor_weight,
-            'Weight',
-            displayPet.weight != null ? '${displayPet.weight} kg' : 'Not set',
-            theme,
-          ),
-          _buildInfoRow(
-            Icons.pets,
-            'Breed',
-            displayPet.breed ?? 'Mixed',
-            theme,
-          ),
-          _buildInfoRow(
-            Icons.color_lens,
-            'Color',
-            displayPet.color ?? 'Not specified',
-            theme,
-          ),
-          if (displayPet.microchipId != null)
-            _buildInfoRow(
-              Icons.qr_code,
-              'Microchip',
-              displayPet.microchipId!,
-              theme,
+          // Text('Basic Information', style: theme.textTheme.headlineMedium),
+          //const SizedBox(height: 16),
+          Expanded(
+            child: SkyStatChip(
+              icon: Icons.cake,
+              value: birthDate,
+              label: 'Birth Date',
+              variant: SkyStatChipVariant.onSurface,
             ),
+          ),
+          SizedBox(width: 12),
+          // _buildInfoRow('Birth Date', birthDate, theme),
+          // _buildInfoRow(
+          //   'Weight',
+          //   displayPet.weight != null ? '${displayPet.weight} kg' : 'Not set',
+          //   theme,
+          // ),
+          Expanded(
+            child: SkyStatChip(
+              icon: Icons.monitor_weight,
+              value:
+                  displayPet.weight != null
+                      ? '${displayPet.weight} kg'
+                      : 'Not set',
+              label: 'Weight',
+              variant: SkyStatChipVariant.onSurface,
+            ),
+          ),
+          SizedBox(width: 12),
+
+          // _buildInfoRow(
+          //   'Microchip',
+          //   displayPet.microchipId != null
+          //       ? '${displayPet.microchipId}'
+          //       : 'not set',
+          //   theme,
+          // ),
+          Expanded(
+            child: SkyStatChip(
+              icon: Icons.qr_code,
+              value:
+                  displayPet.microchipId != null
+                      ? '${displayPet.microchipId}'
+                      : 'not set',
+              label: 'Microchip',
+              variant: SkyStatChipVariant.onSurface,
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildInfoRow(
-    IconData icon,
-    String label,
-    String value,
-    ThemeData theme,
-  ) {
+  Widget _buildInfoRow(String label, String value, ThemeData theme) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
+      padding: const EdgeInsets.only(left: 12, right: 12),
+
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.primaryContainer,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, size: 20, color: theme.colorScheme.primary),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
         ],

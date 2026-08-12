@@ -32,7 +32,7 @@ class AppTheme {
   static const Color lightTextSecondary = Color(0xFF55717F);
 
   // Dark Theme Colors
-static const Color darkBackground = Color(0xFF0A1B29);
+  static const Color darkBackground = Color(0xFF0A1B29);
   static const Color darkSurface = Color(0xFF12283B);
   static const Color darkCardBackground = Color(0xFF1B3349);
   static const Color darkTextPrimary = Color(0xFFEFF7FB);
@@ -186,9 +186,7 @@ static const Color darkBackground = Color(0xFF0A1B29);
         borderSide: const BorderSide(color: error, width: 2),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      hintStyle: GoogleFonts.dmSans(
-        color: lightTextSecondary.withOpacity(0.6),
-      ),
+      hintStyle: GoogleFonts.dmSans(color: lightTextSecondary.withOpacity(0.6)),
     ),
 
     floatingActionButtonTheme: const FloatingActionButtonThemeData(
@@ -453,9 +451,7 @@ static const Color darkBackground = Color(0xFF0A1B29);
         borderSide: const BorderSide(color: error, width: 2),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      hintStyle: GoogleFonts.dmSans(
-        color: darkTextSecondary.withOpacity(0.5),
-      ),
+      hintStyle: GoogleFonts.dmSans(color: darkTextSecondary.withOpacity(0.5)),
     ),
 
     floatingActionButtonTheme: FloatingActionButtonThemeData(
@@ -661,26 +657,26 @@ class SkyColors {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return isDark
         ? const SkyColors._(
-            header: AppTheme.skyHeaderDark,
-            pageBackground: AppTheme.skyPageBackgroundDark,
-            surface: AppTheme.skySurfaceDark,
-            textPrimary: AppTheme.skyTextPrimaryDark,
-            textSecondary: AppTheme.skyTextSecondaryDark,
-            border: AppTheme.skyBorderDark,
-            dueSoft: AppTheme.skyDueSoftDark,
-            successSoft: AppTheme.skySuccessSoftDark,
-            premiumSoft: AppTheme.skyPremiumSoftDark,
-          )
+          header: AppTheme.skyHeaderDark,
+          pageBackground: AppTheme.skyPageBackgroundDark,
+          surface: AppTheme.skySurfaceDark,
+          textPrimary: AppTheme.skyTextPrimaryDark,
+          textSecondary: AppTheme.skyTextSecondaryDark,
+          border: AppTheme.skyBorderDark,
+          dueSoft: AppTheme.skyDueSoftDark,
+          successSoft: AppTheme.skySuccessSoftDark,
+          premiumSoft: AppTheme.skyPremiumSoftDark,
+        )
         : const SkyColors._(
-            header: AppTheme.skyHeaderLight,
-            pageBackground: AppTheme.skyPageBackgroundLight,
-            surface: AppTheme.skySurfaceLight,
-            textPrimary: AppTheme.skyTextPrimaryLight,
-            textSecondary: AppTheme.skyTextSecondaryLight,
-            border: AppTheme.skyBorderLight,
-            dueSoft: AppTheme.skyDueSoft,
-            successSoft: AppTheme.skySuccessSoft,
-            premiumSoft: AppTheme.skyPremiumSoft,
-          );
+          header: AppTheme.skyHeaderLight,
+          pageBackground: AppTheme.skyPageBackgroundLight,
+          surface: AppTheme.skySurfaceLight,
+          textPrimary: AppTheme.skyTextPrimaryLight,
+          textSecondary: AppTheme.skyTextSecondaryLight,
+          border: AppTheme.skyBorderLight,
+          dueSoft: AppTheme.skyDueSoft,
+          successSoft: AppTheme.skySuccessSoft,
+          premiumSoft: AppTheme.skyPremiumSoft,
+        );
   }
 }
