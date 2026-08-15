@@ -10,7 +10,12 @@ import 'package:pet_care/theme/app_theme.dart';
 import 'package:pet_care/widgets/widgets.dart';
 
 class MedicalRecordsScreen extends ConsumerStatefulWidget {
-  const MedicalRecordsScreen({Key? key}) : super(key: key);
+  const MedicalRecordsScreen({Key? key, this.initialPetId}) : super(key: key);
+
+  /// Pre-selects this pet's records when navigated here from Pet Details.
+  /// Leave null to default to the user's first pet (e.g. when reached from
+  /// a general entry point rather than a specific pet's page).
+  final String? initialPetId;
 
   @override
   ConsumerState<MedicalRecordsScreen> createState() =>
@@ -18,7 +23,7 @@ class MedicalRecordsScreen extends ConsumerStatefulWidget {
 }
 
 class _MedicalRecordsScreenState extends ConsumerState<MedicalRecordsScreen> {
-  String? selectedPetId;
+  late String? selectedPetId = widget.initialPetId;
   String selectedFilter = 'all'; // all, vaccination, checkup, medication, etc.
 
   @override

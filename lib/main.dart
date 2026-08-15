@@ -104,7 +104,7 @@ class MyApp extends ConsumerWidget {
         '/pet_selection': (context) => const PetSpeciesSelectionScreen(),
         '/onboarding': (context) => const OnboardingFlowScreen(),
         '/home': (context) => const MainNavigation(initialIndex: 0),
-        '/reminders': (context) => const MainNavigation(initialIndex: 1),
+        '/reminders': (context) => const MainNavigation(initialIndex: 2),
         '/pet-details': (context) => const PetDetailsScreen(),
         '/add-pet': (context) => const AddPet(species: 'dog'),
         '/edit-pet': (context) => const Editpetscreen(),
