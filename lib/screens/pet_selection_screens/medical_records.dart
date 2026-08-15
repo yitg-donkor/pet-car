@@ -55,9 +55,10 @@ class _MedicalRecordsScreenState extends ConsumerState<MedicalRecordsScreen> {
                 final selectedPet =
                     pets.where((p) => p.id == selectedPetId).firstOrNull ??
                     pets.first;
-                final recordsAsync = selectedPetId != null
-                    ? ref.watch(petMedicalRecordsProvider(selectedPetId!))
-                    : null;
+                final recordsAsync =
+                    selectedPetId != null
+                        ? ref.watch(petMedicalRecordsProvider(selectedPetId!))
+                        : null;
                 final records = recordsAsync?.valueOrNull ?? [];
 
                 final totalSpent = records.fold<double>(
@@ -68,14 +69,17 @@ class _MedicalRecordsScreenState extends ConsumerState<MedicalRecordsScreen> {
                   ..sort((a, b) => b.date.compareTo(a.date));
                 final lastVisit =
                     sortedByDate.isNotEmpty ? sortedByDate.first.date : null;
-                final upcoming = records
-                    .where(
-                      (r) =>
-                          r.nextDueDate != null &&
-                          r.nextDueDate!.isAfter(DateTime.now()),
-                    )
-                    .toList()
-                  ..sort((a, b) => a.nextDueDate!.compareTo(b.nextDueDate!));
+                final upcoming =
+                    records
+                        .where(
+                          (r) =>
+                              r.nextDueDate != null &&
+                              r.nextDueDate!.isAfter(DateTime.now()),
+                        )
+                        .toList()
+                      ..sort(
+                        (a, b) => a.nextDueDate!.compareTo(b.nextDueDate!),
+                      );
                 final nextDue =
                     upcoming.isNotEmpty ? upcoming.first.nextDueDate : null;
 
@@ -95,8 +99,8 @@ class _MedicalRecordsScreenState extends ConsumerState<MedicalRecordsScreen> {
                         _PetPickerButton(
                           pets: pets,
                           selectedPetId: selectedPetId,
-                          onChanged: (value) =>
-                              setState(() => selectedPetId = value),
+                          onChanged:
+                              (value) => setState(() => selectedPetId = value),
                         ),
                       ],
                     ),
@@ -130,9 +134,10 @@ class _MedicalRecordsScreenState extends ConsumerState<MedicalRecordsScreen> {
                         Expanded(
                           child: SkyStatChip(
                             icon: Icons.event_available,
-                            value: lastVisit != null
-                                ? DateFormat('MMM d').format(lastVisit)
-                                : '\u2014',
+                            value:
+                                lastVisit != null
+                                    ? DateFormat('MMM d').format(lastVisit)
+                                    : '\u2014',
                             label: 'Last visit',
                             variant: SkyStatChipVariant.onHeader,
                           ),
@@ -141,9 +146,10 @@ class _MedicalRecordsScreenState extends ConsumerState<MedicalRecordsScreen> {
                         Expanded(
                           child: SkyStatChip(
                             icon: Icons.event_repeat,
-                            value: nextDue != null
-                                ? DateFormat('MMM d').format(nextDue)
-                                : '\u2014',
+                            value:
+                                nextDue != null
+                                    ? DateFormat('MMM d').format(nextDue)
+                                    : '\u2014',
                             label: 'Next due',
                             variant: SkyStatChipVariant.onHeader,
                           ),
@@ -153,20 +159,25 @@ class _MedicalRecordsScreenState extends ConsumerState<MedicalRecordsScreen> {
                   ],
                 );
               },
-              loading: () => const SizedBox(
-                height: 60,
-                child: Center(
-                  child: CircularProgressIndicator(color: Colors.white),
-                ),
-              ),
-              error: (e, _) =>
-                  Text('Error: $e', style: const TextStyle(color: Colors.white)),
+              loading:
+                  () => const SizedBox(
+                    height: 60,
+                    child: Center(
+                      child: CircularProgressIndicator(color: Colors.white),
+                    ),
+                  ),
+              error:
+                  (e, _) => Text(
+                    'Error: $e',
+                    style: const TextStyle(color: Colors.white),
+                  ),
             ),
           ),
           Container(
             color: sky.pageBackground,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'ALL RECORDS',
@@ -177,29 +188,32 @@ class _MedicalRecordsScreenState extends ConsumerState<MedicalRecordsScreen> {
                     letterSpacing: 0.6,
                   ),
                 ),
-                const Spacer(),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  reverse: true,
-                  child: Row(
-                    children: [
-                      _buildFilterChip('All', 'all'),
-                      _buildFilterChip('Vaccination', 'vaccination'),
-                      _buildFilterChip('Checkup', 'checkup'),
-                      _buildFilterChip('Medication', 'medication'),
-                      _buildFilterChip('Surgery', 'surgery'),
-                      _buildFilterChip('Grooming', 'grooming'),
-                      _buildFilterChip('Other', 'other'),
-                    ],
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _buildFilterChip('All', 'all'),
+                        _buildFilterChip('Vaccination', 'vaccination'),
+                        _buildFilterChip('Checkup', 'checkup'),
+                        _buildFilterChip('Medication', 'medication'),
+                        _buildFilterChip('Surgery', 'surgery'),
+                        _buildFilterChip('Grooming', 'grooming'),
+                        _buildFilterChip('Other', 'other'),
+                      ],
+                    ),
                   ),
                 ),
               ],
             ),
           ),
           Expanded(
-            child: selectedPetId == null
-                ? _buildEmptyState('Select a pet to view records')
-                : _buildRecordsList(selectedPetId!),
+            child:
+                selectedPetId == null
+                    ? _buildEmptyState('Select a pet to view records')
+                    : _buildRecordsList(selectedPetId!),
           ),
         ],
       ),
@@ -650,9 +664,7 @@ class _MedicalRecordsScreenState extends ConsumerState<MedicalRecordsScreen> {
     try {
       // Firestore repository has a real update - no need for the old
       // delete-and-recreate workaround.
-      await ref
-          .read(medicalRecordRepositoryProvider)
-          .set(record.id, record);
+      await ref.read(medicalRecordRepositoryProvider).set(record.id, record);
 
       if (selectedPetId != null) {
         ref.invalidate(petMedicalRecordsProvider(selectedPetId!));
@@ -1019,29 +1031,32 @@ class _PetPickerButton extends StatelessWidget {
           shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           ),
-          builder: (context) => SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: pets
-                  .map(
-                    (pet) => ListTile(
-                      leading: AppAvatar(
-                        imageUrl: pet.photoUrl,
-                        fallbackText: pet.name,
-                      ),
-                      title: Text(pet.name),
-                      trailing: pet.id == selectedPetId
-                          ? const Icon(Icons.check)
-                          : null,
-                      onTap: () {
-                        onChanged(pet.id);
-                        Navigator.of(context).pop();
-                      },
-                    ),
-                  )
-                  .toList(),
-            ),
-          ),
+          builder:
+              (context) => SafeArea(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children:
+                      pets
+                          .map(
+                            (pet) => ListTile(
+                              leading: AppAvatar(
+                                imageUrl: pet.photoUrl,
+                                fallbackText: pet.name,
+                              ),
+                              title: Text(pet.name),
+                              trailing:
+                                  pet.id == selectedPetId
+                                      ? const Icon(Icons.check)
+                                      : null,
+                              onTap: () {
+                                onChanged(pet.id);
+                                Navigator.of(context).pop();
+                              },
+                            ),
+                          )
+                          .toList(),
+                ),
+              ),
         );
       },
       child: Container(
@@ -1057,7 +1072,10 @@ class _PetPickerButton extends StatelessWidget {
             SizedBox(width: 4),
             Text(
               'Switch',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
         ),
