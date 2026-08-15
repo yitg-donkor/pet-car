@@ -1,10 +1,13 @@
+// screens/pet_selection_screens/pet_info.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pet_care/models/pet.dart';
-import 'package:pet_care/models/medical_record.dart';
-import 'package:pet_care/providers/firestore_providers.dart';
-
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:pet_care/models/pet.dart';
+import 'package:pet_care/models/reminder.dart';
+import 'package:pet_care/providers/firestore_providers.dart';
+import 'package:pet_care/screens/pet_selection_screens/medical_records.dart';
+import 'package:pet_care/theme/app_theme.dart';
 import 'package:pet_care/widgets/widgets.dart';
 
 class PetDetailsScreen extends ConsumerWidget {
@@ -17,971 +20,94 @@ class PetDetailsScreen extends ConsumerWidget {
     final Pet? displayPet = routePet ?? selectedPet;
 
     if (displayPet == null) {
-      print('No pet selected: routePet=$routePet, selectedPet=$selectedPet');
-      return Scaffold(
-        appBar: AppBar(title: const Text('Pet Details')),
-        body: const Center(child: Text('No pet selected')),
+      return const Scaffold(
+        body: Center(child: Text('No pet selected')),
       );
     }
 
+    final sky = SkyColors.of(context);
+
     return Scaffold(
+      backgroundColor: sky.pageBackground,
       body: CustomScrollView(
         slivers: [
-          _buildAppBar(context, displayPet, ref),
+          _HeroAppBar(pet: displayPet, ref: ref),
           SliverToBoxAdapter(
-            child: Column(
-              children: [
-                const SizedBox(height: 5),
-                _buildPetInfoCard(context, displayPet),
-                const SizedBox(height: 20),
-                _buildHealthStatsCard(context, displayPet),
-                const SizedBox(height: 20),
-                _buildRemindersSection(context, ref, displayPet),
-                const SizedBox(height: 20),
-                _buildQuickActionsCard(context, displayPet),
-                const SizedBox(height: 20),
-                _buildMedicalHistoryCard(context, ref, displayPet),
-                const SizedBox(height: 20),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAppBar(BuildContext context, Pet displayPet, WidgetRef ref) {
-    final theme = Theme.of(context);
-    return SliverAppBar(
-      expandedHeight: 300,
-
-      pinned: true,
-      leading: IconButton(
-        onPressed: () => Navigator.pop(context),
-        icon: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceVariant,
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 8),
-            ],
-          ),
-          child: Icon(Icons.arrow_back, color: theme.colorScheme.onSurface),
-        ),
-      ),
-      actions: [
-        IconButton(
-          onPressed: () {
-            print('Selected pet: ${displayPet.name}');
-            Navigator.pushNamed(context, '/edit-pet', arguments: displayPet);
-          },
-          icon: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceVariant,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 8),
-              ],
-            ),
-            child: Icon(Icons.edit, color: theme.colorScheme.onSurface),
-          ),
-        ),
-        IconButton(
-          onPressed: () => _showDeleteConfirmation(context, ref, displayPet),
-          icon: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceVariant,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 8),
-              ],
-            ),
-            child: const Icon(Icons.delete, color: Colors.red),
-          ),
-        ),
-      ],
-      flexibleSpace: FlexibleSpaceBar(
-        background: Stack(
-          fit: StackFit.expand,
-          children: [
-            displayPet.photoUrl != null && displayPet.photoUrl!.isNotEmpty
-                ? Image.network(
-                  displayPet.photoUrl!,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => _buildDefaultPetImage(),
-                )
-                : _buildDefaultPetImage(),
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Colors.transparent, Colors.black.withOpacity(0.7)],
-                ),
-              ),
-            ),
-            Positioned(
-              bottom: 20,
-              left: 20,
-              right: 20,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    displayPet.name,
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${displayPet.species} • ${displayPet.breed ?? "Mixed"} • ${displayPet.age ?? 0} ${displayPet.age == 1 ? "year" : "years"}',
-                    style: Theme.of(
-                      context,
-                    ).textTheme.labelSmall?.copyWith(color: Colors.white70),
-                  ),
+                  _BasicInfoRow(pet: displayPet),
+                  const SizedBox(height: 20),
+                  _RemindersSection(pet: displayPet),
+                  const SizedBox(height: 20),
+                  _MedicalRecordsGateway(pet: displayPet),
                 ],
               ),
             ),
-          ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ============================================
+// HERO APP BAR
+// ============================================
+
+class _HeroAppBar extends StatelessWidget {
+  const _HeroAppBar({required this.pet, required this.ref});
+
+  final Pet pet;
+  final WidgetRef ref;
+
+  @override
+  Widget build(BuildContext context) {
+    final sky = SkyColors.of(context);
+
+    return SliverAppBar(
+      expandedHeight: 300,
+      pinned: true,
+      backgroundColor: sky.header,
+      leading: _CircleIconButton(
+        icon: Icons.arrow_back,
+        onPressed: () => Navigator.pop(context),
+      ),
+      actions: [
+        _CircleIconButton(
+          icon: Icons.edit,
+          onPressed: () =>
+              Navigator.pushNamed(context, '/edit-pet', arguments: pet),
+        ),
+        const SizedBox(width: 8),
+        _CircleIconButton(
+          icon: Icons.delete_outline,
+          onPressed: () => _showDeleteConfirmation(context, ref, pet),
+        ),
+        const SizedBox(width: 8),
+      ],
+      flexibleSpace: FlexibleSpaceBar(
+        background: pet.photoUrl != null
+            ? Image.network(pet.photoUrl!, fit: BoxFit.cover)
+            : Container(
+                color: sky.header,
+                child: const Center(
+                  child: Icon(Icons.pets, size: 72, color: Colors.white70),
+                ),
+              ),
+        title: Text(
+          pet.name,
+          style: GoogleFonts.nunito(
+            color: Colors.white,
+            fontWeight: FontWeight.w900,
+            fontSize: 18,
+            shadows: const [Shadow(blurRadius: 8, color: Colors.black45)],
+          ),
         ),
       ),
     );
-  }
-
-  Widget _buildDefaultPetImage() {
-    return Container(
-      child: Image.asset(
-        'assets/images/images.jpg',
-        fit: BoxFit.cover,
-        color: Colors.white.withOpacity(0.7),
-        colorBlendMode: BlendMode.modulate,
-      ),
-    );
-  }
-
-  Widget _buildPetInfoCard(BuildContext context, Pet displayPet) {
-    final theme = Theme.of(context);
-    final age = displayPet.age ?? 0;
-    final birthDate =
-        displayPet.birthDate != null
-            ? DateFormat('MMM dd, yyyy').format(displayPet.birthDate!)
-            : 'Unknown';
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      // padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        //theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        //crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Text('Basic Information', style: theme.textTheme.headlineMedium),
-          //const SizedBox(height: 16),
-          Expanded(
-            child: SkyStatChip(
-              icon: Icons.cake,
-              value: birthDate,
-              label: 'Birth Date',
-              variant: SkyStatChipVariant.onSurface,
-            ),
-          ),
-          SizedBox(width: 12),
-          // _buildInfoRow('Birth Date', birthDate, theme),
-          // _buildInfoRow(
-          //   'Weight',
-          //   displayPet.weight != null ? '${displayPet.weight} kg' : 'Not set',
-          //   theme,
-          // ),
-          Expanded(
-            child: SkyStatChip(
-              icon: Icons.monitor_weight,
-              value:
-                  displayPet.weight != null
-                      ? '${displayPet.weight} kg'
-                      : 'Not set',
-              label: 'Weight',
-              variant: SkyStatChipVariant.onSurface,
-            ),
-          ),
-          SizedBox(width: 12),
-
-          // _buildInfoRow(
-          //   'Microchip',
-          //   displayPet.microchipId != null
-          //       ? '${displayPet.microchipId}'
-          //       : 'not set',
-          //   theme,
-          // ),
-          Expanded(
-            child: SkyStatChip(
-              icon: Icons.qr_code,
-              value:
-                  displayPet.microchipId != null
-                      ? '${displayPet.microchipId}'
-                      : 'not set',
-              label: 'Microchip',
-              variant: SkyStatChipVariant.onSurface,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(String label, String value, ThemeData theme) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 12, right: 12),
-
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Text(
-            value,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-          ),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHealthStatsCard(BuildContext context, Pet displayPet) {
-    final theme = Theme.of(context);
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            theme.colorScheme.primary,
-            theme.colorScheme.primaryContainer,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: theme.colorScheme.primary.withOpacity(0.3),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.favorite, color: Colors.white),
-              const SizedBox(width: 8),
-              Text(
-                'Health Status',
-                style: theme.textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(child: _buildStatBadge('Healthy', Icons.check_circle)),
-              const SizedBox(width: 12),
-              Expanded(child: _buildStatBadge('Active', Icons.flash_on)),
-              const SizedBox(width: 12),
-              Expanded(child: _buildStatBadge('Happy', Icons.mood)),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.local_hospital, color: Colors.white, size: 20),
-                const SizedBox(width: 8),
-                Text(
-                  'Next checkup: Not scheduled',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.9),
-                    fontSize: 14,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatBadge(String label, IconData icon) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: Colors.white, size: 24),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRemindersSection(
-    BuildContext context,
-    WidgetRef ref,
-    Pet displayPet,
-  ) {
-    final remindersAsync = ref.watch(allRemindersProvider);
-    final theme = Theme.of(context);
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.notifications_active,
-                    color: theme.colorScheme.tertiary,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Upcoming Reminders',
-                    style: theme.textTheme.headlineMedium,
-                  ),
-                ],
-              ),
-              TextButton(
-                onPressed:
-                    () => Navigator.pushNamed(
-                      context,
-                      '/reminders',
-                      arguments: displayPet,
-                    ),
-                child: const Text('View All'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          remindersAsync.when(
-            data: (reminders) {
-              final petReminders =
-                  reminders
-                      .where((r) => r.petId == displayPet.id)
-                      .take(3)
-                      .toList();
-
-              if (petReminders.isEmpty) {
-                return Container(
-                  padding: const EdgeInsets.all(20),
-                  child: Center(
-                    child: Column(
-                      children: [
-                        Icon(
-                          Icons.check_circle_outline,
-                          size: 48,
-                          color: theme.colorScheme.outlineVariant,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'No upcoming reminders',
-                          style: TextStyle(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }
-
-              return Column(
-                children:
-                    petReminders
-                        .map((r) => _buildReminderItem(r, theme))
-                        .toList(),
-              );
-            },
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, s) => Text('Error loading reminders: $e'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildReminderItem(reminder, ThemeData theme) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.primaryContainer,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.alarm, color: theme.colorScheme.primary, size: 20),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  reminder.title,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-                Text(
-                  DateFormat('MMM dd, h:mm a').format(reminder.reminderDate),
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildQuickActionsCard(BuildContext context, Pet displayPet) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(left: 4, bottom: 12),
-            child: Text(
-              'Quick Actions',
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-          ),
-          Row(
-            children: [
-              Expanded(
-                child: _buildActionCard(
-                  Theme.of(context),
-                  icon: Icons.add_alert,
-                  label: 'Add Reminder',
-                  color: Colors.blue,
-                  onTap:
-                      () => Navigator.pushNamed(
-                        context,
-                        '/reminders',
-                        arguments: displayPet,
-                      ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildActionCard(
-                  Theme.of(context),
-                  icon: Icons.medical_services,
-                  label: 'Add Record',
-                  color: Colors.red,
-                  onTap: () {
-                    Navigator.pushNamed(
-                      context,
-                      '/add-medical-record',
-                      arguments: displayPet,
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _buildActionCard(
-                  Theme.of(context),
-                  icon: Icons.edit,
-                  label: 'Edit Info',
-                  color: Colors.orange,
-                  onTap:
-                      () => Navigator.pushNamed(
-                        context,
-                        '/edit-pet',
-                        arguments: displayPet,
-                      ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildActionCard(
-                  Theme.of(context),
-                  icon: Icons.share,
-                  label: 'Share',
-                  color: Colors.purple,
-                  onTap: () {
-                    // Implement share functionality
-                  },
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActionCard(
-    ThemeData theme, {
-
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.primaryContainer,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withOpacity(0.3)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: color, size: 28),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMedicalHistoryCard(
-    BuildContext context,
-    WidgetRef ref,
-    Pet displayPet,
-  ) {
-    final theme = Theme.of(context);
-    final medicalRecordsAsync = ref.watch(
-      petMedicalRecordsProvider(displayPet.id),
-    );
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.history, color: theme.colorScheme.primary),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Medical History',
-                    style: theme.textTheme.headlineMedium,
-                  ),
-                ],
-              ),
-              TextButton.icon(
-                onPressed: () {
-                  Navigator.pushNamed(
-                    context,
-                    '/add-medical-record',
-                    arguments: displayPet,
-                  );
-                },
-                icon: const Icon(Icons.add),
-                label: const Text('Add'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          medicalRecordsAsync.when(
-            data: (records) {
-              if (records.isEmpty) {
-                return Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Center(
-                    child: Column(
-                      children: [
-                        Icon(
-                          Icons.medical_information,
-                          size: 48,
-                          color: theme.colorScheme.outlineVariant,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'No medical records yet',
-                          style: TextStyle(
-                            color: theme.colorScheme.onSurfaceVariant,
-                            fontSize: 14,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        ElevatedButton.icon(
-                          onPressed: () {
-                            Navigator.pushNamed(
-                              context,
-                              '/add-medical-record',
-                              arguments: displayPet,
-                            );
-                          },
-                          icon: const Icon(Icons.add),
-                          label: const Text('Add First Record'),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }
-
-              // Sort records by date (newest first)
-              final sortedRecords = List<MedicalRecord>.from(records)
-                ..sort((a, b) => b.date.compareTo(a.date));
-
-              return ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: sortedRecords.length,
-                itemBuilder: (context, index) {
-                  return _buildMedicalRecordItem(
-                    sortedRecords[index],
-                    theme,
-                    index == 0,
-                  );
-                },
-              );
-            },
-            loading:
-                () => Container(
-                  padding: const EdgeInsets.all(20),
-                  child: const Center(child: CircularProgressIndicator()),
-                ),
-            error:
-                (error, stack) => Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.errorContainer,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Center(
-                    child: Text(
-                      'Error loading records: $error',
-                      style: TextStyle(
-                        color: theme.colorScheme.onErrorContainer,
-                      ),
-                    ),
-                  ),
-                ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMedicalRecordItem(
-    MedicalRecord record,
-    ThemeData theme,
-    bool isLatest,
-  ) {
-    final recordTypeIcon = _getRecordTypeIcon(record.recordType);
-    final recordTypeColor = _getRecordTypeColor(record.recordType);
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color:
-            isLatest
-                ? recordTypeColor.withOpacity(0.1)
-                : theme.colorScheme.surfaceVariant.withOpacity(0.3),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color:
-              isLatest ? recordTypeColor.withOpacity(0.5) : Colors.transparent,
-          width: 1.5,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: recordTypeColor.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(recordTypeIcon, color: recordTypeColor, size: 24),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      record.title,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    Text(
-                      _formatRecordType(record.recordType),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: recordTypeColor,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (isLatest)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: recordTypeColor,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: const Text(
-                    'Latest',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          if (record.description != null && record.description!.isNotEmpty) ...[
-            Text(
-              record.description!,
-              style: TextStyle(
-                fontSize: 13,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 12),
-          ],
-          Row(
-            children: [
-              Expanded(
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.calendar_today,
-                      size: 16,
-                      color: recordTypeColor,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      DateFormat('MMM dd, yyyy').format(record.date),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (record.veterinarian != null &&
-                  record.veterinarian!.isNotEmpty)
-                Expanded(
-                  child: Row(
-                    children: [
-                      Icon(Icons.person, size: 16, color: recordTypeColor),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          record.veterinarian!,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              if (record.cost != null && record.cost! > 0)
-                Text(
-                  'GHS ${record.cost!.toStringAsFixed(2)}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: recordTypeColor,
-                  ),
-                ),
-            ],
-          ),
-          if (record.nextDueDate != null) ...[
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.alarm_on, size: 14, color: Colors.orange),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Due: ${DateFormat('MMM dd').format(record.nextDueDate!)}',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.orange,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  IconData _getRecordTypeIcon(String type) {
-    switch (type.toLowerCase()) {
-      case 'vaccination':
-        return Icons.shield_outlined;
-      case 'checkup':
-        return Icons.local_hospital;
-      case 'surgery':
-        return Icons.medical_services;
-      case 'prescription':
-        return Icons.medication;
-      case 'dental':
-        return Icons.medical_services_outlined;
-      case 'lab':
-        return Icons.science;
-      default:
-        return Icons.medical_information;
-    }
-  }
-
-  Color _getRecordTypeColor(String type) {
-    switch (type.toLowerCase()) {
-      case 'vaccination':
-        return Colors.blue;
-      case 'checkup':
-        return Colors.green;
-      case 'surgery':
-        return Colors.red;
-      case 'prescription':
-        return Colors.orange;
-      case 'dental':
-        return Colors.purple;
-      case 'lab':
-        return Colors.indigo;
-      default:
-        return Colors.grey;
-    }
-  }
-
-  String _formatRecordType(String type) {
-    return type.replaceFirst(type[0], type[0].toUpperCase());
   }
 
   void _showDeleteConfirmation(
@@ -991,60 +117,303 @@ class PetDetailsScreen extends ConsumerWidget {
   ) {
     showDialog(
       context: context,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Delete Pet'),
+        content: Text(
+          'Are you sure you want to delete ${displayPet.name}? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
           ),
-          title: const Text('Delete Pet'),
-          content: Text(
-            'Are you sure you want to delete ${displayPet.name}? This action cannot be undone.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                try {
-                  // Delete pet using the notifier
-                  await ref
-                      .read(petsControllerProvider.notifier)
-                      .deletePet(displayPet.id);
-
-                  // Clear selection
-                  ref.read(selectedPetProvider.notifier).clearSelection();
-
-                  Navigator.pop(dialogContext);
-                  Navigator.pop(context);
-
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('${displayPet.name} has been deleted'),
-                    ),
-                  );
-                } catch (e) {
-                  Navigator.pop(dialogContext);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Failed to delete pet: $e'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
+          ElevatedButton(
+            onPressed: () async {
+              try {
+                await ref
+                    .read(petsControllerProvider.notifier)
+                    .deletePet(displayPet.id);
+                ref.read(selectedPetProvider.notifier).clearSelection();
+                Navigator.pop(dialogContext);
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('${displayPet.name} has been deleted')),
+                );
+              } catch (e) {
+                Navigator.pop(dialogContext);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Failed to delete pet: $e'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
               ),
-              child: const Text('Delete'),
             ),
-          ],
-        );
-      },
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CircleIconButton extends StatelessWidget {
+  const _CircleIconButton({required this.icon, required this.onPressed});
+
+  final IconData icon;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      onPressed: onPressed,
+      icon: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: const BoxDecoration(
+          color: Colors.black26,
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, color: Colors.white, size: 20),
+      ),
+    );
+  }
+}
+
+// ============================================
+// BASIC INFO
+// ============================================
+
+class _BasicInfoRow extends StatelessWidget {
+  const _BasicInfoRow({required this.pet});
+
+  final Pet pet;
+
+  @override
+  Widget build(BuildContext context) {
+    final birthDate = pet.birthDate != null
+        ? DateFormat('MMM dd, yyyy').format(pet.birthDate!)
+        : 'Unknown';
+
+    return Row(
+      children: [
+        Expanded(
+          child: SkyStatChip(
+            icon: Icons.cake,
+            value: birthDate,
+            label: 'Birth Date',
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: SkyStatChip(
+            icon: Icons.monitor_weight,
+            value: pet.weight != null ? '${pet.weight} kg' : 'Not set',
+            label: 'Weight',
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: SkyStatChip(
+            icon: Icons.qr_code,
+            value: pet.microchipId ?? 'Not set',
+            label: 'Microchip',
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ============================================
+// REMINDERS
+// ============================================
+
+class _RemindersSection extends ConsumerWidget {
+  const _RemindersSection({required this.pet});
+
+  final Pet pet;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sky = SkyColors.of(context);
+    final remindersAsync = ref.watch(allRemindersProvider);
+
+    return SkyCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SkySectionHeader(
+            label: 'Upcoming Reminders',
+            actionLabel: 'View All',
+            onAction: () => _goToCareTab(context, ref),
+          ),
+          const SizedBox(height: 12),
+          remindersAsync.when(
+            data: (reminders) {
+              final petReminders = reminders
+                  .where((r) => r.petId == pet.id)
+                  .take(3)
+                  .toList();
+
+              if (petReminders.isEmpty) {
+                return const SkyEmptyState(
+                  icon: Icons.check_circle_outline,
+                  title: 'No upcoming reminders',
+                  iconColor: SkyColors.success,
+                );
+              }
+
+              return Column(
+                children: petReminders
+                    .map((r) => _ReminderRow(reminder: r))
+                    .toList(),
+              );
+            },
+            loading: () => const Padding(
+              padding: EdgeInsets.symmetric(vertical: 20),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+            error: (e, _) => Text(
+              'Error loading reminders: $e',
+              style: TextStyle(color: sky.textSecondary),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Pops back to the root MainNavigation shell and switches to the Care
+/// (Reminders) tab, rather than pushing a second nested MainNavigation on
+/// top of this screen.
+void _goToCareTab(BuildContext context, WidgetRef ref) {
+  ref.read(currentTabIndexProvider.notifier).state = 2;
+  Navigator.of(context).popUntil((route) => route.isFirst);
+}
+
+class _ReminderRow extends StatelessWidget {
+  const _ReminderRow({required this.reminder});
+
+  final Reminder reminder;
+
+  @override
+  Widget build(BuildContext context) {
+    final sky = SkyColors.of(context);
+    final isDue =
+        !reminder.isCompleted && reminder.reminderDate.isBefore(DateTime.now());
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDue ? sky.dueSoft : sky.pageBackground,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.alarm,
+            color: isDue ? SkyColors.due : sky.textSecondary,
+            size: 20,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  reminder.title,
+                  style: GoogleFonts.dmSans(
+                    fontWeight: FontWeight.w600,
+                    color: sky.textPrimary,
+                  ),
+                ),
+                Text(
+                  DateFormat('MMM dd, h:mm a').format(reminder.reminderDate),
+                  style: GoogleFonts.dmSans(
+                    fontSize: 12,
+                    color: sky.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (isDue) const StatusPill(label: 'DUE', tone: SkyPillTone.due, filled: true),
+        ],
+      ),
+    );
+  }
+}
+
+// ============================================
+// MEDICAL RECORDS GATEWAY
+// ============================================
+
+/// Entry point into this pet's full medical history, pre-scoped so the
+/// destination screen opens already showing this pet's records.
+class _MedicalRecordsGateway extends ConsumerWidget {
+  const _MedicalRecordsGateway({required this.pet});
+
+  final Pet pet;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sky = SkyColors.of(context);
+    final recordsAsync = ref.watch(petMedicalRecordsProvider(pet.id));
+    final count = recordsAsync.valueOrNull?.length ?? 0;
+
+    return SkyCard(
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => MedicalRecordsScreen(initialPetId: pet.id),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: sky.header,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Icon(Icons.folder_shared, color: Colors.white),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Medical Records',
+                  style: GoogleFonts.dmSans(
+                    fontWeight: FontWeight.w700,
+                    color: sky.textPrimary,
+                  ),
+                ),
+                Text(
+                  count == 0
+                      ? 'No records yet - tap to add one'
+                      : '$count record${count == 1 ? '' : 's'} on file',
+                  style: GoogleFonts.dmSans(
+                    fontSize: 12,
+                    color: sky.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Icon(Icons.chevron_right, color: sky.textSecondary),
+        ],
+      ),
     );
   }
 }
