@@ -49,6 +49,7 @@ class _MainNavigationState extends ConsumerState<MainNavigation> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(currentTabIndexProvider.notifier).state = widget.initialIndex;
+      ref.read(remindersControllerProvider.notifier).resetOverdueRecurringReminders();
     });
   }
 

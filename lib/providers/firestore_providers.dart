@@ -203,6 +203,102 @@ class RemindersController extends _$RemindersController {
 
   Future<void> deleteReminder(String reminderId) =>
       ref.read(reminderRepositoryProvider).delete(reminderId);
+
+  /// Rolls forward any daily/weekly/monthly reminder whose period has fully
+  /// elapsed - to today (daily), the current week (weekly), or the current
+  /// month (monthly) - and clears `isCompleted` regardless of whether it
+  /// was checked off before. A one-off ('once') reminder is never touched.
+  ///
+  /// Idempotent by design: each reminder is compared against "now" fresh
+  /// every call, so running this multiple times in the same period (e.g.
+  /// reopening the app several times in one day) never advances a reminder
+  /// more than once or causes it to drift past where it should be - that's
+  /// what keeps daily/weekly/monthly resets from overlapping each other or
+  /// stacking incorrectly.
+  Future<void> resetOverdueRecurringReminders() async {
+    final user = ref.read(currentUserProvider);
+    if (user == null) return;
+
+    final repo = ref.read(reminderRepositoryProvider);
+    final reminders = await repo.fetch(
+      (q) => q.where('ownerId', isEqualTo: user.uid),
+    );
+    final now = DateTime.now();
+
+    for (final reminder in reminders) {
+      if (reminder.id == null) continue;
+      final updated = _nextOccurrenceIfElapsed(reminder, now);
+      if (updated != null) {
+        await repo.set(reminder.id!, updated);
+      }
+    }
+  }
+}
+
+DateTime _startOfDay(DateTime d) => DateTime(d.year, d.month, d.day);
+
+DateTime _startOfWeek(DateTime d) {
+  final day = _startOfDay(d);
+  return day.subtract(Duration(days: day.weekday - 1)); // Monday start
+}
+
+DateTime _startOfMonth(DateTime d) => DateTime(d.year, d.month, 1);
+
+/// Returns an updated copy of [reminder] if its recurrence period has fully
+/// elapsed relative to [now], or null if it's still current (or 'once',
+/// which never auto-resets).
+Reminder? _nextOccurrenceIfElapsed(Reminder reminder, DateTime now) {
+  switch (reminder.reminderType) {
+    case 'daily':
+      if (_startOfDay(reminder.reminderDate).isBefore(_startOfDay(now))) {
+        final newDate = DateTime(
+          now.year,
+          now.month,
+          now.day,
+          reminder.reminderDate.hour,
+          reminder.reminderDate.minute,
+        );
+        return reminder.copyWith(reminderDate: newDate, isCompleted: false);
+      }
+      return null;
+
+    case 'weekly':
+      if (_startOfWeek(reminder.reminderDate).isBefore(_startOfWeek(now))) {
+        var newDate = reminder.reminderDate;
+        while (_startOfWeek(newDate).isBefore(_startOfWeek(now))) {
+          newDate = newDate.add(const Duration(days: 7));
+        }
+        return reminder.copyWith(reminderDate: newDate, isCompleted: false);
+      }
+      return null;
+
+    case 'monthly':
+      if (_startOfMonth(reminder.reminderDate).isBefore(_startOfMonth(now))) {
+        var newDate = reminder.reminderDate;
+        while (_startOfMonth(newDate).isBefore(_startOfMonth(now))) {
+          final nextMonth = newDate.month == 12 ? 1 : newDate.month + 1;
+          final nextYear =
+              newDate.month == 12 ? newDate.year + 1 : newDate.year;
+          // Clamp the day so e.g. Jan 31 -> Feb doesn't overflow into March.
+          final daysInNextMonth = DateTime(nextYear, nextMonth + 1, 0).day;
+          final day = newDate.day > daysInNextMonth
+              ? daysInNextMonth
+              : newDate.day;
+          newDate = DateTime(
+            nextYear,
+            nextMonth,
+            day,
+            newDate.hour,
+            newDate.minute,
+          );
+        }
+        return reminder.copyWith(reminderDate: newDate, isCompleted: false);
+      }
+      return null;
+
+    default:
+      return null;
+  }
 }
 
 // ============================================

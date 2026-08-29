@@ -20,9 +20,7 @@ class PetDetailsScreen extends ConsumerWidget {
     final Pet? displayPet = routePet ?? selectedPet;
 
     if (displayPet == null) {
-      return const Scaffold(
-        body: Center(child: Text('No pet selected')),
-      );
+      return const Scaffold(body: Center(child: Text('No pet selected')));
     }
 
     final sky = SkyColors.of(context);
@@ -78,8 +76,8 @@ class _HeroAppBar extends StatelessWidget {
       actions: [
         _CircleIconButton(
           icon: Icons.edit,
-          onPressed: () =>
-              Navigator.pushNamed(context, '/edit-pet', arguments: pet),
+          onPressed:
+              () => Navigator.pushNamed(context, '/edit-pet', arguments: pet),
         ),
         const SizedBox(width: 8),
         _CircleIconButton(
@@ -89,14 +87,15 @@ class _HeroAppBar extends StatelessWidget {
         const SizedBox(width: 8),
       ],
       flexibleSpace: FlexibleSpaceBar(
-        background: pet.photoUrl != null
-            ? Image.network(pet.photoUrl!, fit: BoxFit.cover)
-            : Container(
-                color: sky.header,
-                child: const Center(
-                  child: Icon(Icons.pets, size: 72, color: Colors.white70),
+        background:
+            pet.photoUrl != null
+                ? Image.network(pet.photoUrl!, fit: BoxFit.cover)
+                : Container(
+                  color: sky.header,
+                  child: const Center(
+                    child: Icon(Icons.pets, size: 72, color: Colors.white70),
+                  ),
                 ),
-              ),
         title: Text(
           pet.name,
           style: GoogleFonts.nunito(
@@ -117,49 +116,54 @@ class _HeroAppBar extends StatelessWidget {
   ) {
     showDialog(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Delete Pet'),
-        content: Text(
-          'Are you sure you want to delete ${displayPet.name}? This action cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              try {
-                await ref
-                    .read(petsControllerProvider.notifier)
-                    .deletePet(displayPet.id);
-                ref.read(selectedPetProvider.notifier).clearSelection();
-                Navigator.pop(dialogContext);
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('${displayPet.name} has been deleted')),
-                );
-              } catch (e) {
-                Navigator.pop(dialogContext);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Failed to delete pet: $e'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
+      builder:
+          (dialogContext) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
             ),
-            child: const Text('Delete'),
+            title: const Text('Delete Pet'),
+            content: Text(
+              'Are you sure you want to delete ${displayPet.name}? This action cannot be undone.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  try {
+                    await ref
+                        .read(petsControllerProvider.notifier)
+                        .deletePet(displayPet.id);
+                    ref.read(selectedPetProvider.notifier).clearSelection();
+                    Navigator.pop(dialogContext);
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('${displayPet.name} has been deleted'),
+                      ),
+                    );
+                  } catch (e) {
+                    Navigator.pop(dialogContext);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Failed to delete pet: $e'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                child: const Text('Delete'),
+              ),
+            ],
           ),
-        ],
-      ),
     );
   }
 }
@@ -197,9 +201,10 @@ class _BasicInfoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final birthDate = pet.birthDate != null
-        ? DateFormat('MMM dd, yyyy').format(pet.birthDate!)
-        : 'Unknown';
+    final birthDate =
+        pet.birthDate != null
+            ? DateFormat('MMM dd, yyyy').format(pet.birthDate!)
+            : 'Unknown';
 
     return Row(
       children: [
@@ -257,12 +262,18 @@ class _RemindersSection extends ConsumerWidget {
           const SizedBox(height: 12),
           remindersAsync.when(
             data: (reminders) {
-              final petReminders = reminders
-                  .where((r) => r.petId == pet.id)
-                  .take(3)
-                  .toList();
+              final now = DateTime.now();
+              final petReminders =
+                  reminders
+                      .where(
+                        (r) =>
+                            r.petId == pet.id && !r.reminderDate.isBefore(now),
+                      )
+                      .toList()
+                    ..sort((a, b) => a.reminderDate.compareTo(b.reminderDate));
+              final upcoming = petReminders.take(3).toList();
 
-              if (petReminders.isEmpty) {
+              if (upcoming.isEmpty) {
                 return const SkyEmptyState(
                   icon: Icons.check_circle_outline,
                   title: 'No upcoming reminders',
@@ -271,19 +282,20 @@ class _RemindersSection extends ConsumerWidget {
               }
 
               return Column(
-                children: petReminders
-                    .map((r) => _ReminderRow(reminder: r))
-                    .toList(),
+                children:
+                    upcoming.map((r) => _ReminderRow(reminder: r)).toList(),
               );
             },
-            loading: () => const Padding(
-              padding: EdgeInsets.symmetric(vertical: 20),
-              child: Center(child: CircularProgressIndicator()),
-            ),
-            error: (e, _) => Text(
-              'Error loading reminders: $e',
-              style: TextStyle(color: sky.textSecondary),
-            ),
+            loading:
+                () => const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 20),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+            error:
+                (e, _) => Text(
+                  'Error loading reminders: $e',
+                  style: TextStyle(color: sky.textSecondary),
+                ),
           ),
         ],
       ),
@@ -346,7 +358,8 @@ class _ReminderRow extends StatelessWidget {
               ],
             ),
           ),
-          if (isDue) const StatusPill(label: 'DUE', tone: SkyPillTone.due, filled: true),
+          if (isDue)
+            const StatusPill(label: 'DUE', tone: SkyPillTone.due, filled: true),
         ],
       ),
     );
@@ -371,11 +384,12 @@ class _MedicalRecordsGateway extends ConsumerWidget {
     final count = recordsAsync.valueOrNull?.length ?? 0;
 
     return SkyCard(
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => MedicalRecordsScreen(initialPetId: pet.id),
-        ),
-      ),
+      onTap:
+          () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => MedicalRecordsScreen(initialPetId: pet.id),
+            ),
+          ),
       child: Row(
         children: [
           Container(
